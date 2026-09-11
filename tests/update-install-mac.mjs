@@ -17,7 +17,9 @@ const installed = join(work, 'installed/Local DB Viewer.app');
 const replacement = join(work, 'replacement/Local DB Viewer.app');
 const dataDirectory = join(work, 'user-data');
 const marker = join(work, 'restarted.json');
-const version = '0.2.1';
+const sourceVersion = JSON.parse(asar.extractFile(join(original, 'Contents/Resources/app.asar'), 'package.json').toString('utf8')).version;
+const [major, minor, patch] = sourceVersion.split('.').map(Number);
+const version = `${major}.${minor}.${patch + 1}`;
 await cp(original, installed, { recursive: true, verbatimSymlinks: true });
 await cp(original, replacement, { recursive: true, verbatimSymlinks: true });
 const unpacked = join(work, 'asar');
@@ -90,6 +92,6 @@ try {
   expect(result.profiles.map(profile => profile.name)).toContain('Kept connection');
   expect(result.tabs.some(tab => tab.sql.includes('SELECT 42 AS kept_sql'))).toBe(true);
   expect((await readdir(join(work, 'installed'))).some(name => name.startsWith('.Local-DB-Viewer-backup-'))).toBe(true);
-  await writeFile(join(artifacts, 'update-install-results.json'), JSON.stringify({ passed: true, from: pkg.version === version ? '0.2.0' : pkg.version, to: version, retainedProfile: true, retainedSQL: true, backup: true, testedAt: new Date().toISOString() }, null, 2));
-  console.log('PASS: click → replace application → restart 0.2.1 → connection and SQL restored; previous app retained');
+  await writeFile(join(artifacts, 'update-install-results.json'), JSON.stringify({ passed: true, from: sourceVersion, to: version, retainedProfile: true, retainedSQL: true, backup: true, testedAt: new Date().toISOString() }, null, 2));
+  console.log(`PASS: click → replace application → restart ${version} → connection and SQL restored; previous app retained`);
 } finally { if (!quit) await app.close().catch(() => {}); }
