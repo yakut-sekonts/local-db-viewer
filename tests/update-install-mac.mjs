@@ -79,7 +79,9 @@ try {
     };
     await security(['unlock-keychain', '-p', keychainPassword, keychain]);
     await security(['set-keychain-settings', '-lut', '3600', keychain]);
-    await security(['list-keychains', '-d', 'user', '-s', keychain, ...oldSearch]);
+    // A preceding desktop test has an identically named item in the login
+    // keychain. Exclude that keychain for this isolated, disposable CI test.
+    await security(['list-keychains', '-d', 'user', '-s', keychain]);
     await security(['default-keychain', '-d', 'user', '-s', keychain]);
     const executables = [installed, replacement].map(bundle => join(bundle, 'Contents/MacOS/Local DB Viewer'));
     const hashes = [];
@@ -132,6 +134,12 @@ try {
   console.log(`PASS: click → replace application → restart ${version} → connection and SQL restored; previous app retained`);
 } catch (error) {
   const diagnostics = { error: error.message, progress: await readFile(progressPath, 'utf8').catch(() => 'not started'), logs: [] };
+  if (process.env.GITHUB_ACTIONS === 'true') {
+    const progress = JSON.parse(await readFile(progressPath, 'utf8').catch(() => '{}'));
+    if (progress.pid) await execute('/usr/bin/sample', [String(progress.pid), '1', '-file', join(artifacts, 'update-process-sample.txt')], { timeout: 10000 }).catch(() => {});
+    await execute('/usr/sbin/screencapture', ['-x', join(artifacts, 'update-install-failure.png')], { timeout: 10000 }).catch(() => {});
+    diagnostics.keychain = (await execute('/usr/bin/security', ['find-generic-password', '-a', 'Local DB Viewer', '-s', 'Local DB Viewer Safe Storage', join(work, 'update-fixture.keychain-db')]).catch(error => ({ stdout: error.message }))).stdout;
+  }
   for (const folder of await readdir(join(dataDirectory, 'updates')).catch(() => [])) {
     const log = await readFile(join(dataDirectory, 'updates', folder, 'install.log'), 'utf8').catch(() => '');
     if (log) diagnostics.logs.push(log);

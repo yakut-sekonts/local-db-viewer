@@ -80,6 +80,7 @@ jobs:
             test-artifacts/*.json
             test-artifacts/*.png
             test-artifacts/*.csv
+            test-artifacts/*.txt
           retention-days: 7
 
   publish:
