@@ -49,6 +49,7 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - name: Test packaged desktop
+        timeout-minutes: 8
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then

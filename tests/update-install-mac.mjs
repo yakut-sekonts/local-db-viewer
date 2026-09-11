@@ -90,8 +90,12 @@ try {
       const hash = /^CDHash=([a-f0-9]+)$/m.exec(stderr)?.[1]; if (!hash) throw new Error('Missing test binary CDHash');
       hashes.push(`cdhash:${hash}`);
     }
-    await security(['add-generic-password', '-a', 'Local DB Viewer', '-s', 'Local DB Viewer Safe Storage', '-w', randomBytes(24).toString('base64'), ...executables.flatMap(path => ['-T', path]), keychain]);
-    await security(['set-generic-password-partition-list', '-a', 'Local DB Viewer', '-s', 'Local DB Viewer Safe Storage', '-S', hashes.join(','), '-k', keychainPassword, keychain]);
+    // Electron's non-MAS account has the ' Key' suffix. An unsuffixed item
+    // is migrated (and its prepared ACL discarded) during the first launch.
+    // See patches/chromium/feat_ensure_mas_builds_of_the_same_application_can_use_safestorage.patch.
+    await security(['add-generic-password', '-a', 'Local DB Viewer Key', '-s', 'Local DB Viewer Safe Storage', '-w', randomBytes(24).toString('base64'), ...executables.flatMap(path => ['-T', path]), keychain]);
+    await security(['set-generic-password-partition-list', '-a', 'Local DB Viewer Key', '-s', 'Local DB Viewer Safe Storage', '-S', hashes.join(','), '-k', keychainPassword, keychain]);
+    await security(['find-generic-password', '-a', 'Local DB Viewer Key', '-s', 'Local DB Viewer Safe Storage', keychain]);
     console.log('Prepared isolated CI Keychain for the two signed update fixtures');
   }
   app = await electron.launch({ executablePath: join(installed, 'Contents/MacOS/Local DB Viewer'), args: [], env: { ...process.env, LOCAL_DB_VIEWER_DATA_DIR: dataDirectory } });
@@ -138,7 +142,7 @@ try {
     const progress = JSON.parse(await readFile(progressPath, 'utf8').catch(() => '{}'));
     if (progress.pid) await execute('/usr/bin/sample', [String(progress.pid), '1', '-file', join(artifacts, 'update-process-sample.txt')], { timeout: 10000 }).catch(() => {});
     await execute('/usr/sbin/screencapture', ['-x', join(artifacts, 'update-install-failure.png')], { timeout: 10000 }).catch(() => {});
-    diagnostics.keychain = (await execute('/usr/bin/security', ['find-generic-password', '-a', 'Local DB Viewer', '-s', 'Local DB Viewer Safe Storage', join(work, 'update-fixture.keychain-db')]).catch(error => ({ stdout: error.message }))).stdout;
+    diagnostics.keychain = (await execute('/usr/bin/security', ['find-generic-password', '-a', 'Local DB Viewer Key', '-s', 'Local DB Viewer Safe Storage', join(work, 'update-fixture.keychain-db')]).catch(error => ({ stdout: error.message }))).stdout;
   }
   for (const folder of await readdir(join(dataDirectory, 'updates')).catch(() => [])) {
     const log = await readFile(join(dataDirectory, 'updates', folder, 'install.log'), 'utf8').catch(() => '');
