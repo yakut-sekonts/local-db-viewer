@@ -53,10 +53,15 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then
             export LOCAL_DB_VIEWER_EXECUTABLE="$GITHUB_WORKSPACE/release/mac-arm64/Local DB Viewer.app/Contents/MacOS/Local DB Viewer"
+            export LOCAL_DB_VIEWER_RESOURCES="$GITHUB_WORKSPACE/release/mac-arm64/Local DB Viewer.app/Contents/Resources"
+            node tests/jdbc-runtime.mjs
+            npm run test:ui
+            node tests/update-install-mac.mjs
           else
-            export LOCAL_DB_VIEWER_EXECUTABLE="$GITHUB_WORKSPACE/release/win-unpacked/Local DB Viewer.exe"
+            export LOCAL_DB_VIEWER_RESOURCES="$GITHUB_WORKSPACE/release/win-unpacked/resources"
+            node tests/jdbc-runtime.mjs
+            node tests/windows-install.mjs
           fi
-          npm run test:ui
       - uses: actions/upload-artifact@v7
         with:
           name: installers-${{ matrix.platform }}
@@ -71,7 +76,10 @@ jobs:
         if: always()
         with:
           name: verification-${{ matrix.platform }}
-          path: test-artifacts/
+          path: |
+            test-artifacts/*.json
+            test-artifacts/*.png
+            test-artifacts/*.csv
           retention-days: 7
 
   publish:

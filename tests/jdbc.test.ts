@@ -6,6 +6,18 @@ import { join } from 'node:path';
 import { jdbcConfig, validateJdbc } from '../electron/jdbc-config';
 import { ProfileStore } from '../electron/storage';
 import type { ProfileDraft } from '../src/shared';
+import { transactionAction } from '../electron/sql';
+
+test('transaction tracking handles comments, savepoints and chained transactions', () => {
+  assert.equal(transactionAction('-- ignored\n/* outer /* nested */ */ BEGIN'), 'begin');
+  assert.equal(transactionAction('START /* options */ TRANSACTION READ ONLY'), 'begin');
+  assert.equal(transactionAction('BEGIN IMMEDIATE'), 'begin');
+  assert.equal(transactionAction('SAVEPOINT kept'), 'begin');
+  assert.equal(transactionAction('ROLLBACK WORK TO SAVEPOINT kept'), '');
+  assert.equal(transactionAction('COMMIT /* keep session */ AND CHAIN'), 'commit-chain');
+  assert.equal(transactionAction('ROLLBACK AND NO CHAIN'), 'rollback');
+  assert.equal(transactionAction("SELECT 'COMMIT'"), '');
+});
 
 const draft: ProfileDraft = { name: 'JDBC test', engine: 'trino', endpoint: 'https://example.test:8443', user: 'tester', auth: 'none', tls: true, catalog: 'iceberg', schema: 'analytics' };
 test('Trino SSL and literal JDBC parameters reach the driver without a whitelist', () => {
@@ -19,6 +31,7 @@ test('Trino SSL and literal JDBC parameters reach the driver without a whitelist
   assert.equal(override.properties.SSL, undefined);
   assert.throws(() => validateJdbc({ url: 'jdbc:trino://example.test:8443?accessToken=secret' }));
   assert.throws(() => validateJdbc({ classpath: ['relative.jar'] }));
+  assert.equal(jdbcConfig({ ...draft, engine: 'clickhouse', sslVerification: 'CA', jdbc: {} }).properties.ssl_mode, 'VERIFY_CA');
 });
 test('JDBC secrets and environment are encrypted, masked and preserved across settings edits', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'local-db-viewer-jdbc-'));

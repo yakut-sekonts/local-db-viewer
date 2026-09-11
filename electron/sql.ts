@@ -1,5 +1,30 @@
 import type { DatabaseEngine, MetadataInput } from '../src/shared';
 
+// Read command words only; comments do not change transaction semantics and a
+// savepoint rollback does not end the surrounding transaction.
+export function transactionAction(sql: string): string {
+  const words: string[] = [];
+  let i = 0;
+  while (i < sql.length && words.length < 6) {
+    if (/\s/.test(sql[i])) { i++; continue; }
+    if (sql.startsWith('--', i)) { const end = sql.indexOf('\n', i); i = end < 0 ? sql.length : end + 1; continue; }
+    if (sql.startsWith('/*', i)) {
+      let depth = 1; i += 2;
+      while (i < sql.length && depth) { if (sql.startsWith('/*', i)) { depth++; i += 2; } else if (sql.startsWith('*/', i)) { depth--; i += 2; } else i++; }
+      continue;
+    }
+    const word = /^[A-Za-z_]+/.exec(sql.slice(i))?.[0];
+    if (!word) break;
+    words.push(word.toUpperCase()); i += word.length;
+  }
+  const command = words.join(' ');
+  if (words[0] === 'BEGIN' || words[0] === 'SAVEPOINT') return 'begin';
+  if (words[0] === 'START' && words[1] === 'TRANSACTION') return 'begin';
+  if (/^ROLLBACK(?: (?:WORK|TRANSACTION))? TO\b/.test(command)) return '';
+  const action = ['COMMIT', 'END'].includes(words[0]) ? 'commit' : ['ROLLBACK', 'ABORT'].includes(words[0]) ? 'rollback' : '';
+  return action && /\bAND CHAIN\b/.test(command) ? `${action}-chain` : action;
+}
+
 export function identifier(value: string, engine: DatabaseEngine): string {
   if (engine === 'mysql' || engine === 'mariadb' || engine === 'clickhouse') return '`' + value.replaceAll('`', '``') + '`';
   if (engine === 'mssql') return '[' + value.replaceAll(']', ']]') + ']';

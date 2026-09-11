@@ -153,7 +153,7 @@ public final class LocalDBViewerBridge {
             if (!catalog.isEmpty() && !Objects.equals(active.getCatalog(), catalog)) active.setCatalog(catalog);
             if (!schema.isEmpty() && !Objects.equals(active.getSchema(), schema)) active.setSchema(schema);
             String sql = request.get("sql").getAsString();
-            String command = sql.stripLeading().toUpperCase(Locale.ROOT);
+            String command = string(request, "transactionAction", "");
             try (Statement statement = active.createStatement()) {
                 runningStatement = statement;
                 int timeout = number(options(), "queryTimeoutSeconds", 0);
@@ -161,12 +161,11 @@ public final class LocalDBViewerBridge {
                 if (CANCELED.get()) throw new CancellationException("Query canceled");
                 boolean hasResult;
                 if (!active.getAutoCommit()) explicitTransaction = true;
-                if (!active.getAutoCommit() && command.matches("COMMIT\\s*;?")) { active.commit(); hasResult = false; }
-                else if (!active.getAutoCommit() && command.matches("ROLLBACK\\s*;?")) { active.rollback(); hasResult = false; }
+                if (!active.getAutoCommit() && command.startsWith("commit")) { active.commit(); hasResult = false; }
+                else if (!active.getAutoCommit() && command.startsWith("rollback")) { active.rollback(); hasResult = false; }
                 else hasResult = statement.execute(sql);
-                if (command.matches("(?:BEGIN|START\\s+TRANSACTION)\\b[\\s\\S]*")) explicitTransaction = true;
-                if (command.matches("(?:COMMIT|ROLLBACK)\\b[\\s\\S]*")) explicitTransaction = false;
-                if (!active.getAutoCommit()) explicitTransaction = !command.matches("(?:COMMIT|ROLLBACK)\\s*;?");
+                if (command.equals("begin") || command.endsWith("-chain")) explicitTransaction = true;
+                if (command.equals("commit") || command.equals("rollback")) explicitTransaction = false;
                 if (hasResult) {
                     try (ResultSet result = statement.getResultSet()) {
                         ResultSetMetaData metadata = result.getMetaData();
@@ -223,9 +222,13 @@ public final class LocalDBViewerBridge {
         JsonObject result = message("closed");
         try {
             if (connection != null) {
-                if (!connection.getAutoCommit()) connection.rollback();
-                else if (explicitTransaction) try (Statement statement = connection.createStatement()) { statement.execute("ROLLBACK"); }
-                connection.close();
+                try {
+                    if (!connection.getAutoCommit()) connection.rollback();
+                    else if (explicitTransaction) try (Statement statement = connection.createStatement()) { statement.execute("ROLLBACK"); }
+                } catch (SQLException failure) {
+                    // Releasing SQLite's outermost SAVEPOINT already ends the transaction.
+                    if (!string(config, "engine", "").equals("sqlite") || !error(failure).toLowerCase(Locale.ROOT).contains("no transaction is active")) throw failure;
+                } finally { connection.close(); }
             }
         } catch (Throwable failure) { result.addProperty("error", error(failure)); }
         finally { for (Path file : temporaryFiles) try { Files.deleteIfExists(file); } catch (IOException ignored) {} send(result); System.exit(0); }

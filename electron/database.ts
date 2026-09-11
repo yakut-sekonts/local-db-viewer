@@ -2,7 +2,7 @@ import { Worker } from 'node:worker_threads';
 import { join } from 'node:path';
 import { TrinoQuery, TrinoSession, type Connection } from './trino';
 import type { QuerySnapshot } from '../src/shared';
-import { singleStatement } from './sql';
+import { singleStatement, transactionAction } from './sql';
 import { JdbcWorker } from './jdbc-worker';
 
 export interface QueryTask { run(sql: string): Promise<QuerySnapshot>; cancel(): Promise<void> }
@@ -48,10 +48,12 @@ export class DatabaseSession {
     return {
       run: sql => {
         if (this.current) throw new Error('В сессии уже выполняется запрос.');
+        const statement = singleStatement(sql);
         const worker = this.ensureWorker();
         return new Promise(resolve => {
           this.current = { requestId, resolve, notify, latest: { requestId, queryId: '', state: 'RUNNING', columns: [], rows: [], totalRows: 0, truncated: false, stats: {}, warnings: [], inTransaction: false, catalog, schema } };
-          worker.postMessage({ kind: 'run', requestId, sql: singleStatement(sql), maxRows, catalog, schema });
+          try { worker.postMessage({ kind: 'run', requestId, sql: statement, transactionAction: transactionAction(statement), maxRows, catalog, schema }); }
+          catch (error) { this.fail(error instanceof Error ? error : new Error(String(error))); }
         });
       },
       cancel: async () => {
@@ -77,12 +79,16 @@ export class DatabaseSession {
     }
     if (this.worker) {
       const worker = this.worker;
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => { void worker.terminate(); reject(new Error('Таймаут закрытия сессии.')); }, 10000);
-        const listener = (message: any) => { if (message.kind === 'closed') { clearTimeout(timeout); worker.off('message', listener); if (message.error) reject(new Error(message.error)); else resolve(); } };
-        worker.on('message', listener); worker.postMessage({ kind: 'close' });
-      });
-      this.worker = undefined; await worker.terminate();
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const finish = (error?: Error) => { clearTimeout(timeout); worker.off('message', listener); worker.off('exit', exited); if (error) reject(error); else resolve(); };
+          const listener = (message: any) => { if (message.kind === 'closed') finish(message.error ? new Error(message.error) : undefined); };
+          const exited = () => finish();
+          const timeout = setTimeout(() => finish(new Error('Таймаут закрытия сессии.')), 10000);
+          worker.on('message', listener); worker.once('exit', exited);
+          try { worker.postMessage({ kind: 'close' }); } catch (error) { finish(error as Error); }
+        });
+      } finally { this.worker = undefined; await worker.terminate(); }
     }
   }
 }

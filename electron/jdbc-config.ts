@@ -30,7 +30,7 @@ export function jdbcConfig(profile: Connection | ProfileDraft) {
   validateJdbc(profile.jdbc);
   const engine = profile.engine;
   const custom = profile.jdbc ?? {};
-  const properties: Record<string, string> = {};
+  const properties: Record<string, string> = Object.create(null);
   let url: string;
   if (engine === 'sqlite') url = `jdbc:sqlite:${profile.endpoint}`;
   else {
@@ -61,7 +61,7 @@ export function jdbcConfig(profile: Connection | ProfileDraft) {
       properties.applicationName = 'Local DB Viewer';
     } else {
       url = `jdbc:clickhouse:${secure ? 'https' : 'http'}://${host}/${segment(database || 'default')}`;
-      if (secure) properties.sslmode = verify === 'NONE' ? 'none' : 'strict';
+      if (secure) properties.ssl_mode = ({ FULL: 'STRICT', CA: 'VERIFY_CA', NONE: 'TRUST' } as const)[verify];
     }
     if (profile.user) properties.user = profile.user;
     if (profile.auth === 'basic' && profile.secret) properties.password = profile.secret;

@@ -25,7 +25,7 @@ General задаёт URL, credentials и начальную schema. Для Trino
 
 Advanced читает свойства через `Driver.getPropertyInfo` и передаёт заданные строки напрямую в JDBC `Properties`. Встроены Trino 483, PostgreSQL 42.7.13, MySQL 26.7.0, MariaDB 3.5.10, SQLite 3.53.4.0, SQL Server 13.6.0 и ClickHouse 0.10.0. Произвольные дополнительные параметры поддерживаются; Advanced заменяет значения General, параметры собственного JDBC URL имеют приоритет. Password/token/credentials вводятся в таблице свойств, а не в URL.
 
-Options поддерживает read-only, Auto/Manual transaction control, isolation, connection/query timeout и startup statements. Поддержка конкретного свойства и протокола аутентификации определяется JDBC-драйвером и сервером. Встроенный SSH tunnel, полное управление сессиями и интерфейс DDL mappings ещё не реализованы; это не полная копия всех возможностей DataGrip.
+Options поддерживает read-only, Auto/Manual transaction control, isolation, connection/query timeout и startup statements. Поддержка конкретного свойства и протокола аутентификации определяется JDBC-драйвером и сервером. Встроенный SSH tunnel, отдельная вкладка Schemas, полное управление сессиями и интерфейс DDL mappings ещё не реализованы; это не полная копия всех возможностей DataGrip.
 
 ## Обновления на устройствах
 
@@ -73,7 +73,9 @@ npm run package:win
 
 `npm test` проверяет обработку Trino pagination/session/cancellation, точность чисел, SQL quoting, защищённое хранение credentials, CSV, SQL completion, FK и persistence виртуальных связей. `test:ui` запускает настоящее Electron-окно с изолированным профилем и SQLite-файлом: проверяет запросы, ошибки, rollback, отмену, Explorer, CSV, popup Monaco, выполнение вставленного составного JOIN и создание виртуальной связи.
 
-`test:drivers` проверяет реальные pg/mysql2/ClickHouse драйверы на локальных protocol fixtures. Это не проверка на промышленных серверах. Доступа к реальным Trino/PostgreSQL/MySQL/MariaDB/SQL Server/ClickHouse в этом окружении нет; Windows-инсталлятор собран на macOS и требует проверки установки/запуска на целевом Windows 11. macOS-пакет проверяется запуском содержащегося в нём приложения. Для проверки конкретного macOS binary: `LOCAL_DB_VIEWER_EXECUTABLE="/path/Local DB Viewer.app/Contents/MacOS/Local DB Viewer" npm run test:ui`.
+`test:drivers` проверяет реальные pg/mysql2/ClickHouse драйверы на локальных protocol fixtures. `node tests/jdbc-runtime.mjs` загружает все семь встроенных JDBC-драйверов и выполняет запрос настоящим Trino JDBC через локальный HTTPS-сервер: проверяет аутентификацию, доверенный CA, несовпадение имени и режимы FULL/CA/NONE. Это не проверка на промышленных серверах; доступа к реальным Trino/PostgreSQL/MySQL/MariaDB/SQL Server/ClickHouse в окружении разработки нет.
+
+Workflow собирает обе платформы на их ОС. Windows проходит установку NSIS в изолированный профиль CI, проверку x64/asInvoker manifest и UI-тесты установленного приложения на Windows Server 2022; корпоративный Windows 11 остаётся отдельной целевой проверкой. macOS-пакет проверяется запуском содержащегося в нём приложения и полным циклом замены bundle/перезапуска с сохранением подключения и SQL. Тест обновления использует изолированные копии приложения и не изменяет установленную IDE. Для проверки конкретного macOS binary: `LOCAL_DB_VIEWER_EXECUTABLE="/path/Local DB Viewer.app/Contents/MacOS/Local DB Viewer" npm run test:ui`.
 
 Архитектура: React + Monaco в sandboxed renderer, ограниченный IPC через preload, Electron main для native dialogs/хранения, worker threads с отдельными сессиями драйверов. Сборка Windows x64 и macOS ARM64 содержит runtime и production dependencies.
 

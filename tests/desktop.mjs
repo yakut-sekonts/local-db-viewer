@@ -60,12 +60,22 @@ try {
   expect(result.rows).toEqual([['9223372036854775807', '12345678901234567890.123456', null]]);
   const duplicate = await execute('SELECT 1 AS x, 2 AS x');
   expect(duplicate.rows).toEqual([['1', '2']]);
-  const begin = await execute('BEGIN'); expect(begin.inTransaction).toBe(true);
+  const begin = await execute('-- Start a transaction\n/* comment */ BEGIN'); expect(begin.inTransaction).toBe(true);
+  await execute('SAVEPOINT retained');
+  const savepoint = await execute('ROLLBACK TO retained'); expect(savepoint.inTransaction).toBe(true);
   await execute("INSERT INTO metrics VALUES (4, 'rollback-test', '0', NULL)");
   await page.evaluate(() => window.studio.query.release('integration-session'));
   const rollback = await execute("SELECT COUNT(*) FROM metrics WHERE name = 'rollback-test'");
   expect(rollback.rows).toEqual([['0']]);
+  expect((await execute('SAVEPOINT outside_begin')).inTransaction).toBe(true);
+  await execute("INSERT INTO metrics VALUES (4, 'savepoint-test', '0', NULL)");
+  await page.evaluate(() => window.studio.query.release('integration-session'));
+  expect((await execute("SELECT COUNT(*) FROM metrics WHERE name = 'savepoint-test'")).rows).toEqual([['0']]);
+  await execute('SAVEPOINT already_released'); await execute('RELEASE already_released');
+  await page.evaluate(() => window.studio.query.release('integration-session'));
   await execute('SELECT * FROM missing_table', 'FAILED');
+  await execute('SELECT 1; SELECT 2').then(() => { throw new Error('Multiple statements accepted'); }, error => expect(error.message).toContain('одну SQL-команду'));
+  expect((await execute('SELECT 1')).rows).toEqual([['1']]);
   console.log('PASS: bigint, NULL, duplicate column names, transaction rollback on close, SQL errors');
 
   const cancel = await page.evaluate(async () => {
@@ -111,7 +121,7 @@ try {
   console.log('PASS: real SQLite schema introspection with composite foreign key');
 
   async function setSQL(sql) {
-    await page.locator('.monaco-editor .view-lines').click({ position: { x: 90, y: 12 } });
+    await page.locator('.monaco-editor').click({ position: { x: 100, y: 20 } });
     await page.keyboard.press(process.platform === 'darwin' ? 'Meta+a' : 'Control+a');
     await page.keyboard.insertText(sql);
     await page.keyboard.press('Escape');

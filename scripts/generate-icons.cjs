@@ -18,5 +18,12 @@ app.whenReady().then(async () => {
   let offset = header.length;
   images.forEach((image, index) => { const start = 6 + index * 16; header[start] = sizes[index] % 256; header[start + 1] = sizes[index] % 256; header.writeUInt16LE(1, start + 4); header.writeUInt16LE(32, start + 6); header.writeUInt32LE(image.length, start + 8); header.writeUInt32LE(offset, start + 12); offset += image.length; });
   fs.writeFileSync('build/icon.ico', Buffer.concat([header, ...images]));
+  const icnsEntries = [['icp4', 16], ['icp5', 32], ['ic07', 128], ['ic08', 256], ['ic09', 512], ['ic10', 1024]].map(([type, size]) => {
+    const png = source.resize({ width: size, height: size }).toPNG();
+    const entry = Buffer.alloc(8); entry.write(type); entry.writeUInt32BE(png.length + 8, 4);
+    return Buffer.concat([entry, png]);
+  });
+  const icnsHeader = Buffer.alloc(8); icnsHeader.write('icns'); icnsHeader.writeUInt32BE(8 + icnsEntries.reduce((total, entry) => total + entry.length, 0), 4);
+  fs.writeFileSync('build/icon.icns', Buffer.concat([icnsHeader, ...icnsEntries]));
   window.destroy(); app.quit();
 }).catch(error => { console.error(error.message); app.exit(1); });
