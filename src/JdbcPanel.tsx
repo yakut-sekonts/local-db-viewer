@@ -10,7 +10,11 @@ export function JdbcPanel({ draft, onChange, onError }: { draft: ProfileDraft; o
   const [environmentText, setEnvironmentText] = useState(() => Object.entries(draft.jdbc?.environment ?? {}).map(([name, value]) => `${name}=${value}`).join('\n'));
   const settings = draft.jdbc ?? {};
   const change = (values: Partial<JdbcSettings>) => onChange({ ...draft, jdbc: { ...settings, ...values } });
-  const property = (name: string, value: string) => change({ properties: { ...settings.properties, [name]: value } });
+  const property = (name: string, value: string | undefined) => {
+    const properties = { ...settings.properties };
+    if (value === undefined) delete properties[name]; else properties[name] = value;
+    change({ properties });
+  };
   async function load() {
     setBusy(true);
     try { setProperties(await window.studio.jdbc.properties(draft)); }
@@ -25,7 +29,7 @@ export function JdbcPanel({ draft, onChange, onError }: { draft: ProfileDraft; o
     <input aria-label="Поиск JDBC-параметров" placeholder="Поиск: SSL, accessToken, Kerberos…" value={search} onChange={event => setSearch(event.target.value)} />
     <div className="jdbc-properties"><div className="jdbc-property-header"><span>Name</span><span>Value</span></div>{names.filter(name => name.toLowerCase().includes(search.toLowerCase())).map(name => {
       const info = help.get(name); const saved = draft.jdbcSecrets?.includes(name);
-      return <label key={name} className="jdbc-property" title={info?.description ?? name}><span>{name}{info?.required && ' *'}</span>{info?.choices?.length && !secretProperty(name) ? <select aria-label={name} value={settings.properties?.[name] ?? ''} onChange={event => property(name, event.target.value)}><option value="">По умолчанию{info.value ? `: ${info.value}` : ''}</option>{info.choices.map(value => <option key={value}>{value}</option>)}</select> : <input aria-label={name} type={secretProperty(name) ? 'password' : 'text'} autoComplete="off" value={settings.properties?.[name] ?? ''} placeholder={saved ? 'Сохранён · введите новое значение для замены' : info?.value ?? 'По умолчанию драйвера'} onChange={event => property(name, event.target.value)} />}</label>;
+      return <label key={name} className="jdbc-property" title={info?.description ?? name}><span>{name}{info?.required && ' *'}</span>{info?.choices?.length && !secretProperty(name) ? <select aria-label={name} value={settings.properties?.[name] ?? ''} onChange={event => property(name, event.target.value || undefined)}><option value="">По умолчанию{info.value ? `: ${info.value}` : ''}</option>{info.choices.map(value => <option key={value}>{value}</option>)}</select> : <input aria-label={name} type={secretProperty(name) ? 'password' : 'text'} autoComplete="off" value={settings.properties?.[name] ?? ''} placeholder={saved ? 'Сохранён · введите новое значение для замены' : info?.value ?? 'По умолчанию драйвера'} onChange={event => property(name, event.target.value)} />}</label>;
     })}</div>
     <div className="form-row"><input aria-label="Имя пользовательского JDBC-параметра" placeholder="Дополнительный параметр" value={customName} onChange={event => setCustomName(event.target.value)} /><button type="button" className="button secondary" disabled={!customName.trim()} onClick={() => { property(customName.trim(), ''); setSearch(customName.trim()); setCustomName(''); }}>Добавить</button></div>
     <small>Заданные значения передаются JDBC-драйверу напрямую и заменяют значения General. Параметры в JDBC URL имеют приоритет.</small>
