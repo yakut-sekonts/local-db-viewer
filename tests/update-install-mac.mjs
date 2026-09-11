@@ -1,7 +1,7 @@
 import { _electron as electron, expect } from '@playwright/test';
 import { cp, mkdir, mkdtemp, readFile, writeFile, readdir } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -17,6 +17,7 @@ const installed = join(work, 'installed/Local DB Viewer.app');
 const replacement = join(work, 'replacement/Local DB Viewer.app');
 const dataDirectory = join(work, 'user-data');
 const marker = join(work, 'restarted.json');
+const progressPath = join(work, 'restart-progress.json');
 const sourceVersion = JSON.parse(asar.extractFile(join(original, 'Contents/Resources/app.asar'), 'package.json').toString('utf8')).version;
 const [major, minor, patch] = sourceVersion.split('.').map(Number);
 const version = `${major}.${minor}.${patch + 1}`;
@@ -30,9 +31,13 @@ const main = join(unpacked, 'dist-electron/main.cjs');
 // Only the test replacement records the state after LaunchServices starts it.
 const bootstrap = `
 process.env.LOCAL_DB_VIEWER_DATA_DIR = ${JSON.stringify(dataDirectory)};
+const updateTestProgress = stage => require('node:fs').writeFileSync(${JSON.stringify(progressPath)}, JSON.stringify({ stage, pid: process.pid }));
+updateTestProgress('main-started');
 require('electron').app.on('browser-window-created', (_event, window) => {
+  updateTestProgress('window-created');
   window.webContents.once('did-finish-load', async () => {
     try {
+      updateTestProgress('reading-profiles');
       const profiles = await window.webContents.executeJavaScript('window.studio.profiles.list()');
       const tabs = await window.webContents.executeJavaScript('JSON.parse(localStorage.getItem("studio.tabs") || "[]")');
       require('node:fs').writeFileSync(${JSON.stringify(marker)}, JSON.stringify({ version: require('electron').app.getVersion(), profiles, tabs }));
@@ -54,9 +59,40 @@ const hash = createHash('sha256'); let size = 0;
 for await (const chunk of createReadStream(archive)) { size += chunk.length; hash.update(chunk); }
 const digest = `sha256:${hash.digest('hex')}`;
 console.log('Prepared isolated application and verified replacement fixture');
-const app = await electron.launch({ executablePath: join(installed, 'Contents/MacOS/Local DB Viewer'), args: [], env: { ...process.env, LOCAL_DB_VIEWER_DATA_DIR: dataDirectory } });
+let app;
 let quit = false;
+let restoreKeychain = async () => {};
 try {
+  if (process.env.GITHUB_ACTIONS === 'true') {
+    // Only the disposable CI account gets a dedicated fixture keychain. Trust
+    // precisely these two ad-hoc test binaries; production Keychain ACLs stay intact.
+    const security = args => execute('/usr/bin/security', args);
+    const oldSearch = (await security(['list-keychains', '-d', 'user'])).stdout.match(/"([^"]+)"/g)?.map(value => value.slice(1, -1)) ?? [];
+    const oldDefault = (await security(['default-keychain', '-d', 'user'])).stdout.trim().replace(/^"|"$/g, '');
+    const keychain = join(work, 'update-fixture.keychain-db');
+    const keychainPassword = randomBytes(24).toString('base64');
+    await security(['create-keychain', '-p', keychainPassword, keychain]);
+    restoreKeychain = async () => {
+      await security(['default-keychain', '-d', 'user', '-s', oldDefault]);
+      await security(['list-keychains', '-d', 'user', '-s', ...oldSearch]);
+      await security(['delete-keychain', keychain]);
+    };
+    await security(['unlock-keychain', '-p', keychainPassword, keychain]);
+    await security(['set-keychain-settings', '-lut', '3600', keychain]);
+    await security(['list-keychains', '-d', 'user', '-s', keychain, ...oldSearch]);
+    await security(['default-keychain', '-d', 'user', '-s', keychain]);
+    const executables = [installed, replacement].map(bundle => join(bundle, 'Contents/MacOS/Local DB Viewer'));
+    const hashes = [];
+    for (const executable of executables) {
+      const { stderr } = await execute('/usr/bin/codesign', ['-d', '--verbose=4', executable]);
+      const hash = /^CDHash=([a-f0-9]+)$/m.exec(stderr)?.[1]; if (!hash) throw new Error('Missing test binary CDHash');
+      hashes.push(`cdhash:${hash}`);
+    }
+    await security(['add-generic-password', '-a', 'Local DB Viewer', '-s', 'Local DB Viewer Safe Storage', '-w', randomBytes(24).toString('base64'), ...executables.flatMap(path => ['-T', path]), keychain]);
+    await security(['set-generic-password-partition-list', '-a', 'Local DB Viewer', '-s', 'Local DB Viewer Safe Storage', '-S', hashes.join(','), '-k', keychainPassword, keychain]);
+    console.log('Prepared isolated CI Keychain for the two signed update fixtures');
+  }
+  app = await electron.launch({ executablePath: join(installed, 'Contents/MacOS/Local DB Viewer'), args: [], env: { ...process.env, LOCAL_DB_VIEWER_DATA_DIR: dataDirectory } });
   const page = await app.firstWindow();
   await expect(page.locator('.monaco-editor')).toBeVisible();
   const database = join(work, 'kept.sqlite');
@@ -94,4 +130,12 @@ try {
   expect((await readdir(join(work, 'installed'))).some(name => name.startsWith('.Local-DB-Viewer-backup-'))).toBe(true);
   await writeFile(join(artifacts, 'update-install-results.json'), JSON.stringify({ passed: true, from: sourceVersion, to: version, retainedProfile: true, retainedSQL: true, backup: true, testedAt: new Date().toISOString() }, null, 2));
   console.log(`PASS: click → replace application → restart ${version} → connection and SQL restored; previous app retained`);
-} finally { if (!quit) await app.close().catch(() => {}); }
+} catch (error) {
+  const diagnostics = { error: error.message, progress: await readFile(progressPath, 'utf8').catch(() => 'not started'), logs: [] };
+  for (const folder of await readdir(join(dataDirectory, 'updates')).catch(() => [])) {
+    const log = await readFile(join(dataDirectory, 'updates', folder, 'install.log'), 'utf8').catch(() => '');
+    if (log) diagnostics.logs.push(log);
+  }
+  await writeFile(join(artifacts, 'update-install-failure.json'), JSON.stringify(diagnostics, null, 2));
+  console.error(JSON.stringify(diagnostics)); throw error;
+} finally { if (app && !quit) await app.close().catch(() => {}); await restoreKeychain(); }

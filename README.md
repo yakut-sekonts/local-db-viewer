@@ -1,13 +1,13 @@
-# Local DB Viewer 0.2.0
+# Local DB Viewer 0.2.1
 
 Desktop SQL IDE для Trino, PostgreSQL, MySQL, MariaDB, SQLite, Microsoft SQL Server и ClickHouse. Интерфейс выполнен по предоставленному референсу DataGrip: тёмная тема, Database Explorer, SQL-консоли, Files и нижняя панель Services с результатами. Это самостоятельное приложение, не продукт JetBrains.
 
 ## Установка в профиль пользователя
 
-- **macOS 13 и новее, Apple Silicon (ARM64, M1 и новее):** откройте `Local-DB-Viewer-0.2.0-mac-arm64.dmg` и скопируйте `Local DB Viewer.app` в `~/Applications`. Папку можно создать в своей домашней директории. Intel Mac не поддерживается.
-- **Windows 11 x64:** запустите `Local-DB-Viewer-0.2.0-windows-x64-setup.exe`. NSIS устанавливает приложение для текущего пользователя в `%LOCALAPPDATA%\Programs\Local DB Viewer`, создаёт ярлыки и не запрашивает elevation. Используются `perMachine: false`, `allowElevation: false`, `asInvoker`.
+- **macOS 13 и новее, Apple Silicon (ARM64, M1 и новее):** откройте `Local-DB-Viewer-0.2.1-mac-arm64.dmg` и скопируйте `Local DB Viewer.app` в `~/Applications`. Папку можно создать в своей домашней директории. Intel Mac не поддерживается.
+- **Windows 11 x64:** запустите `Local-DB-Viewer-0.2.1-windows-x64-setup.exe`. NSIS устанавливает приложение для текущего пользователя в `%LOCALAPPDATA%\Programs\Local DB Viewer`, создаёт ярлыки и не запрашивает elevation. Используются `perMachine: false`, `allowElevation: false`, `asInvoker`.
 
-Node.js, Java, Python и отдельная установка драйверов пользователю не требуются. Сборка macOS имеет локальную ad-hoc подпись, но не Developer ID/notarization; Windows не имеет Authenticode-подписи. Корпоративные политики запуска, Gatekeeper и SmartScreen действуют независимо от возможности установки без прав администратора.
+Node.js, Java, Python и отдельная установка драйверов пользователю не требуются. Сборка macOS имеет локальную ad-hoc подпись, но не Developer ID/notarization; Windows не имеет Authenticode-подписи. После обновления ad-hoc сборки macOS может повторно запросить разрешение Keychain; постоянный Developer ID нужен для стабильного доступа без таких запросов. Корпоративные политики запуска, Gatekeeper и SmartScreen действуют независимо от возможности установки без прав администратора.
 
 ## Подключения и SQL
 
@@ -75,7 +75,7 @@ npm run package:win
 
 `test:drivers` проверяет реальные pg/mysql2/ClickHouse драйверы на локальных protocol fixtures. `node tests/jdbc-runtime.mjs` загружает все семь встроенных JDBC-драйверов и выполняет запрос настоящим Trino JDBC через локальный HTTPS-сервер: проверяет аутентификацию, доверенный CA, несовпадение имени и режимы FULL/CA/NONE. Это не проверка на промышленных серверах; доступа к реальным Trino/PostgreSQL/MySQL/MariaDB/SQL Server/ClickHouse в окружении разработки нет.
 
-Workflow собирает обе платформы на их ОС. Windows проходит установку NSIS в изолированный профиль CI, проверку x64/asInvoker manifest и UI-тесты установленного приложения на Windows Server 2022; корпоративный Windows 11 остаётся отдельной целевой проверкой. macOS-пакет проверяется запуском содержащегося в нём приложения и полным циклом замены bundle/перезапуска с сохранением подключения и SQL. Тест обновления использует изолированные копии приложения и не изменяет установленную IDE. Для проверки конкретного macOS binary: `LOCAL_DB_VIEWER_EXECUTABLE="/path/Local DB Viewer.app/Contents/MacOS/Local DB Viewer" npm run test:ui`.
+Workflow собирает обе платформы на их ОС. Windows проходит установку NSIS в изолированный профиль CI, проверку x64/asInvoker manifest и UI-тесты установленного приложения на Windows Server 2022; корпоративный Windows 11 остаётся отдельной целевой проверкой. macOS-пакет проверяется запуском содержащегося в нём приложения и полным циклом замены bundle/перезапуска с сохранением подключения и SQL. Тест обновления использует изолированные копии приложения и не изменяет установленную IDE. В macOS CI создаётся отдельный временный Keychain с доступом только для двух тестовых binaries: системное подтверждение доступа после смены ad-hoc подписи проверяется отдельно на пользовательском устройстве. Для проверки конкретного macOS binary: `LOCAL_DB_VIEWER_EXECUTABLE="/path/Local DB Viewer.app/Contents/MacOS/Local DB Viewer" npm run test:ui`.
 
 Архитектура: React + Monaco в sandboxed renderer, ограниченный IPC через preload, Electron main для native dialogs/хранения, worker threads с отдельными сессиями драйверов. Сборка Windows x64 и macOS ARM64 содержит runtime и production dependencies.
 
