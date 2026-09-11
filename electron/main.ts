@@ -1,0 +1,277 @@
+import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, session as electronSession } from 'electron';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { randomUUID } from 'node:crypto';
+import { readFile, writeFile, stat } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { DatabaseSession, type QueryTask } from './database';
+import { metadataSQL } from './sql';
+import { ProfileStore } from './storage';
+import { csv } from './csv';
+import { MAX_CA_BYTES, validateCertificate, validateSSL } from './tls';
+import { loadSchema, RelationStore, validateRelation } from './schema';
+import { Updater } from './updater';
+import { installUpdate } from './install-update';
+import { validateJdbc } from './jdbc-config';
+import { describeDriver } from './jdbc-worker';
+import type { MetadataInput, ProfileDraft, QueryInput, Relationship, SchemaInput } from '../src/shared';
+
+const productName = 'Local DB Viewer';
+const legacyName = 'DataKhrip';
+const legacyDirectory = join(app.getPath('appData'), legacyName);
+const newDirectory = join(app.getPath('appData'), productName);
+const explicitDataDirectory = process.env.LOCAL_DB_VIEWER_DATA_DIR || process.env.DATAKHRIP_DATA_DIR;
+const useLegacyStorage = !explicitDataDirectory && !existsSync(newDirectory) && existsSync(legacyDirectory);
+// Electron sets its macOS Keychain service during startup, before app.ready.
+// Existing installations retain that service and userData path after a rename.
+app.setName(useLegacyStorage ? legacyName : productName);
+app.setPath('userData', explicitDataDirectory || (useLegacyStorage ? legacyDirectory : newDirectory));
+const sessions = new Map<string, { profileId: string; session: DatabaseSession }>();
+const active = new Map<string, { query: QueryTask; sessionId: string; done: Promise<unknown> }>();
+let window: BrowserWindow;
+let profiles: ProfileStore;
+let relations: RelationStore;
+let updater: Updater;
+let installingUpdate = false;
+let pendingDatabaseOperations = 0;
+const transactions = new Set<string>();
+const entry = join(__dirname, '../dist/index.html');
+
+function string(value: unknown, name: string, limit = 512): asserts value is string {
+  if (typeof value !== 'string' || value.length > limit || /[\r\n\0]/.test(value)) throw new Error(`Некорректное поле: ${name}`);
+}
+function validateDraft(value: ProfileDraft): void {
+  if (!value || typeof value !== 'object') throw new Error('Некорректное подключение.');
+  for (const key of ['name', 'endpoint', 'user', 'auth', 'catalog', 'schema', 'engine'] as const) string(value[key], key);
+  if (typeof value.tls !== 'boolean') throw new Error('Некорректный TLS flag.');
+  validateSSL(value);
+  validateJdbc(value.jdbc);
+  if (value.id !== undefined) string(value.id, 'id');
+  if (value.secret !== undefined) string(value.secret, 'secret', 16384);
+}
+
+async function release(id: string): Promise<void> {
+  if ([...active.values()].some(job => job.sessionId === id)) throw new Error('Сначала завершите или отмените запрос.');
+  const stored = sessions.get(id);
+  await stored?.session.close();
+  sessions.delete(id);
+  transactions.delete(id);
+}
+
+function handle(name: string, fn: (...args: any[]) => unknown): void {
+  ipcMain.handle(name, (event, ...args) => {
+    if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || event.senderFrame.url !== pathToFileURL(entry).href) {
+      throw new Error('Недоверенный IPC sender.');
+    }
+    const databaseOperation = ['query:run', 'profiles:test', 'metadata', 'schema:load', 'jdbc:properties'].includes(name);
+    if (!databaseOperation) return fn(...args);
+    if (installingUpdate) throw new Error('Приложение обновляется.');
+    pendingDatabaseOperations++;
+    return Promise.resolve().then(() => fn(...args)).finally(() => { pendingDatabaseOperations--; });
+  });
+}
+
+void app.whenReady().then(() => {
+  app.setName(productName);
+  relations = new RelationStore(join(app.getPath('userData'), 'relationships.json'));
+  const encryption = {
+    encrypt(value: string) {
+      if (!safeStorage.isEncryptionAvailable() || (process.platform === 'linux' && safeStorage.getSelectedStorageBackend() === 'basic_text')) {
+        throw new Error('Системное защищённое хранилище недоступно.');
+      }
+      return safeStorage.encryptString(value).toString('base64');
+    },
+    decrypt: (value: string) => safeStorage.decryptString(Buffer.from(value, 'base64')),
+  };
+  profiles = new ProfileStore(join(app.getPath('userData'), 'connections.json'), encryption);
+  electronSession.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
+  electronSession.defaultSession.setPermissionCheckHandler(() => false);
+  window = new BrowserWindow({ width: 1440, height: 960, minWidth: 1000, minHeight: 680,
+    title: 'Local DB Viewer', backgroundColor: '#101216', titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    trafficLightPosition: { x: 18, y: 19 },
+    webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true },
+  });
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.on('will-navigate', event => event.preventDefault());
+  window.webContents.on('will-attach-webview', event => event.preventDefault());
+  updater = new Updater(join(app.getPath('userData'), 'updates'), app.getVersion(), encryption,
+    value => { if (!window.isDestroyed()) window.webContents.send('updates:change', value); },
+    async (path, version) => {
+      if (active.size || transactions.size || pendingDatabaseOperations) throw new Error('Завершите запросы и выполните COMMIT или ROLLBACK перед обновлением.');
+      installingUpdate = true;
+      try { await installUpdate(path, version, async () => {
+        if (active.size || transactions.size) throw new Error('Обнаружена активная сессия. Обновление отложено.');
+        for (const id of [...sessions.keys()]) await release(id);
+        await window.webContents.session.flushStorageData();
+      }); } catch (error) { installingUpdate = false; throw error; }
+    });
+  handle('updates:state', () => updater.state());
+  handle('updates:configure', input => updater.configure(input));
+  handle('updates:check', () => updater.check());
+  handle('updates:download', () => updater.download());
+  handle('updates:install', () => updater.install());
+  void readFile(join(process.resourcesPath, 'update-config.json'), 'utf8').then(value => JSON.parse(value).repository ?? '').catch(() => '').then(repository => updater.initialize(repository));
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    { label: 'Local DB Viewer', submenu: [{ role: 'about' }, { type: 'separator' }, { role: 'hide' }, { role: 'quit' }] },
+    { label: 'Правка', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
+    { label: 'Вид', submenu: [{ role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { role: 'togglefullscreen' }] },
+  ]));
+
+  handle('profiles:list', () => profiles.list());
+  handle('jdbc:properties', async (draft: ProfileDraft) => {
+    validateDraft(draft);
+    // DriverPropertyInfo does not require opening a database connection.
+    return describeDriver({ ...draft, id: draft.id ?? randomUUID() });
+  });
+  handle('profiles:save', async (draft: ProfileDraft) => {
+    validateDraft(draft);
+    if (draft.id && [...sessions.values()].some(item => item.profileId === draft.id)) throw new Error('Закройте консоли этого подключения перед изменением.');
+    return profiles.save(draft);
+  });
+  handle('profiles:remove', async (id: string) => {
+    string(id, 'id');
+    for (const [sessionId, entry] of sessions) if (entry.profileId === id) await release(sessionId);
+    await profiles.remove(id);
+  });
+  handle('profiles:test', async (draft: ProfileDraft) => {
+    if (installingUpdate) throw new Error('Приложение обновляется.');
+    validateDraft(draft);
+    const session = new DatabaseSession(await profiles.resolve(draft));
+    const query = session.createQuery(randomUUID(), 1);
+    const id = randomUUID();
+    const done = query.run('SELECT 1');
+    active.set(id, { query, done, sessionId: id });
+    try {
+      const result = await done;
+      if (result.state !== 'FINISHED') throw new Error(result.error ?? 'Запрос отменён.');
+      return 'Соединение установлено · SELECT 1 выполнен';
+    } finally { active.delete(id); await session.close(); }
+  });
+  handle('query:run', async (input: QueryInput) => {
+    if (installingUpdate) throw new Error('Приложение обновляется.');
+    if (!input || typeof input !== 'object' || typeof input.sql !== 'string' || !input.sql.trim() || input.sql.length > 1_000_000) throw new Error('Некорректный SQL.');
+    for (const key of ['requestId', 'sessionId', 'profileId', 'catalog', 'schema'] as const) string(input[key], key);
+    if (!input.requestId || !input.sessionId || active.has(input.requestId)) throw new Error('Некорректный request ID.');
+    if ([...active.values()].some(job => job.sessionId === input.sessionId)) throw new Error('В этой консоли уже выполняется запрос.');
+    const connection = await profiles.get(input.profileId);
+    if (installingUpdate) throw new Error('Приложение обновляется.');
+    if ([...active.values()].some(job => job.sessionId === input.sessionId)) throw new Error('В этой консоли уже выполняется запрос.');
+    const previous = sessions.get(input.sessionId);
+    if (previous && previous.profileId !== input.profileId) throw new Error('Консоль привязана к другому подключению.');
+    const session = previous?.session ?? new DatabaseSession(connection);
+    sessions.set(input.sessionId, { profileId: input.profileId, session });
+    const query = session.createQuery(input.requestId, input.maxRows, result => {
+      if (result.inTransaction) transactions.add(input.sessionId); else transactions.delete(input.sessionId);
+      if (!window.isDestroyed()) window.webContents.send('query:update', result);
+    }, input.catalog, input.schema);
+    const done = query.run(input.sql).finally(() => active.delete(input.requestId));
+    active.set(input.requestId, { query, sessionId: input.sessionId, done });
+    void done.catch(() => {});
+  });
+  handle('query:cancel', async (id: string) => { string(id, 'requestId'); await active.get(id)?.query.cancel(); });
+  handle('query:release', async (id: string) => { string(id, 'sessionId'); await release(id); });
+  handle('schema:load', async (input: SchemaInput) => {
+    if (installingUpdate) throw new Error('Приложение обновляется.');
+    if (!input || typeof input !== 'object') throw new Error('Некорректный запрос схемы.');
+    for (const name of ['profileId', 'catalog', 'schema'] as const) string(input[name], name);
+    const connection = await profiles.get(input.profileId);
+    const session = new DatabaseSession(connection);
+    try {
+      return await loadSchema(connection, input, async sql => {
+        const id = randomUUID();
+        const query = session.createQuery(id, 10000);
+        const done = query.run(sql);
+        active.set(id, { query, done, sessionId: id });
+        const timeout = setTimeout(() => { void query.cancel().catch(() => {}); }, 60000);
+        try {
+          const result = await done;
+          if (result.state !== 'FINISHED') throw new Error(result.error ?? 'Загрузка метаданных отменена или превысила 60 секунд.');
+          return { columns: result.columns, rows: result.rows, truncated: result.truncated };
+        } finally { clearTimeout(timeout); active.delete(id); }
+      }, await relations.list(input.profileId));
+    } finally { await session.close(); }
+  });
+  handle('schema:save-relation', async (profileId: string, relation: Relationship) => {
+    string(profileId, 'profileId');
+    await profiles.get(profileId);
+    validateRelation(relation);
+    await relations.change(profileId, items => [...items.filter(item => item.id !== relation.id), relation]);
+  });
+  handle('schema:remove-relation', async (profileId: string, id: string) => {
+    string(profileId, 'profileId'); string(id, 'id');
+    await profiles.get(profileId);
+    await relations.change(profileId, items => items.filter(item => item.id !== id));
+  });
+  handle('metadata', async (input: MetadataInput) => {
+    if (installingUpdate) throw new Error('Приложение обновляется.');
+    if (!input || typeof input !== 'object') throw new Error('Некорректный metadata request.');
+    string(input.profileId, 'profileId');
+    const connection = await profiles.get(input.profileId);
+    const identifiers = [input.catalog, input.schema, input.table];
+    const depth = { catalogs: 0, schemas: 1, tables: 2, columns: 3 }[input.kind];
+    if (depth === undefined) throw new Error('Неизвестный metadata request.');
+    for (let i = 0; i < depth; i++) { string(identifiers[i], 'identifier'); if (!identifiers[i]) throw new Error('Пустой identifier.'); }
+    const sql = metadataSQL(connection.engine, input);
+    const id = randomUUID();
+    const session = new DatabaseSession(connection);
+    const query = session.createQuery(id, 10000);
+    const done = query.run(sql);
+    active.set(id, { query, sessionId: id, done });
+    try {
+      const result = await done;
+      if (result.state !== 'FINISHED') throw new Error(result.error ?? 'Запрос отменён.');
+      return { columns: result.columns, rows: result.rows, truncated: result.truncated };
+    } finally { active.delete(id); await session.close(); }
+  });
+  handle('export:csv', async (input) => {
+    if (!input || !Array.isArray(input.columns) || !Array.isArray(input.rows) || input.rows.length > 10000 || !input.rows.every(Array.isArray)) throw new Error('Некорректный результат.');
+    const result = await dialog.showSaveDialog(window, { defaultPath: 'result.csv', filters: [{ name: 'CSV', extensions: ['csv'] }] });
+    if (result.canceled || !result.filePath) return false;
+    await writeFile(result.filePath, csv(input.columns, input.rows), 'utf8');
+    return true;
+  });
+  handle('files:open', async () => {
+    const result = await dialog.showOpenDialog(window, { properties: ['openFile'], filters: [{ name: 'SQL', extensions: ['sql'] }] });
+    if (result.canceled) return null;
+    const path = result.filePaths[0];
+    if ((await stat(path)).size > 1_000_000) throw new Error('SQL-файл превышает 1 MB.');
+    return { name: path.split(/[\\/]/).pop()!, sql: await readFile(path, 'utf8') };
+  });
+  handle('files:database', async () => {
+    const result = await dialog.showOpenDialog(window, { properties: ['openFile'], filters: [{ name: 'SQLite', extensions: ['db', 'sqlite', 'sqlite3'] }, { name: 'Все файлы', extensions: ['*'] }] });
+    return result.canceled ? null : result.filePaths[0];
+  });
+  handle('files:certificate', async () => {
+    const result = await dialog.showOpenDialog(window, { properties: ['openFile'], filters: [{ name: 'CA certificates (PEM)', extensions: ['pem', 'crt', 'cer'] }] });
+    if (result.canceled) return null;
+    const path = result.filePaths[0];
+    if ((await stat(path)).size > MAX_CA_BYTES) throw new Error('CA bundle превышает 256 KB.');
+    return { name: path.split(/[\\/]/).pop()!, pem: validateCertificate(await readFile(path, 'utf8')) };
+  });
+  handle('files:save', async (sql: string) => {
+    if (typeof sql !== 'string' || sql.length > 1_000_000) throw new Error('Некорректный SQL.');
+    const result = await dialog.showSaveDialog(window, { defaultPath: 'query.sql', filters: [{ name: 'SQL', extensions: ['sql'] }] });
+    if (result.canceled || !result.filePath) return false;
+    await writeFile(result.filePath, sql, 'utf8');
+    return true;
+  });
+  void window.loadFile(entry);
+});
+
+let exiting = false;
+app.on('before-quit', event => {
+  if (exiting) return;
+  exiting = true;
+  updater?.dispose();
+  event.preventDefault();
+  const shutdownTimeout = setTimeout(() => app.exit(0), 20000);
+  void (async () => {
+    const jobs = [...active.values()];
+    await Promise.allSettled(jobs.map(job => job.query.cancel()));
+    await Promise.allSettled(jobs.map(job => job.done));
+    await Promise.allSettled([...sessions.keys()].map(release));
+    clearTimeout(shutdownTimeout);
+    app.quit();
+  })();
+});
+app.on('window-all-closed', () => app.quit());

@@ -1,0 +1,19 @@
+Local DB Viewer — установка для текущего пользователя
+
+Только macOS 13 и новее на Apple Silicon (ARM64: M1 и новее). Intel не поддерживается.
+
+1. В Finder выберите «Переход → Переход к папке» (Shift + Command + G).
+2. Введите ~ и откройте свою домашнюю папку.
+3. Создайте в ней папку Applications, если её ещё нет.
+4. Перетащите Local DB Viewer.app из этого образа в ~/Applications.
+5. Запустите ~/Applications/Local DB Viewer.app.
+
+Установка в ~/Applications не требует прав администратора.
+Local DB Viewer содержит необходимые runtime и драйверы.
+Настройки сохраняются в ~/Library/Application Support/Local DB Viewer.
+
+Эта сборка не подписана Developer ID и не notarized.
+Возможность запуска зависит от Gatekeeper и корпоративных политик.
+Установка в профиль пользователя не обходит ограничения компании.
+
+СУБД: Trino, PostgreSQL, MySQL, MariaDB, SQLite, Microsoft SQL Server, ClickHouse.

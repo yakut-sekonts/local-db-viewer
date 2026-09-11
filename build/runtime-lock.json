@@ -1,0 +1,97 @@
+{
+  "java": {
+    "mac-arm64": {
+      "name": "OpenJDK25U-jre_aarch64_mac_hotspot_25.0.4.1_1.tar.gz",
+      "url": "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jre_aarch64_mac_hotspot_25.0.4.1_1.tar.gz",
+      "sha256": "5b02bcc908da092e7e00b9772d4f9bbb87f44a60b7c90f7cf5a91a1d98f37e1b",
+      "version": "25.0.4.1+1",
+      "license": "GPL-2.0-with-classpath-exception"
+    },
+    "windows-x64": {
+      "name": "OpenJDK25U-jre_x64_windows_hotspot_25.0.4.1_1.zip",
+      "url": "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jre_x64_windows_hotspot_25.0.4.1_1.zip",
+      "sha256": "4c95451cea98556def2c54f7782933f52a26d4a36bd85e1d59f0364464828b07",
+      "version": "25.0.4.1+1",
+      "license": "GPL-2.0-with-classpath-exception"
+    },
+    "compiler-mac-arm64": {
+      "name": "OpenJDK25U-jdk_aarch64_mac_hotspot_25.0.4.1_1.tar.gz",
+      "url": "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jdk_aarch64_mac_hotspot_25.0.4.1_1.tar.gz",
+      "sha256": "61979887f7506a24a57439ff99adb8b3a7fc89977d9cfe3b8984f58a981b7b9d",
+      "version": "25.0.4.1+1",
+      "license": "GPL-2.0-with-classpath-exception"
+    }
+  },
+  "jars": [
+    {
+      "name": "trino-jdbc-483.jar",
+      "url": "https://repo.maven.apache.org/maven2/io/trino/trino-jdbc/483/trino-jdbc-483.jar",
+      "sha256": "518062369fdfa937b35f11aa45276daa31cccaaad3c8c05eb51e674e23a419e3",
+      "version": "483",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "postgresql-42.7.13.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/postgresql/postgresql/42.7.13/postgresql-42.7.13.jar",
+      "sha256": "6e0e4cc2d8cae902084f8a2b18728b073a6fd9d1f87c9d8bff8f298c18185b93",
+      "version": "42.7.13",
+      "license": "BSD-2-Clause"
+    },
+    {
+      "name": "mysql-connector-j-26.7.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/mysql/mysql-connector-j/26.7.0/mysql-connector-j-26.7.0.jar",
+      "sha256": "69084713593a4aa8d07c383619b9639276f08bccf8faf1c562178147d389b1e1",
+      "version": "26.7.0",
+      "license": "GPL-2.0-with-universal-foss-exception"
+    },
+    {
+      "name": "mariadb-java-client-3.5.10.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.5.10/mariadb-java-client-3.5.10.jar",
+      "sha256": "919b8c1c771d9ee3465811462f242c9543ab401e140c64988ddbf1d8abcb18b2",
+      "version": "3.5.10",
+      "license": "LGPL-2.1-or-later"
+    },
+    {
+      "name": "sqlite-jdbc-3.53.4.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/xerial/sqlite-jdbc/3.53.4.0/sqlite-jdbc-3.53.4.0.jar",
+      "sha256": "bcb1f51e36f940867e83342f9efbf5968ac44a6bef4d397bb4af7b17b45cd2fb",
+      "version": "3.53.4.0",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "mssql-jdbc-13.6.0.jre11.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/microsoft/sqlserver/mssql-jdbc/13.6.0.jre11/mssql-jdbc-13.6.0.jre11.jar",
+      "sha256": "4c566e4022c4dcf1489aeb639fe49a0f6ffae3d796fdc2f56b5b8882d4c3bf5a",
+      "version": "13.6.0.jre11",
+      "license": "MIT"
+    },
+    {
+      "name": "clickhouse-jdbc-0.10.0-all.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/clickhouse/clickhouse-jdbc/0.10.0/clickhouse-jdbc-0.10.0-all.jar",
+      "sha256": "d83736e24306e11929b0cf81b3306ae903c6f51c735c509ad5680c88640d99ce",
+      "version": "0.10.0",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "gson-2.14.0.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/google/code/gson/gson/2.14.0/gson-2.14.0.jar",
+      "sha256": "2cbd119bf1961c28788310963dc80ba65f58cdeec1dd139c8bdb1240faa2c36f",
+      "version": "2.14.0",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "slf4j-api-2.0.19.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.19/slf4j-api-2.0.19.jar",
+      "sha256": "e91ff6d720609e7a194ffe758c3ed5c84e798617ae07b0a0f6a4fe229741b4bb",
+      "version": "2.0.19",
+      "license": "MIT"
+    },
+    {
+      "name": "slf4j-nop-2.0.19.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-nop/2.0.19/slf4j-nop-2.0.19.jar",
+      "sha256": "d0226062f9b3a2793f62002f892a8e624eb07f396130fc949e01b1d5f4888cba",
+      "version": "2.0.19",
+      "license": "MIT"
+    }
+  ]
+}

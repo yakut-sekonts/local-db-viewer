@@ -1,0 +1,99 @@
+name: Desktop release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            platform: mac-arm64
+            package: mac
+          - os: windows-2022
+            platform: windows-x64
+            package: win
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+      - run: npm ci
+      - name: Prepare embedded JDBC runtime
+        run: python scripts/prepare-runtime.py --platform ${{ matrix.platform }}
+      - name: Configure private update source
+        run: node scripts/write-update-config.mjs
+        env:
+          UPDATE_REPOSITORY: ${{ vars.UPDATE_REPOSITORY || github.repository }}
+      - run: npm test
+      - run: npm run package:${{ matrix.package }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Test packaged desktop
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            export LOCAL_DB_VIEWER_EXECUTABLE="$GITHUB_WORKSPACE/release/mac-arm64/Local DB Viewer.app/Contents/MacOS/Local DB Viewer"
+          else
+            export LOCAL_DB_VIEWER_EXECUTABLE="$GITHUB_WORKSPACE/release/win-unpacked/Local DB Viewer.exe"
+          fi
+          npm run test:ui
+      - uses: actions/upload-artifact@v7
+        with:
+          name: installers-${{ matrix.platform }}
+          path: |
+            release/Local-DB-Viewer-*.dmg
+            release/Local-DB-Viewer-*.zip
+            release/Local-DB-Viewer-*-setup.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: verification-${{ matrix.platform }}
+          path: test-artifacts/
+          retention-days: 7
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: installers-*
+          merge-multiple: true
+          path: release-assets
+      - run: node scripts/release.mjs
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN || github.token }}
+          UPDATE_REPOSITORY: ${{ vars.UPDATE_REPOSITORY || github.repository }}

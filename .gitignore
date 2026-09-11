@@ -1,0 +1,15 @@
+node_modules/
+dist/
+dist-electron/
+release/
+test-artifacts/
+*.log
+.DS_Store
+runtime/
+.runtime-cache/
+.env
+.env.*
+*.pem
+*.p12
+*.pfx
+*.key

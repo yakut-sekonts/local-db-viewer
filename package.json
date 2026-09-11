@@ -1,0 +1,153 @@
+{
+  "name": "local-db-viewer",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Desktop database IDE for Trino, PostgreSQL, MySQL, MariaDB, SQLite, SQL Server and ClickHouse",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "build": "npm run build:jdbc && tsc --noEmit && vite build --logLevel warn && node scripts/build-electron.mjs",
+    "start": "npm run build && electron .",
+    "start:built": "electron .",
+    "test": "tsx --test tests/*.test.ts",
+    "test:ui": "node tests/desktop.mjs",
+    "package:mac": "npm run build && electron-builder --mac dmg zip --arm64 --publish never",
+    "package:win": "npm run build && electron-builder --win nsis --x64 --publish never",
+    "test:drivers": "node tests/drivers.mjs",
+    "build:jdbc": "node scripts/build-jdbc.mjs"
+  },
+  "build": {
+    "appId": "dev.localdbviewer.desktop",
+    "productName": "Local DB Viewer",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "identity": "-",
+      "icon": "build/icon.icns",
+      "extraResources": [
+        {
+          "from": "runtime/mac-arm64",
+          "to": "jre"
+        }
+      ]
+    },
+    "artifactName": "Local-DB-Viewer-${version}-${os}-${arch}.${ext}",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "requestedExecutionLevel": "asInvoker",
+      "icon": "build/icon.ico",
+      "signExecutable": false,
+      "extraResources": [
+        {
+          "from": "runtime/windows-x64",
+          "to": "jre"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": false,
+      "packElevateHelper": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "Local-DB-Viewer-${version}-windows-x64-setup.${ext}",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "runAfterFinish": false
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 160,
+          "y": 150,
+          "type": "file"
+        },
+        {
+          "x": 380,
+          "y": 150,
+          "type": "file",
+          "path": "build/INSTALL-macOS.txt"
+        }
+      ],
+      "title": "Local DB Viewer — установка для пользователя"
+    },
+    "extraResources": [
+      {
+        "from": "build",
+        "to": "updater",
+        "filter": [
+          "update-mac.sh",
+          "update-windows.ps1"
+        ]
+      },
+      {
+        "from": "build/update-config.json",
+        "to": "update-config.json"
+      },
+      {
+        "from": "runtime/common",
+        "to": "jdbc"
+      }
+    ]
+  },
+  "dependencies": {
+    "lossless-json": "^4.3.1",
+    "lucide-react": "^1.44.0",
+    "monaco-editor": "^0.56.0",
+    "mysql2": "^3.24.4",
+    "pg": "^8.23.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tedious": "^20.0.0",
+    "undici": "^7.29.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^24.13.4",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  },
+  "type": "module",
+  "overrides": {
+    "dompurify": "3.4.15"
+  },
+  "productName": "Local DB Viewer",
+  "author": "yakut-sekonts"
+}

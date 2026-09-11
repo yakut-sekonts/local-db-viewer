@@ -1,0 +1,49 @@
+import { contextBridge, ipcRenderer } from 'electron';
+import type { DesktopAPI, QuerySnapshot } from '../src/shared';
+import type { UpdateState } from '../src/updates';
+
+async function invoke(channel: string, ...args: unknown[]): Promise<any> {
+  try { return await ipcRenderer.invoke(channel, ...args); }
+  catch (error) { throw new Error((error as Error).message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '')); }
+}
+
+const api: DesktopAPI = {
+  jdbc: { properties: profile => invoke('jdbc:properties', profile) },
+  updates: {
+    state: () => invoke('updates:state'),
+    configure: input => invoke('updates:configure', input),
+    check: () => invoke('updates:check'),
+    download: () => invoke('updates:download'),
+    install: () => invoke('updates:install'),
+    onChange: listener => {
+      const handler = (_: Electron.IpcRendererEvent, value: UpdateState) => listener(value);
+      ipcRenderer.on('updates:change', handler);
+      return () => ipcRenderer.removeListener('updates:change', handler);
+    },
+  },
+  profiles: {
+    list: () => invoke('profiles:list'),
+    save: value => invoke('profiles:save', value),
+    remove: id => invoke('profiles:remove', id),
+    test: value => invoke('profiles:test', value),
+  },
+  query: {
+    run: input => invoke('query:run', input),
+    cancel: id => invoke('query:cancel', id),
+    release: id => invoke('query:release', id),
+    onUpdate: listener => {
+      const handler = (_: Electron.IpcRendererEvent, value: QuerySnapshot) => listener(value);
+      ipcRenderer.on('query:update', handler);
+      return () => ipcRenderer.removeListener('query:update', handler);
+    },
+  },
+  metadata: input => invoke('metadata', input),
+  schema: {
+    load: input => invoke('schema:load', input),
+    saveRelation: (profileId, relation) => invoke('schema:save-relation', profileId, relation),
+    removeRelation: (profileId, id) => invoke('schema:remove-relation', profileId, id),
+  },
+  exportCSV: input => invoke('export:csv', input),
+  files: { open: () => invoke('files:open'), save: sql => invoke('files:save', sql), database: () => invoke('files:database'), certificate: () => invoke('files:certificate') },
+};
+contextBridge.exposeInMainWorld('studio', api);
