@@ -40,7 +40,7 @@ jobs:
       - run: npm ci
       - name: Prepare embedded JDBC runtime
         run: python scripts/prepare-runtime.py --platform ${{ matrix.platform }}
-      - name: Configure private update source
+      - name: Configure update source
         run: node scripts/write-update-config.mjs
         env:
           UPDATE_REPOSITORY: ${{ vars.UPDATE_REPOSITORY || github.repository }}

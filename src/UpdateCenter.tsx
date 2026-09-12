@@ -17,7 +17,7 @@ export function UpdateCenter({ beforeRestart }: { beforeRestart(): void }) {
     return window.studio.updates.onChange(setState);
   }, []);
   useEffect(() => { if (open) dialog.current?.showModal(); }, [open]);
-  function show() { setRepository(state?.settings.repository ?? ''); setAutomatic(state?.settings.automatic ?? true); setToken(''); setError(''); setEditing(!state?.settings.hasToken); setOpen(true); }
+  function show() { setRepository(state?.settings.repository ?? ''); setAutomatic(state?.settings.automatic ?? true); setToken(''); setError(''); setEditing(!state?.settings.repository); setOpen(true); }
   async function perform(task: () => Promise<unknown>) { setError(''); try { await task(); } catch (error) { setError((error as Error).message); } }
   const busy = !!state && ['checking', 'downloading', 'installing'].includes(state.phase);
   const available = !!state?.version && ['available', 'ready', 'downloading', 'installing'].includes(state.phase);
@@ -41,15 +41,16 @@ export function UpdateCenter({ beforeRestart }: { beforeRestart(): void }) {
         {state?.checkedAt && <small>Последняя проверка: {new Date(state.checkedAt).toLocaleString('ru')}</small>}
         <button className="ssl-summary" onClick={() => setEditing(!editing)}>{editing ? 'Скрыть настройки доступа' : 'Настройки доступа к обновлениям'}</button>
         {editing && <div className="update-access">
-          <label>Приватный GitHub-репозиторий<input placeholder="owner/local-db-viewer-releases" value={repository} disabled={busy} onChange={event => setRepository(event.target.value)} /></label>
-          <label>Личный токен GitHub<input type="password" autoComplete="off" placeholder={state?.settings.hasToken ? 'Сохранён · оставьте пустым, чтобы сохранить' : 'Токен пользователя с доступом к релизам'} value={token} disabled={busy} onChange={event => setToken(event.target.value)} /><small>Токен хранится зашифрованным на этом устройстве. Не используйте общий токен для всех пользователей.</small></label>
+          <label>GitHub-репозиторий<input placeholder="owner/local-db-viewer-releases" value={repository} disabled={busy} onChange={event => setRepository(event.target.value)} /></label>
+          <label>Личный токен GitHub (необязательно)<input type="password" autoComplete="off" placeholder={state?.settings.hasToken ? 'Сохранён · оставьте пустым, чтобы сохранить' : 'Для приватного репозитория'} value={token} disabled={busy} onChange={event => setToken(event.target.value)} /><small>Для публичного репозитория токен не нужен. Сохранённый токен можно удалить кнопкой ниже. Токен хранится зашифрованным только на этом устройстве.</small></label>
+          <small>Обновления используют системные настройки proxy и проверку TLS-сертификатов.</small>
           <label className="checkbox-row"><input type="checkbox" checked={automatic} disabled={busy} onChange={event => setAutomatic(event.target.checked)} />Проверять при запуске и каждые 15 минут</label>
           <button className="button secondary" disabled={busy} onClick={() => void perform(async () => { await window.studio.updates.configure({ repository, automatic, token: token || undefined }); setToken(''); setEditing(false); await window.studio.updates.check(); })}>Сохранить и проверить</button>
           {state?.settings.hasToken && <button className="button secondary" disabled={busy} onClick={() => void perform(() => window.studio.updates.configure({ repository, automatic, token: '' }))}>Удалить токен с устройства</button>}
         </div>}
         {(error || state?.error) && <div className="form-message error" role="alert">{error || state?.error}</div>}
       </div>
-      <div className="dialog-footer"><button className="button secondary" disabled={busy || !state?.settings.hasToken} onClick={() => void perform(() => window.studio.updates.check())}><RefreshCw size={14} className={state?.phase === 'checking' ? 'spin' : ''} />Проверить обновления</button><div className="spacer" />{state?.phase === 'available' && <button className="button primary" onClick={() => void perform(update)}><Download size={15} />Обновить и перезапустить</button>}{state?.phase === 'ready' && <button className="button primary" onClick={() => void perform(restart)}>Перезапустить и обновить</button>}</div>
+      <div className="dialog-footer"><button className="button secondary" disabled={busy || !state?.settings.repository} onClick={() => void perform(() => window.studio.updates.check())}><RefreshCw size={14} className={state?.phase === 'checking' ? 'spin' : ''} />Проверить обновления</button><div className="spacer" />{state?.phase === 'available' && <button className="button primary" onClick={() => void perform(update)}><Download size={15} />Обновить и перезапустить</button>}{state?.phase === 'ready' && <button className="button primary" onClick={() => void perform(restart)}>Перезапустить и обновить</button>}</div>
     </dialog>}
   </>;
 }

@@ -11,6 +11,7 @@ import { csv } from './csv';
 import { MAX_CA_BYTES, validateCertificate, validateSSL } from './tls';
 import { loadSchema, RelationStore, validateRelation } from './schema';
 import { Updater } from './updater';
+import { fetchUpdate } from './update-transport';
 import { installUpdate } from './install-update';
 import { validateJdbc } from './jdbc-config';
 import { describeDriver } from './jdbc-worker';
@@ -104,7 +105,7 @@ void app.whenReady().then(() => {
         for (const id of [...sessions.keys()]) await release(id);
         await window.webContents.session.flushStorageData();
       }); } catch (error) { installingUpdate = false; throw error; }
-    });
+    }, fetchUpdate);
   handle('updates:state', () => updater.state());
   handle('updates:configure', input => updater.configure(input));
   handle('updates:check', () => updater.check());

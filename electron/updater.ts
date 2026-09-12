@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { downloadAsset, latestRelease, selectRelease, validRepository, type UpdateRelease } from './update-source';
+import { downloadAsset, latestRelease, selectRelease, validRepository, type UpdateRelease, type UpdateFetch } from './update-source';
 import type { UpdateState } from '../src/updates';
 
 interface StoredSettings { repository: string; automatic: boolean; encryptedToken?: string }
@@ -16,7 +16,7 @@ export class Updater {
   private busy = false;
   private timer?: ReturnType<typeof setInterval>;
   constructor(private directory: string, private version: string, private encryption: Encryption,
-    private notify: (value: UpdateState) => void, private installer: (path: string, version: string) => Promise<void>) {
+    private notify: (value: UpdateState) => void, private installer: (path: string, version: string) => Promise<void>, private fetchUpdate: UpdateFetch) {
     this.status = { currentVersion: version, phase: 'unconfigured', settings: { repository: '', automatic: true, hasToken: false } };
   }
   async initialize(defaultRepository = ''): Promise<void> {
@@ -34,7 +34,8 @@ export class Updater {
   }
   dispose(): void { clearInterval(this.timer); }
   state(): UpdateState { return structuredClone(this.status); }
-  private configured(): boolean { return !!(this.settings.repository && this.settings.encryptedToken); }
+  private configured(): boolean { return !!this.settings.repository; }
+  private token(): string | undefined { return this.settings.encryptedToken ? this.encryption.decrypt(this.settings.encryptedToken) : undefined; }
   private publish(values: Partial<UpdateState>): UpdateState {
     this.status = { ...this.status, ...values, settings: { repository: this.settings.repository, automatic: this.settings.automatic, hasToken: !!this.settings.encryptedToken } };
     this.notify(this.state()); return this.state();
@@ -61,7 +62,7 @@ export class Updater {
     if (this.downloaded && this.release) return this.publish({ phase: 'ready' });
     this.busy = true; this.publish({ phase: 'checking', error: undefined });
     try {
-      const data = await latestRelease(this.settings.repository, this.encryption.decrypt(this.settings.encryptedToken!));
+      const data = await latestRelease(this.settings.repository, this.token(), this.fetchUpdate);
       this.release = selectRelease(data, this.version, process.platform, process.arch);
       return this.publish({ phase: this.release ? 'available' : 'idle', version: this.release?.version, notes: this.release?.notes, checkedAt: Date.now() });
     } catch (error) { return this.publish({ phase: 'error', error: (error as Error).message }); }
@@ -75,7 +76,7 @@ export class Updater {
     try {
       await mkdir(directory, { recursive: true, mode: 0o700 });
       const path = join(directory, this.release.asset.name);
-      await downloadAsset(this.settings.repository, this.encryption.decrypt(this.settings.encryptedToken!), this.release.asset, path, progress => this.publish({ progress }));
+      await downloadAsset(this.settings.repository, this.token(), this.release.asset, path, progress => this.publish({ progress }), this.fetchUpdate);
       this.downloaded = path; return this.publish({ phase: 'ready', progress: 100 });
     } catch (error) { await rm(directory, { recursive: true, force: true }); return this.publish({ phase: 'error', error: (error as Error).message }); }
     finally { this.busy = false; }

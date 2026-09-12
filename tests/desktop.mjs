@@ -3,11 +3,16 @@ import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createServer } from 'node:http';
+import { testUpdateNetwork } from './update-network.mjs';
+import { installUpdateFixture, restoreUpdateFixture } from './update-fixture.mjs';
+import { createHash } from 'node:crypto';
 
 const root = resolve('.');
 const artifacts = join(root, 'test-artifacts');
 await mkdir(artifacts, { recursive: true });
 const dataDirectory = await mkdtemp(join(tmpdir(), 'local-db-viewer-desktop-'));
+await mkdir(join(dataDirectory, 'updates'));
+await writeFile(join(dataDirectory, 'updates/settings.json'), JSON.stringify({ repository: 'fixture/public', automatic: false }));
 const app = await electron.launch({ executablePath: process.env.LOCAL_DB_VIEWER_EXECUTABLE, args: process.env.LOCAL_DB_VIEWER_EXECUTABLE ? [] : [root], env: { ...process.env, LOCAL_DB_VIEWER_DATA_DIR: dataDirectory }, timeout: 30000 });
 const errors = [];
 const page = await app.firstWindow();
@@ -19,6 +24,7 @@ try {
   await expect(page.locator('.monaco-editor')).toBeVisible();
   await page.screenshot({ path: join(artifacts, 'welcome.png') });
   console.log('PASS: desktop opens, IPC bridge available, Monaco renders');
+  await testUpdateNetwork(app, page, dataDirectory, artifacts);
   const database = join(dataDirectory, 'integration.sqlite');
   await app.evaluate(async (_electron, database) => {
     const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
@@ -169,23 +175,13 @@ try {
 
   const architecture = await app.evaluate(() => process.arch);
   if ((process.platform === 'darwin' && architecture === 'arm64') || (process.platform === 'win32' && architecture === 'x64')) {
-    await app.evaluate(() => {
-      const { createHash } = process.getBuiltinModule('node:crypto');
-      const bytes = Buffer.from('local update fixture');
-      const digest = 'sha256:' + createHash('sha256').update(bytes).digest('hex');
-      globalThis.__updateFetch = globalThis.fetch;
-      globalThis.fetch = async url => {
-        if (String(url).includes('/releases/latest')) return new Response(JSON.stringify({ tag_name: 'v9.9.9', body: 'Test release notes', assets: [
-          { id: 100, name: 'Local-DB-Viewer-9.9.9-mac-arm64.zip', size: bytes.length, digest },
-          { id: 101, name: 'Local-DB-Viewer-9.9.9-windows-x64-setup.exe', size: bytes.length, digest },
-        ] }), { headers: { 'content-type': 'application/json' } });
-        if (String(url).includes('/releases/assets/')) return new Response(bytes);
-        return globalThis.__updateFetch(url);
-      };
-    });
+    const bytes = 'local update fixture';
+    await installUpdateFixture(app, { version: '9.9.9', bytes, size: Buffer.byteLength(bytes), digest: 'sha256:' + createHash('sha256').update(bytes).digest('hex') });
     await page.getByRole('button', { name: 'Обновления Local DB Viewer', exact: true }).click();
     await expect(page.locator('.update-dialog')).toBeVisible();
-    await page.getByLabel('Приватный GitHub-репозиторий', { exact: true }).fill('owner/releases');
+    await expect(page.getByRole('button', { name: 'Проверить обновления', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: 'Настройки доступа к обновлениям', exact: true }).click();
+    await page.getByLabel('GitHub-репозиторий', { exact: true }).fill('owner/releases');
     await page.getByLabel(/^Личный токен GitHub/).fill('fixture-private-update-token');
     await page.getByLabel('Проверять при запуске и каждые 15 минут').uncheck();
     await page.getByRole('button', { name: 'Сохранить и проверить', exact: true }).click();
@@ -203,7 +199,7 @@ try {
     await execute('ROLLBACK');
     await page.screenshot({ path: join(artifacts, 'updates.png') });
     await page.getByRole('button', { name: 'Закрыть обновления', exact: true }).click();
-    await app.evaluate(() => { globalThis.fetch = globalThis.__updateFetch; });
+    await restoreUpdateFixture(app);
     console.log('PASS: update notification, private credentials, verified download and transaction-safe restart guard');
   }
   expect(errors).toEqual([]);

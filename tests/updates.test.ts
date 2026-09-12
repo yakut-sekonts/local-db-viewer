@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { downloadAsset, newerVersion, selectRelease, validRepository } from '../electron/update-source';
+import { downloadAsset, latestRelease, newerVersion, selectRelease, updateNetworkError, validRepository, type UpdateFetch } from '../electron/update-source';
 import { Updater } from '../electron/updater';
 
 test('stable release selection uses numeric versions, architecture and SHA256', () => {
@@ -25,33 +25,32 @@ test('stable release selection uses numeric versions, architecture and SHA256', 
 
 test('download authenticates only to GitHub API and verifies complete bytes before rename', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'local-db-viewer-update-'));
-  const previous = globalThis.fetch;
   const bytes = Buffer.from('verified installer');
   const asset = { id: 4, name: 'installer.exe', size: bytes.length, digest: `sha256:${createHash('sha256').update(bytes).digest('hex')}` };
   const calls: { url: string; authorization: string | null }[] = [];
-  globalThis.fetch = (async (url: any, options: RequestInit) => {
+  let fetchUpdate: UpdateFetch = async (url, options) => {
     calls.push({ url: String(url), authorization: new Headers(options.headers).get('authorization') });
     return String(url).startsWith('https://api.github.com/') ? new Response(null, { status: 302, headers: { location: 'https://release-assets.githubusercontent.com/download/file' } }) : new Response(bytes);
-  }) as typeof fetch;
+  };
   try {
     const file = join(directory, asset.name);
-    await downloadAsset('owner/releases', 'device-token', asset, file, () => {});
+    await downloadAsset('owner/releases', 'device-token', asset, file, () => {}, fetchUpdate);
     assert.deepEqual(await readFile(file), bytes);
     assert.equal(calls[0].authorization, 'Bearer device-token');
     assert.equal(calls[1].authorization, null);
-    await assert.rejects(downloadAsset('owner/releases', 'device-token', { ...asset, digest: `sha256:${'f'.repeat(64)}` }, join(directory, 'bad.exe'), () => {}), /SHA256/);
+    await assert.rejects(downloadAsset('owner/releases', 'device-token', { ...asset, digest: `sha256:${'f'.repeat(64)}` }, join(directory, 'bad.exe'), () => {}, fetchUpdate), /SHA256/);
     assert.deepEqual(await readdir(directory), ['installer.exe']);
-    await assert.rejects(downloadAsset('owner/releases', 'device-token', { ...asset, size: 2 }, join(directory, 'large.exe'), () => {}), /Размер/);
+    await assert.rejects(downloadAsset('owner/releases', 'device-token', { ...asset, size: 2 }, join(directory, 'large.exe'), () => {}, fetchUpdate), /Размер/);
     assert.deepEqual(await readdir(directory), ['installer.exe']);
-    globalThis.fetch = (async () => new Response(null, { status: 302, headers: { location: 'https://attacker.example/collect' } })) as typeof fetch;
-    await assert.rejects(downloadAsset('owner/releases', 'device-token', asset, join(directory, 'redirect.exe'), () => {}), /недопустимый адрес/);
-  } finally { globalThis.fetch = previous; await rm(directory, { recursive: true, force: true }); }
+    fetchUpdate = async () => new Response(null, { status: 302, headers: { location: 'https://attacker.example/collect' } });
+    await assert.rejects(downloadAsset('owner/releases', 'device-token', asset, join(directory, 'redirect.exe'), () => {}, fetchUpdate), /недопустимый адрес/);
+  } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
 test('updater persists only encrypted credentials and preserves them on ordinary settings edits', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'local-db-viewer-update-settings-'));
   const encryption = { encrypt: (value: string) => Buffer.from(value).toString('base64'), decrypt: (value: string) => Buffer.from(value, 'base64').toString() };
-  const updater = new Updater(directory, '0.1.0', encryption, () => {}, async () => {});
+  const updater = new Updater(directory, '0.1.0', encryption, () => {}, async () => {}, async () => new Response(JSON.stringify({ tag_name: 'v0.1.0' })));
   try {
     await updater.initialize();
     await updater.configure({ repository: 'owner/releases', automatic: false, token: 'private-device-token' });
@@ -63,6 +62,81 @@ test('updater persists only encrypted credentials and preserves them on ordinary
     await assert.rejects(updater.install(), /не загружено/);
     await updater.configure({ repository: 'owner/releases', automatic: false, token: '' });
     assert.equal(updater.state().settings.hasToken, false);
-    assert.equal(updater.state().phase, 'unconfigured');
+    assert.equal(updater.state().phase, 'idle');
+    assert.equal((await updater.check()).phase, 'idle');
   } finally { updater.dispose(); await rm(directory, { recursive: true, force: true }); }
+});
+
+test('public updates need no encryption or token, including automatic checks on startup', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'local-db-viewer-public-update-'));
+  const requests: RequestInit[] = [];
+  let checked!: () => void;
+  const done = new Promise<void>(resolve => { checked = resolve; });
+  const encryption = { encrypt(): string { throw new Error('Unexpected encryption'); }, decrypt(): string { throw new Error('Unexpected decryption'); } };
+  const updater = new Updater(directory, '0.2.5', encryption, state => { if (state.checkedAt) checked(); }, async () => {}, async (_url, options) => {
+    requests.push(options);
+    return new Response(JSON.stringify({ tag_name: 'v0.2.5' }));
+  });
+  try {
+    await updater.initialize('owner/public');
+    await done;
+    assert.equal(updater.state().phase, 'idle');
+    assert.equal(updater.state().settings.hasToken, false);
+    assert.equal(requests.length, 1);
+    assert.equal(new Headers(requests[0].headers).has('authorization'), false);
+    assert.equal(requests[0].cache, 'no-store');
+    assert.equal(requests[0].credentials, 'omit');
+  } finally { updater.dispose(); await rm(directory, { recursive: true, force: true }); }
+});
+
+test('public release and verified download recover from an expired saved token', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'local-db-viewer-public-asset-'));
+  const bytes = Buffer.from('public installer');
+  const asset = { id: 8, name: 'public.exe', size: bytes.length, digest: `sha256:${createHash('sha256').update(bytes).digest('hex')}` };
+  const calls: { url: string; auth: string | null }[] = [];
+  const fetchUpdate: UpdateFetch = async (url, options) => {
+    const auth = new Headers(options.headers).get('authorization'); calls.push({ url, auth });
+    if (auth) return new Response(null, { status: 401 });
+    if (url.endsWith('/latest')) return new Response(JSON.stringify({ tag_name: 'v0.2.5' }));
+    if (url.includes('/assets/')) return new Response(null, { status: 302, headers: { location: 'https://release-assets.githubusercontent.com/public' } });
+    return new Response(bytes);
+  };
+  try {
+    assert.deepEqual(await latestRelease('owner/public', 'expired', fetchUpdate), { tag_name: 'v0.2.5' });
+    await downloadAsset('owner/public', 'expired', asset, join(directory, asset.name), () => {}, fetchUpdate);
+    assert.deepEqual(await readFile(join(directory, asset.name)), bytes);
+    assert.deepEqual(calls.map(call => call.auth), ['Bearer expired', null, 'Bearer expired', null, null]);
+    calls.length = 0;
+    await downloadAsset('owner/public', undefined, asset, join(directory, 'anonymous.exe'), () => {}, fetchUpdate);
+    assert.ok(calls.every(call => call.auth === null));
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test('HTTP errors distinguish authentication, missing releases and rate limits', async () => {
+  for (const [status, headers, expected] of [
+    [401, {}, /401.*Токен/], [403, {}, /403.*Доступ запрещён/],
+    [403, { 'x-ratelimit-remaining': '0' }, /лимит/], [429, {}, /лимит/],
+    [404, {}, /404.*опубликованный релиз/], [407, {}, /авторизация.*proxy/], [503, {}, /HTTP 503/],
+  ] as [number, Record<string, string>, RegExp][]) {
+    await assert.rejects(latestRelease('owner/releases', undefined, async () => new Response(null, { status, headers })), expected);
+  }
+  let count = 0;
+  await assert.rejects(latestRelease('owner/private', 'expired', async () => new Response(null, { status: ++count === 1 ? 401 : 404 })), /401/);
+  assert.equal(count, 2);
+});
+
+test('network diagnostics expose codes without leaking URLs or tokens', async () => {
+  for (const [code, expected] of [
+    ['ERR_PROXY_CONNECTION_FAILED', /proxy/], ['ERR_TUNNEL_CONNECTION_FAILED', /proxy/],
+    ['ERR_CERT_AUTHORITY_INVALID', /TLS-сертификат/], ['SELF_SIGNED_CERT_IN_CHAIN', /TLS-сертификат/],
+    ['ERR_NAME_NOT_RESOLVED', /DNS/], ['ENOTFOUND', /DNS/], ['UND_ERR_CONNECT_TIMEOUT', /вовремя/], ['ECONNRESET', /VPN/],
+  ] as const) {
+    const error = new TypeError('fetch failed https://private.test/?token=secret', { cause: new Error(`net::${code} secret`) });
+    const message = updateNetworkError(error, 'api.github.com').message;
+    assert.match(message, expected); assert.ok(message.includes(code));
+    assert.ok(!message.includes('secret')); assert.ok(!message.includes('private.test'));
+    await assert.rejects(latestRelease('owner/releases', undefined, async () => { throw error; }), expected);
+  }
+  assert.match(updateNetworkError(new DOMException('private', 'TimeoutError'), 'api.github.com').message, /ETIMEDOUT/);
+  await assert.rejects(latestRelease('owner/releases', undefined, async () => new Response('<html>proxy login secret</html>')), /proxy/);
 });

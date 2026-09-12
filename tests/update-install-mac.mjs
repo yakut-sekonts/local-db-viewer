@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import * as asar from '@electron/asar';
+import { installUpdateFixture } from './update-fixture.mjs';
 
 if (process.platform !== 'darwin') throw new Error('This test exercises the macOS updater.');
 const execute = promisify(execFile);
@@ -16,6 +17,8 @@ const original = resolve('release/mac-arm64/Local DB Viewer.app');
 const installed = join(work, 'installed/Local DB Viewer.app');
 const replacement = join(work, 'replacement/Local DB Viewer.app');
 const dataDirectory = join(work, 'user-data');
+await mkdir(join(dataDirectory, 'updates'), { recursive: true });
+await writeFile(join(dataDirectory, 'updates/settings.json'), JSON.stringify({ repository: 'fixture/public', automatic: false }));
 const marker = join(work, 'restarted.json');
 const progressPath = join(work, 'restart-progress.json');
 const sourceVersion = JSON.parse(asar.extractFile(join(original, 'Contents/Resources/app.asar'), 'package.json').toString('utf8')).version;
@@ -107,13 +110,7 @@ try {
   await page.locator('.monaco-editor').click({ position: { x: 100, y: 20 } });
   await page.keyboard.press('Meta+A'); await page.keyboard.insertText('SELECT 42 AS kept_sql;');
   await expect(page.locator('.view-lines')).toContainText('SELECT 42 AS kept_sql');
-  await app.evaluate((_electron, { archive, version, size, digest }) => {
-    const { createReadStream } = process.getBuiltinModule('node:fs');
-    const { Readable } = process.getBuiltinModule('node:stream');
-    globalThis.fetch = async url => String(url).includes('/releases/latest')
-      ? new Response(JSON.stringify({ tag_name: `v${version}`, body: 'Isolated update test', assets: [{ id: 1, name: `Local-DB-Viewer-${version}-mac-arm64.zip`, size, digest }] }))
-      : new Response(Readable.toWeb(createReadStream(archive)));
-  }, { archive, version, size, digest });
+  await installUpdateFixture(app, { archive, version, size, digest });
   await page.evaluate(async () => {
     await window.studio.updates.configure({ repository: 'fixture/releases', automatic: false, token: 'isolated-token' });
     await window.studio.updates.check();
