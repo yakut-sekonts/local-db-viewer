@@ -122,7 +122,14 @@ public final class LocalDBViewerBridge {
                 return HexFormat.of().formatHex(data);
             }
         }
-        if (type == Types.CLOB || type == Types.NCLOB || type == Types.LONGVARCHAR || type == Types.LONGNVARCHAR || type == Types.VARCHAR || type == Types.NVARCHAR || type == Types.CHAR || type == Types.NCHAR) {
+        if (type == Types.LONGVARCHAR || type == Types.LONGNVARCHAR || type == Types.VARCHAR || type == Types.NVARCHAR || type == Types.CHAR || type == Types.NCHAR) {
+            // Trino supports getString for character columns but does not
+            // implement getCharacterStream. Reserve streaming for actual LOBs.
+            String value = result.getString(column);
+            if (value != null && value.length() > 4 * 1024 * 1024) throw new SQLException("Text cell exceeds 4 MB; select a smaller value");
+            return value;
+        }
+        if (type == Types.CLOB || type == Types.NCLOB) {
             try (Reader reader = result.getCharacterStream(column)) {
                 if (reader == null) return null;
                 char[] buffer = new char[8192]; StringBuilder output = new StringBuilder(); int count;

@@ -6,6 +6,7 @@ import { mkdtemp, readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { join, resolve, delimiter } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createInterface } from 'node:readline';
+import { LosslessNumber, stringify } from 'lossless-json';
 
 const execute = promisify(execFile);
 const resources = process.env.LOCAL_DB_VIEWER_RESOURCES;
@@ -65,12 +66,22 @@ try {
   const store = join(work, 'server.p12');
   await execute(binary('keytool'), ['-genkeypair', '-alias', 'fixture', '-keyalg', 'RSA', '-keysize', '2048', '-dname', 'CN=localhost', '-ext', 'SAN=DNS:localhost', '-ext', 'BC=ca:true', '-validity', '1', '-storetype', 'PKCS12', '-keystore', store, '-storepass', password, '-keypass', password, '-noprompt']);
   const { stdout: certificate } = await execute(binary('keytool'), ['-exportcert', '-rfc', '-alias', 'fixture', '-keystore', store, '-storepass', password]);
+  const column = (name, type, rawType = type, arguments_ = rawType === 'varchar' ? [2147483647] : []) => ({ name, type, typeSignature: { rawType, arguments: arguments_.map(value => ({ kind: 'LONG', value })) } });
+  // Exercise actual value decoding, including VARCHAR used by SHOW/information_schema.
+  // A numeric-only SELECT 1 cannot detect unsupported JDBC text getters.
+  const columns = [column('id', 'bigint'), column('state_id', 'varchar'), column('note', 'varchar'), column('code', 'char(5)', 'char', [5]), column('dt', 'timestamp(6)', 'timestamp', [6]), column('amount', 'decimal(38,12)', 'decimal', [38, 12]), column('payload', 'varbinary'), column('active', 'boolean')];
+  const rows = [[new LosslessNumber('9223372036854775807'), 'Готово 🌍', 'Кавычки: "\nНовая строка\tтабуляция', 'OK   ', '2026-09-12 12:34:56.123456', '12345678901234567890.123456789012', Buffer.from([0, 127, 128, 255]).toString('base64'), true], Array(8).fill(null), [0, '', '', '     ', null, '0.000000000000', '', false]];
   let authenticated = 0;
   server = createServer({ pfx: await readFile(store), passphrase: password }, async (request, response) => {
-    for await (const _chunk of request) { /* Consume the SQL body. */ }
+    let sql = ''; for await (const chunk of request) sql += chunk.toString('utf8');
     if (request.headers.authorization === `Basic ${Buffer.from(`fixture:${password}`).toString('base64')}`) authenticated++;
+    let resultColumns = columns, data = rows;
+    if (sql === 'SHOW CATALOGS') { resultColumns = [column('Catalog', 'varchar')]; data = [['iceberg'], ['system']]; }
+    if (sql === "SELECT 'fixture:text-limit'" || sql === "SELECT 'fixture:text-overflow'") {
+      resultColumns = [column('text_value', 'varchar')]; data = [['x'.repeat(4 * 1024 * 1024 + (sql.includes('overflow') ? 1 : 0))]];
+    }
     response.setHeader('Content-Type', 'application/json');
-    response.end(JSON.stringify({ id: 'tls-fixture', infoUri: `https://localhost:${server.address().port}/query`, columns: [{ name: 'connected', type: 'bigint', typeSignature: { rawType: 'bigint', arguments: [] } }], data: [[1]], stats: { state: 'FINISHED', queued: false, scheduled: true, nodes: 1, totalSplits: 1, queuedSplits: 0, runningSplits: 0, completedSplits: 1, cpuTimeMillis: 0, wallTimeMillis: 0, queuedTimeMillis: 0, elapsedTimeMillis: 1, processedRows: 1, processedBytes: 8, physicalInputBytes: 8, peakMemoryBytes: 0, spilledBytes: 0 }, warnings: [] }));
+    response.end(stringify({ id: 'tls-fixture', infoUri: `https://localhost:${server.address().port}/query`, columns: resultColumns, data, stats: { state: 'FINISHED', queued: false, scheduled: true, nodes: 1, totalSplits: 1, queuedSplits: 0, runningSplits: 0, completedSplits: 1, cpuTimeMillis: 0, wallTimeMillis: 0, queuedTimeMillis: 0, elapsedTimeMillis: 1, processedRows: data.length, processedBytes: 8, physicalInputBytes: 8, peakMemoryBytes: 0, spilledBytes: 0 }, warnings: [] }));
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port;
@@ -78,7 +89,20 @@ try {
   const config = (host, verification, ca) => ({ engine: 'trino', driverClass: drivers.trino[0], url: `jdbc:trino://${host}:${port}`, properties: { user: 'fixture', password, SSL: 'true', SSLVerification: verification }, sslCa: ca, options: {} });
   const valid = await bridge(config('localhost', 'FULL', certificate), query, 'done');
   assert.equal(valid.snapshot.state, 'FINISHED', valid.snapshot.error);
-  assert.deepEqual(valid.snapshot.rows, [['1']]);
+  assert.deepEqual(valid.snapshot.columns.map(item => item.name), columns.map(item => item.name));
+  assert.deepEqual(valid.snapshot.rows, [['9223372036854775807', ...rows[0].slice(1, 6), '007f80ff', true], Array(8).fill(null), ['0', '', '', '     ', null, '0.000000000000', '', false]]);
+  assert.equal(valid.snapshot.totalRows, 3);
+  const catalogs = await bridge(config('localhost', 'FULL', certificate), { ...query, sql: 'SHOW CATALOGS' }, 'done');
+  assert.equal(catalogs.snapshot.state, 'FINISHED', catalogs.snapshot.error);
+  assert.deepEqual(catalogs.snapshot.rows, [['iceberg'], ['system']]);
+  const textLimit = await bridge(config('localhost', 'FULL', certificate), { ...query, sql: "SELECT 'fixture:text-limit'" }, 'done');
+  assert.equal(textLimit.snapshot.state, 'FINISHED', textLimit.snapshot.error);
+  assert.equal(textLimit.snapshot.rows[0][0].length, 4 * 1024 * 1024);
+  const overflow = await bridge(config('localhost', 'FULL', certificate), { ...query, sql: "SELECT 'fixture:text-overflow'" }, 'done');
+  assert.equal(overflow.snapshot.state, 'FAILED');
+  assert.match(overflow.snapshot.error, /Text cell exceeds 4 MB/);
+  assert.deepEqual(overflow.snapshot.rows, []);
+  console.log('PASS: real Trino JDBC reads text/CHAR, Unicode, NULL, empty strings, exact numbers, timestamps, binary and catalog metadata; text bounds enforced');
   const wrongName = await bridge(config('127.0.0.1', 'FULL', certificate), query, 'done');
   assert.equal(wrongName.snapshot.state, 'FAILED');
   const caOnly = await bridge(config('127.0.0.1', 'CA', certificate), query, 'done');
@@ -91,7 +115,7 @@ try {
   assert.ok(!JSON.stringify([wrongName, untrusted]).includes(password));
   console.log('PASS: real Trino JDBC uses TLS/authentication and distinguishes FULL, CA and NONE verification');
   await mkdir('test-artifacts', { recursive: true });
-  await writeFile('test-artifacts/jdbc-runtime-results.json', JSON.stringify({ passed: true, driverCounts, trinoTLS: { FULL: true, CA: true, NONE: true, rejectedWrongHostname: true, rejectedUntrustedCertificate: true }, testedAt: new Date().toISOString() }, null, 2));
+  await writeFile('test-artifacts/jdbc-runtime-results.json', JSON.stringify({ passed: true, driverCounts, trinoValues: { text: true, char: true, unicode: true, nulls: true, emptyStrings: true, exactNumbers: true, timestamps: true, binary: true, catalogs: true, textLimit: true }, trinoTLS: { FULL: true, CA: true, NONE: true, rejectedWrongHostname: true, rejectedUntrustedCertificate: true }, testedAt: new Date().toISOString() }, null, 2));
 } finally {
   if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
   await rm(work, { recursive: true, force: true });

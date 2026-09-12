@@ -1,11 +1,11 @@
-# Local DB Viewer 0.2.2
+# Local DB Viewer 0.2.3
 
 Desktop SQL IDE для Trino, PostgreSQL, MySQL, MariaDB, SQLite, Microsoft SQL Server и ClickHouse. Интерфейс выполнен по предоставленному референсу DataGrip: тёмная тема, Database Explorer, SQL-консоли, Files и нижняя панель Services с результатами. Это самостоятельное приложение, не продукт JetBrains.
 
 ## Установка в профиль пользователя
 
-- **macOS 13 и новее, Apple Silicon (ARM64, M1 и новее):** откройте `Local-DB-Viewer-0.2.2-mac-arm64.dmg` и скопируйте `Local DB Viewer.app` в `~/Applications`. Папку можно создать в своей домашней директории. Intel Mac не поддерживается.
-- **Windows 11 x64:** запустите `Local-DB-Viewer-0.2.2-windows-x64-setup.exe`. NSIS устанавливает приложение для текущего пользователя в `%LOCALAPPDATA%\Programs\Local DB Viewer`, создаёт ярлыки и не запрашивает elevation. Используются `perMachine: false`, `allowElevation: false`, `asInvoker`.
+- **macOS 13 и новее, Apple Silicon (ARM64, M1 и новее):** откройте `Local-DB-Viewer-0.2.3-mac-arm64.dmg` и скопируйте `Local DB Viewer.app` в `~/Applications`. Папку можно создать в своей домашней директории. Intel Mac не поддерживается.
+- **Windows 11 x64:** запустите `Local-DB-Viewer-0.2.3-windows-x64-setup.exe`. NSIS устанавливает приложение для текущего пользователя в `%LOCALAPPDATA%\Programs\Local DB Viewer`, создаёт ярлыки и не запрашивает elevation. Используются `perMachine: false`, `allowElevation: false`, `asInvoker`.
 
 Node.js, Java, Python и отдельная установка драйверов пользователю не требуются. Сборка macOS имеет локальную ad-hoc подпись, но не Developer ID/notarization; Windows не имеет Authenticode-подписи. После обновления ad-hoc сборки macOS может повторно запросить разрешение Keychain; постоянный Developer ID нужен для стабильного доступа без таких запросов. Корпоративные политики запуска, Gatekeeper и SmartScreen действуют независимо от возможности установки без прав администратора.
 
