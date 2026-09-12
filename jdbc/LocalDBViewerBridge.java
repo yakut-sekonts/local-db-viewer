@@ -13,7 +13,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /** One process owns one JDBC connection. stdout is reserved for the JSON protocol. */
 public final class LocalDBViewerBridge {
     private static final Gson JSON = new GsonBuilder().disableHtmlEscaping().serializeNulls().create();
-    private static final PrintStream PROTOCOL = System.out;
+    // Windows may give System.out a legacy code page even when file.encoding
+    // is UTF-8. The Node bridge always decodes this JSON channel as UTF-8.
+    private static final PrintStream PROTOCOL = new PrintStream(new FileOutputStream(FileDescriptor.out), true, StandardCharsets.UTF_8);
     private static final ExecutorService QUERIES = Executors.newSingleThreadExecutor();
     private static final AtomicBoolean CANCELED = new AtomicBoolean();
     private static volatile Statement runningStatement;

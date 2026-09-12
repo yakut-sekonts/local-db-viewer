@@ -19,7 +19,9 @@ const password = 'local-fixture-password';
 let server;
 
 async function bridge(config, request, expectedKind) {
-  const child = spawn(binary('java'), ['-Xmx256m', '--enable-native-access=ALL-UNNAMED', '-cp', [join(common, '*')].join(delimiter), 'LocalDBViewerBridge'], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+  // Simulate a Windows legacy stdout encoding on every OS: the bridge must
+  // explicitly encode its JSON protocol as UTF-8 instead of inheriting this.
+  const child = spawn(binary('java'), ['-Xmx256m', '-Dstdout.encoding=windows-1252', '--enable-native-access=ALL-UNNAMED', '-cp', [join(common, '*')].join(delimiter), 'LocalDBViewerBridge'], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
   child.stderr.resume();
   const lines = createInterface({ input: child.stdout });
   try {
