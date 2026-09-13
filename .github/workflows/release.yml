@@ -51,9 +51,10 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - name: Test packaged desktop
-        timeout-minutes: 12
+        timeout-minutes: 20
         shell: bash
         run: |
+          node scripts/test-connections.mjs
           if [ "$RUNNER_OS" = "macOS" ]; then
             export LOCAL_DB_VIEWER_EXECUTABLE="$GITHUB_WORKSPACE/release/mac-arm64/Local DB Viewer.app/Contents/MacOS/Local DB Viewer"
             export LOCAL_DB_VIEWER_RESOURCES="$GITHUB_WORKSPACE/release/mac-arm64/Local DB Viewer.app/Contents/Resources"
@@ -62,15 +63,18 @@ jobs:
             npm run test:ui
             node tests/driver-desktop.mjs
             node tests/hardening-desktop.mjs
+            node tests/settings-desktop.mjs
             node tests/update-install-mac.mjs
           else
             export LOCAL_DB_VIEWER_RESOURCES="$GITHUB_WORKSPACE/release/win-unpacked/resources"
             node tests/jdbc-runtime.mjs
             node tests/jdbc-streaming.mjs
             node tests/windows-install.mjs
+            node tests/update-install-windows.mjs
             export LOCAL_DB_VIEWER_EXECUTABLE="$GITHUB_WORKSPACE/release/win-unpacked/Local DB Viewer.exe"
             node tests/driver-desktop.mjs
             node tests/hardening-desktop.mjs
+            node tests/settings-desktop.mjs
           fi
       - uses: actions/upload-artifact@v7
         with:

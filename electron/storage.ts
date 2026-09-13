@@ -46,6 +46,14 @@ export class ProfileStore {
     const jdbcSecrets = Object.keys(jdbc?.properties ?? {}).filter(secretProperty);
     const jdbcEnvironmentNames = Object.keys(jdbc?.environment ?? {});
     const visibleJdbc = jdbc ? { ...jdbc, properties: Object.fromEntries(Object.entries(jdbc.properties ?? {}).filter(([name]) => !secretProperty(name))), environment: {} } : undefined;
+    if (visibleJdbc?.ssh) {
+      const { password, passphrase, ...ssh } = visibleJdbc.ssh;
+      visibleJdbc.ssh = { ...ssh, hasPassword: Boolean(password), hasPassphrase: Boolean(passphrase) };
+    }
+    if (visibleJdbc?.certificates) {
+      const { trustStorePassword, clientKeyPassword, clientStorePassword, ...certificates } = visibleJdbc.certificates;
+      visibleJdbc.certificates = { ...certificates, savedSecrets: Object.entries({ trustStorePassword, clientKeyPassword, clientStorePassword }).filter(([, value]) => value).map(([key]) => key) };
+    }
     return { ...rest, jdbc: visibleJdbc, jdbcSecrets, jdbcEnvironmentNames, tls: sslEnabled(rest), sslVerification: rest.sslVerification ?? 'FULL', hasSecret: Boolean(encryptedSecret) };
   }
   async list(): Promise<Profile[]> { return (await this.read()).map(profile => this.public(profile)); }
@@ -61,6 +69,12 @@ export class ProfileStore {
     const jdbc = draft.jdbc ? { ...draft.jdbc,
       properties: { ...Object.fromEntries(Object.entries(previous?.jdbc?.properties ?? {}).filter(([name]) => secretProperty(name))), ...draft.jdbc.properties },
       environment: { ...previous?.jdbc?.environment, ...draft.jdbc.environment },
+      ssh: draft.jdbc.ssh ? { ...draft.jdbc.ssh, password: draft.jdbc.ssh.password ?? previous?.jdbc?.ssh?.password, passphrase: draft.jdbc.ssh.passphrase ?? previous?.jdbc?.ssh?.passphrase } : undefined,
+      certificates: draft.jdbc.certificates ? { ...draft.jdbc.certificates,
+        trustStorePassword: draft.jdbc.certificates.trustStorePassword ?? previous?.jdbc?.certificates?.trustStorePassword,
+        clientKeyPassword: draft.jdbc.certificates.clientKeyPassword ?? previous?.jdbc?.certificates?.clientKeyPassword,
+        clientStorePassword: draft.jdbc.certificates.clientStorePassword ?? previous?.jdbc?.certificates?.clientStorePassword,
+      } : undefined,
     } : undefined;
     return validateConnection({
       id: draft.id ?? randomUUID(), name: draft.name, endpoint: draft.endpoint,

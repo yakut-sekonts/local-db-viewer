@@ -1,5 +1,8 @@
 import type { DatabaseEngine } from './shared';
 export interface JdbcSettings {
+  ssh?: SshSettings;
+  certificates?: CertificateSettings;
+  schemas?: SchemaSettings;
   driverId?: string;
   productId?: string;
   driverVersion?: string;
@@ -17,8 +20,55 @@ export interface JdbcSettings {
     connectTimeoutSeconds?: number;
     queryTimeoutSeconds?: number;
     startupStatements?: string[];
+    singleSession?: boolean;
+    keepAliveSeconds?: number;
+    keepAliveQuery?: string;
+    autoDisconnectSeconds?: number;
+    autoSync?: boolean;
+    introspectionMinutes?: number;
+    trackSchemaChanges?: boolean;
+    loadSystemSchemas?: boolean;
+    beforeConnect?: BeforeConnectTask[];
   };
 }
+export interface SshSettings {
+  enabled: boolean;
+  host: string;
+  port: number;
+  user: string;
+  authentication: 'password' | 'key' | 'agent';
+  privateKeyPath?: string;
+  password?: string;
+  passphrase?: string;
+  hasPassword?: boolean;
+  hasPassphrase?: boolean;
+  fingerprint: string;
+  localPort?: number;
+  connectTimeoutSeconds?: number;
+}
+export interface CertificateSettings {
+  trustSource?: 'driver' | 'java' | 'system' | 'file';
+  trustStorePath?: string;
+  trustStoreType?: 'JKS' | 'PKCS12' | 'PEM';
+  trustStorePassword?: string;
+  clientMode?: 'none' | 'pem' | 'store' | 'system';
+  clientCertificatePath?: string;
+  clientKeyPath?: string;
+  clientKeyPassword?: string;
+  clientStorePath?: string;
+  clientStoreType?: 'JKS' | 'PKCS12';
+  clientStorePassword?: string;
+  savedSecrets?: string[];
+}
+export interface SchemaSettings {
+  mode: 'all' | 'selected';
+  selected: { catalog: string; schema: string }[];
+  includePattern?: string;
+  excludePattern?: string;
+  objectInclude?: string;
+  objectExclude?: string;
+}
+export interface BeforeConnectTask { id: string; name: string; executable: string; args: string[]; timeoutSeconds: number; enabled: boolean }
 export interface JdbcProperty { name: string; description?: string; value?: string; required: boolean; choices?: string[] }
 export const DRIVER_CLASSES: Record<DatabaseEngine, string> = {
   jdbc: '',

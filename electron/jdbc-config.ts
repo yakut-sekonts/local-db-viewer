@@ -4,10 +4,12 @@ import type { ProfileDraft } from '../src/shared';
 import type { Connection } from './trino';
 import { singleStatement } from './sql';
 import { driverDefinition, profileDriver, sqlEngine, DATABASE_PRODUCTS } from '../src/drivers';
+import { validateConnectionOptions } from './connection-options';
 
 export function validateJdbc(input: JdbcSettings | undefined): void {
   if (input === undefined) return;
   if (!input || typeof input !== 'object' || JSON.stringify(input).length > 256000) throw new Error('Некорректные настройки JDBC.');
+  validateConnectionOptions(input);
   if (input.driverId) driverDefinition(input.driverId);
   if (input.productId && !DATABASE_PRODUCTS.some(product => product.id === input.productId)) throw new Error('Неизвестный тип СУБД.');
   if (input.driverVersion && !/^(bundled|[a-f0-9]{64})$/.test(input.driverVersion)) throw new Error('Некорректная версия драйвера.');
@@ -35,6 +37,7 @@ export function jdbcConfig(profile: Connection | ProfileDraft) {
   const engine = profile.engine;
   const custom = profile.jdbc ?? {};
   custom.options?.startupStatements?.forEach(sql => singleStatement(sql, sqlEngine(profile)));
+  if (custom.options?.keepAliveQuery?.trim()) singleStatement(custom.options.keepAliveQuery, sqlEngine(profile));
   const properties: Record<string, string> = Object.create(null);
   let url: string;
   if (engine === 'jdbc') {

@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { downloadAsset, latestRelease, driverCatalog, selectRelease, validRepository, type UpdateRelease, type UpdateFetch } from './update-source';
 import type { UpdateState } from '../src/updates';
+import { installState } from './update-install-state';
 
 interface StoredSettings { repository: string; automatic: boolean; encryptedToken?: string }
 interface Encryption { encrypt(value: string): string; decrypt(value: string): string }
@@ -20,6 +21,11 @@ export class Updater {
     this.status = { currentVersion: version, phase: 'unconfigured', settings: { repository: '', automatic: true, hasToken: false } };
   }
   async initialize(defaultRepository = ''): Promise<void> {
+    const installation = await installState(this.directory);
+    if (installation && installation.phase !== 'complete' && installation.version !== this.version) {
+      this.status.installationError = installation.phase === 'error' ? `Не удалось установить ${installation.version}: ${installation.message}`
+        : `Предыдущая установка ${installation.version} не завершена (${installation.phase}). Текущая версия: ${this.version}.`;
+    } else if (installation?.phase === 'error') this.status.installationError = `Обновление установлено, но перезапуск завершился с ошибкой: ${installation.message}`;
     try {
       const input: StoredSettings = JSON.parse(await readFile(join(this.directory, 'settings.json'), 'utf8'));
       this.settings = { repository: input.repository ? validRepository(input.repository) : '', automatic: input.automatic !== false, encryptedToken: input.encryptedToken };
@@ -86,7 +92,7 @@ export class Updater {
   }
   async install(): Promise<void> {
     if (this.busy || !this.downloaded || !this.release) throw new Error('Обновление ещё не загружено.');
-    this.busy = true; this.publish({ phase: 'installing', error: undefined });
+    this.busy = true; this.publish({ phase: 'installing', error: undefined, installationError: undefined });
     try {
       const hash = createHash('sha256'); let size = 0;
       for await (const chunk of createReadStream(this.downloaded)) { size += chunk.length; hash.update(chunk); }

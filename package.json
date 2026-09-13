@@ -1,11 +1,11 @@
 {
   "name": "local-db-viewer",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Desktop database IDE with a versioned JDBC driver catalog",
   "main": "dist-electron/main.cjs",
   "scripts": {
-    "build": "npm run build:jdbc && tsc --noEmit && vite build --logLevel warn && node scripts/build-electron.mjs",
+    "build": "node scripts/build-windows-updater.mjs && npm run build:jdbc && tsc --noEmit && vite build --logLevel warn && node scripts/build-electron.mjs",
     "start": "npm run build && electron .",
     "start:built": "electron .",
     "test": "tsx --test tests/*.test.ts",
@@ -106,7 +106,7 @@
         "to": "updater",
         "filter": [
           "update-mac.sh",
-          "update-windows.ps1"
+          "update-windows.exe"
         ]
       },
       {
@@ -127,6 +127,7 @@
     "pg": "^8.23.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "ssh2": "1.17.0",
     "tedious": "^20.0.0",
     "undici": "^7.29.1"
   },
@@ -136,6 +137,7 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@types/ssh2": "1.15.6",
     "@vitejs/plugin-react": "^6.1.1",
     "electron": "^44.3.0",
     "electron-builder": "^26.15.3",

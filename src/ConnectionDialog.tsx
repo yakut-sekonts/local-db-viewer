@@ -4,6 +4,7 @@ import { ENGINES, type Profile, type ProfileDraft } from './shared';
 import { sslEnabled, usesHTTP } from './connectionSettings';
 import { JdbcPanel, JdbcOptions } from './JdbcPanel';
 import { SSLPanel } from './SSLPanel';
+import { SSHPanel, CertificatePanel, SchemasPanel } from './ConnectionExtras';
 import { DATABASE_PRODUCTS, driverDefinition, productName } from './drivers';
 import { DriverSelection } from './DriverCenter';
 
@@ -11,7 +12,7 @@ export function ConnectionDialog({ profile, onClose, onSaved, onDeleted }: {
   profile?: Profile; onClose(): void; onSaved(profile: Profile): void; onDeleted(id: string): void;
 }) {
   const [draft, setDraft] = useState<ProfileDraft>(profile ? { ...profile, tls: sslEnabled(profile), jdbc: profile.jdbc ?? {} } : { name: '', endpoint: 'http://localhost:8080', user: '', auth: 'none', engine: 'trino', tls: false, sslVerification: 'FULL', catalog: '', schema: '', jdbc: {} });
-  const [section, setSection] = useState<'general' | 'options' | 'ssl' | 'advanced'>('general');
+  const [section, setSection] = useState<'general' | 'options' | 'ssl' | 'schemas' | 'advanced'>('general');
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [success, setSuccess] = useState(false);
@@ -31,7 +32,7 @@ export function ConnectionDialog({ profile, onClose, onSaved, onDeleted }: {
   return <dialog ref={dialog} className="connection-dialog" onCancel={event => { if (busy) event.preventDefault(); else onClose(); }}>
     <form onSubmit={event => { event.preventDefault(); void perform('save'); }}>
       <div className="dialog-heading"><div className="large-icon"><Database size={22} /></div><div><h2>{profile ? 'Настройки подключения' : 'Новое подключение'}</h2><p>Local DB Viewer · {productName(draft)}</p></div><button type="button" className="icon-button close-dialog" aria-label="Закрыть" disabled={!!busy} onClick={onClose}><X size={18} /></button></div>
-      <div className="connection-tabs" role="tablist" aria-label="Настройки подключения">{(['general', 'options', 'ssl', 'advanced'] as const).map(value => <button key={value} type="button" role="tab" aria-selected={section === value} onClick={() => setSection(value)}>{{general: 'General', options: 'Options', ssl: 'SSL/TLS', advanced: 'Advanced'}[value]}</button>)}</div>
+      <div className="connection-tabs" role="tablist" aria-label="Настройки подключения">{(['general', 'options', 'ssl', 'schemas', 'advanced'] as const).map(value => <button key={value} type="button" role="tab" aria-selected={section === value} onClick={() => setSection(value)}>{{general: 'General', options: 'Options', ssl: 'SSH/SSL', schemas: 'Schemas', advanced: 'Advanced'}[value]}</button>)}</div>
       <div className="dialog-body">
         <div className="general-settings" hidden={section !== 'general'}>
         <label>СУБД<select aria-label="СУБД" value={draft.jdbc?.productId || draft.engine} disabled={!!profile || !!busy} onChange={event => {
@@ -48,8 +49,9 @@ export function ConnectionDialog({ profile, onClose, onSaved, onDeleted }: {
         <DriverSelection draft={draft} onChange={setDraft} />
         </div>
         {section === 'advanced' && <JdbcPanel draft={draft} onChange={setDraft} onError={setMessage} />}
-        {section === 'options' && <JdbcOptions draft={draft} onChange={setDraft} />}
-        {section === 'ssl' && <SSLPanel draft={draft} busy={!!busy} onError={setMessage} onChange={value => { setDraft(value); setMessage(''); }} />}
+        {section === 'options' && <JdbcOptions draft={draft} onChange={setDraft} onError={setMessage} />}
+        {section === 'schemas' && <SchemasPanel draft={draft} onChange={setDraft} onError={setMessage} />}
+        {section === 'ssl' && <><SSHPanel draft={draft} onChange={setDraft} onError={setMessage} /><SSLPanel draft={draft} busy={!!busy} onError={setMessage} onChange={value => { setDraft(value); setMessage(''); }} /><CertificatePanel draft={draft} onChange={setDraft} onError={setMessage} /></>}
         {message && <div role="status" className={`form-message ${success ? 'success' : 'error'}`}>{success && <Check size={16} />}<span>{message}</span></div>}
       </div>
       <div className="dialog-footer">{profile && <button type="button" className="icon-button danger" aria-label="Удалить подключение" disabled={!!busy} onClick={() => void perform('delete')}><Trash2 size={17} /></button>}<button type="button" className="button secondary" disabled={!!busy} onClick={() => void perform('test')}>{busy === 'test' ? <LoaderCircle className="spin" size={15} /> : <PlugZap size={15} />}Проверить</button><div className="spacer" /><button className="button primary" type="submit" disabled={!!busy}>{busy === 'save' && <LoaderCircle className="spin" size={15} />}Сохранить</button></div>

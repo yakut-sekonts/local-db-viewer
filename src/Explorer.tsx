@@ -57,6 +57,12 @@ export function Explorer({ profile, onAdd, onPreview, onSelectSchema, onRefresh 
   const [revision, setRevision] = useState(0);
   const [truncated, setTruncated] = useState(false);
   useEffect(() => {
+    const options = profile?.jdbc?.options, minutes = options?.introspectionMinutes ?? 0;
+    if (!profile || options?.autoSync === false || options?.trackSchemaChanges === false || !minutes) return;
+    const timer = setInterval(() => setRevision(value => value + 1), minutes * 60000);
+    return () => clearInterval(timer);
+  }, [profile]);
+  useEffect(() => {
     let disposed = false;
     setCatalogs([]); setError(''); setFilter(''); setTruncated(false);
     if (!profile) { setBusy(false); return; }

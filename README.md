@@ -1,11 +1,11 @@
-# Local DB Viewer 0.3.0
+# Local DB Viewer 0.4.0
 
 Desktop SQL IDE с 71 вариантом JDBC-подключения. Семь драйверов входят в дистрибутив; расширенный каталог содержит SQL, аналитические системы и NoSQL через JDBC. Интерфейс выполнен по предоставленному референсу DataGrip: тёмная тема, Database Explorer, SQL-консоли, Files и нижняя панель Services с результатами. Это самостоятельное приложение, не продукт JetBrains.
 
 ## Установка в профиль пользователя
 
-- **macOS 13 и новее, Apple Silicon (ARM64, M1 и новее):** откройте `Local-DB-Viewer-0.3.0-mac-arm64.dmg` и скопируйте `Local DB Viewer.app` в `~/Applications`. Папку можно создать в своей домашней директории. Intel Mac не поддерживается.
-- **Windows 11 x64:** запустите `Local-DB-Viewer-0.3.0-windows-x64-setup.exe`. NSIS устанавливает приложение для текущего пользователя в `%LOCALAPPDATA%\Programs\Local DB Viewer`, создаёт ярлыки и не запрашивает elevation. Используются `perMachine: false`, `allowElevation: false`, `asInvoker`.
+- **macOS 13 и новее, Apple Silicon (ARM64, M1 и новее):** откройте `Local-DB-Viewer-0.4.0-mac-arm64.dmg` и скопируйте `Local DB Viewer.app` в `~/Applications`. Папку можно создать в своей домашней директории. Intel Mac не поддерживается.
+- **Windows 11 x64:** запустите `Local-DB-Viewer-0.4.0-windows-x64-setup.exe`. NSIS устанавливает приложение для текущего пользователя в `%LOCALAPPDATA%\Programs\Local DB Viewer`, создаёт ярлыки и не запрашивает elevation. Используются `perMachine: false`, `allowElevation: false`, `asInvoker`.
 
 Node.js, Java и Python отдельно не требуются. Семь базовых JDBC-драйверов встроены; дополнительные устанавливаются из окна «JDBC-драйверы». Сборка macOS имеет локальную ad-hoc подпись, но не Developer ID/notarization; Windows не имеет Authenticode-подписи. После обновления ad-hoc сборки macOS может повторно запросить разрешение Keychain; постоянный Developer ID нужен для стабильного доступа без таких запросов. Корпоративные политики запуска, Gatekeeper и SmartScreen действуют независимо от возможности установки без прав администратора.
 
@@ -15,19 +15,30 @@ Node.js, Java и Python отдельно не требуются. Семь ба�
 
 Для PostgreSQL и SQL Server база задаётся в URL, например `postgresql://host:5432/analytics` или `mssql://host:1433/analytics`. Для MySQL/MariaDB можно использовать URL или поле Database. Для ClickHouse URL — HTTP endpoint, а база задаётся в поле Database. У Trino укажите catalog/schema или выберите schema значком рядом с ней в Database Explorer.
 
-`Ctrl+Enter` / `⌘+Enter` выполняет выделение либо содержимое консоли. Выполняется одна SQL-команда за раз. `Ctrl/⌘+T` открывает консоль, `Ctrl/⌘+O` — SQL-файл, `Ctrl/⌘+S` сохраняет SQL. Консоли используют отдельные сессии; доступна отмена запроса. Закрытие сессии завершает её и откатывает незавершённую транзакцию. Отмена SQLite закрывает worker и откатывает его транзакцию.
+`Ctrl+Enter` / `⌘+Enter` выполняет выделение либо содержимое консоли. Выполняется одна SQL-команда за раз. `Ctrl/⌘+T` открывает консоль, `Ctrl/⌘+O` — SQL-файл, `Ctrl/⌘+S` сохраняет SQL. По умолчанию консоли используют отдельные сессии; Single session mode объединяет консоли и метаданные одного подключения в одно последовательное соединение; доступна отмена запроса. Закрытие сессии завершает её и откатывает незавершённую транзакцию. Отмена SQLite закрывает worker и откатывает его транзакцию.
 
 Результаты доступны в таблице с фильтром, страницами и CSV-экспортом. Сохраняется до выбранного лимита (максимум 10 000 строк и 8 MB на результат); оставшиеся строки читаются без сохранения. Экспорт включает сохранённые строки. `bigint` и точные decimal хранятся строками, чтобы не округлять их в JavaScript. JDBC-режим сохраняет точность SQL Server decimal/numeric и money. Для старых профилей с legacy-драйвером tedious значения с precision > 15 требуют `CAST(... AS varchar(...))`; открытие и сохранение настроек переводит профиль на JDBC. Редактирование ячеек с записью в БД пока не реализовано.
 
 ## Настройки JDBC и SSL
 
-General задаёт URL, credentials и начальную schema. Для Trino с портом 8443 включите SSL/TLS → Use SSL: адрес станет `https://host:8443`, а JDBC получит `SSL=true`. По умолчанию `SSLVerification=FULL`. Доступны CA (проверка цепочки) и NONE (без проверки сертификата), импорт CA в PEM. Секреты и CA из пользовательских подключений не входят в репозиторий или установщики.
+General задаёт URL, credentials и начальную schema. Для Trino с портом 8443 включите SSH/SSL → Use SSL: адрес станет `https://host:8443`, а JDBC получит `SSL=true`. По умолчанию `SSLVerification=FULL`. Доступны CA (проверка цепочки) и NONE (без проверки сертификата), импорт CA в PEM. Секреты и CA из пользовательских подключений не входят в репозиторий или установщики.
 
 Advanced читает свойства через `Driver.getPropertyInfo` и передаёт заданные строки напрямую в JDBC `Properties`. Встроены Trino 483, PostgreSQL 42.7.13, MySQL 26.7.0, MariaDB 3.5.10, SQLite 3.53.4.0, SQL Server 13.6.0 и ClickHouse 0.10.0. Произвольные дополнительные параметры поддерживаются; Advanced заменяет значения General, параметры собственного JDBC URL имеют приоритет. Password/token/credentials вводятся в таблице свойств, а не в URL.
 
-Options поддерживает read-only, Auto/Manual transaction control, isolation, connection/query timeout и startup statements. Поддержка конкретного свойства и протокола аутентификации определяется JDBC-драйвером и сервером. Встроенный SSH tunnel, отдельная вкладка Schemas, полное управление сессиями и интерфейс DDL mappings ещё не реализованы; это не полная копия всех возможностей DataGrip.
+Options поддерживает read-only, Auto/Manual transaction control, isolation, connection/query timeout, startup statements, Single session mode, keep-alive и auto-disconnect. Таймеры отключаются значением 0 и не вмешиваются в активные запросы/транзакции. Before connection запускает указанный executable с отдельными аргументами без shell, по порядку; timeout или ненулевой exit code прекращает подключение. Эти задачи выполняются также перед Test Connection и новой сессией метаданных. В общем режиме COMMIT/ROLLBACK действует на транзакцию всех консолей этого подключения.
+
+SSH/SSL поддерживает SSH по password, private key/passphrase или SSH agent (Pageant на Windows). Fingerprint SHA256 нужно сверить с администратором сервера и явно сохранить. Смена ключа блокирует соединение. Встроенный SSH transport доступен для Trino, Presto, PostgreSQL, MySQL, MariaDB, SQL Server и ClickHouse; JDBC URL сохраняет настоящее имя сервера для TLS. Другим JDBC-драйверам нужна отдельная интеграция их proxy/socket API. Динамический локальный порт рекомендуется; фиксированный порт занят одним туннелем.
+
+В панели сертификатов выбираются truststore драйвера, встроенной Java, системы либо файл PEM/PKCS12/JKS. Trino/Presto поддерживают client PEM, keystore и system keystore; PostgreSQL — PKCS8/PKCS12 (alias user), MySQL/MariaDB — client keystore, ClickHouse — PEM. SQL Server client certificate и специфичные режимы сторонних драйверов задаются поддерживаемыми ими параметрами Advanced. Режимы не включают SSL автоматически: SSL должен быть включён в General/Advanced. Секреты SSH и пароли keystore шифруются средствами ОС; файлы ключей остаются на устройстве. Поддержка системного хранилища зависит от провайдера встроенной Java; ошибка провайдера показывается явно.
+
+Schemas задаёт выбранные catalog/schema и glob-фильтры объектов. `*` означает любые символы, `?` — один символ, по одному pattern на строку; исключение имеет приоритет. Пустой Selected schemas исключает все объекты. Фильтры действуют на Explorer и автодополнение, не ограничивают права на выполнение SQL. Auto sync и периодическое обновление настраиваются в Options; фоновая индексация ограничена 32 выбранными схемами, остальные загружаются при явном обращении в SQL. Track databases/schemas обновляет дерево с заданным интервалом. Это клиентская фильтрация: отдельный JDBC-драйвер может запрашивать более широкий набор метаданных у сервера.
+
+DDL mappings, сохранённые шаблоны сессий и полная эквивалентность автодополнения DataGrip пока не реализованы.
 
 ## Обновления на устройствах
+
+Windows 0.4.0 использует отдельный EXE helper вместо PowerShell-скрипта. IDE закрывается только после подтверждения готовности helper. NSIS получает каталог запущенного приложения, после установки проверяется версия EXE и подтверждается старт новой IDE. Ошибка установки сохраняется в `updates/install-state.json` и показывается при следующем запуске; журнал конкретной попытки находится в `updates/<id>/install.log` внутри профиля приложения. Если старая версия закрывается, но не обновляется, один раз установите 0.4.0 вручную поверх прежней копии: старый механизм обновления не может исправить сам себя до установки новой версии.
+
 
 Исходники и Releases находятся в публичном репозитории [yakut-sekonts/local-db-viewer](https://github.com/yakut-sekonts/local-db-viewer). Кнопка с колокольчиком в заголовке показывает установленную версию и открывает настройки обновления.
 
@@ -110,3 +121,5 @@ Workflow собирает обе платформы на их ОС. Windows пр
 Изменения коммитятся в Git. Для релиза обновите версию `package.json` и `package-lock.json`, добавьте запись `CHANGELOG.md`, затем отправьте commit и tag `vX.Y.Z`. Workflow `.github/workflows/release.yml` проверяет код, собирает macOS ARM64 и Windows x64, запускает тесты упакованного приложения и публикует Releases только после успешных сборок обеих платформ. Установщики опубликованной версии не заменяются: исправление выпускается следующим номером.
 
 Java/JDBC загружаются из официальных источников по закреплённым SHA256 в `build/runtime-lock.json`. Runtime, node_modules, пользовательские данные и дистрибутивы не коммитятся в Git. Для Windows-подготовки используйте `python scripts/prepare-runtime.py --platform windows-x64`; для компиляции задайте `JAVA_HOME` на JDK 21 или новее. Пользовательской установке JDK не нужен.
+
+`node scripts/test-connections.mjs` проверяет настоящий Trino JDBC через SSH с remote DNS и mutual TLS, отказ по неверному fingerprint, общий SQLite session, запрет idle-close транзакции и Before connection. `node tests/update-install-windows.mjs` запускается только на одноразовом Windows CI: два настоящих NSIS-пакета, Unicode/пробелы в пути, обновление по клику, проверка старта новой версии и сохранности SQL/подключений.

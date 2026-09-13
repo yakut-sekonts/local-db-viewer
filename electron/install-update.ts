@@ -1,11 +1,12 @@
 import { app } from 'electron';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
-import { access, copyFile, mkdir, realpath, rm } from 'node:fs/promises';
-import { constants } from 'node:fs';
+import { access, copyFile, mkdir, realpath, rm, readFile, writeFile } from 'node:fs/promises';
+import { constants, createReadStream } from 'node:fs';
 import { dirname, join, relative, isAbsolute } from 'node:path';
 import { homedir } from 'node:os';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
+import { installState } from './update-install-state';
 
 const execute = promisify(execFile);
 function under(path: string, root: string): boolean { const value = relative(root, path); return !!value && !isAbsolute(value) && value !== '..' && !value.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`); }
@@ -42,9 +43,29 @@ export async function installUpdate(artifact: string, version: string, readyToQu
     const executable = await realpath(process.execPath);
     if (!under(executable, await realpath(homedir()))) throw new Error('Для обновления без прав администратора установите Local DB Viewer для текущего пользователя.');
     await access(dirname(executable), constants.W_OK);
-    const helper = join(work, 'update.ps1'); await copyFile(join(helperRoot, 'update-windows.ps1'), helper);
-    await readyToQuit();
-    await detached(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32/WindowsPowerShell/v1.0/powershell.exe'), ['-NoProfile', '-NonInteractive', '-File', helper, '-ParentProcessId', String(process.pid), '-Installer', artifact, '-Application', executable, '-LogPath', log]);
-    app.quit();
+    const helper = join(work, 'update-windows.exe'); await copyFile(join(helperRoot, 'update-windows.exe'), helper);
+    const request = join(work, 'install-request.json'), token = randomUUID(), ready = join(work, 'helper-ready.json');
+    await rm(ready, { force: true });
+    const hash = createHash('sha256'); for await (const chunk of createReadStream(artifact)) hash.update(chunk);
+    await writeFile(request, JSON.stringify({ parentId: process.pid, application: executable, installer: artifact, version, token, sha256: hash.digest('hex'), status: join(dirname(work), 'install-state.json') }), { mode: 0o600 });
+    const child = spawn(helper, [request], { detached: true, stdio: 'ignore', windowsHide: true, cwd: work });
+    let launchError: Error | undefined;
+    child.once('error', error => { launchError = error; });
+    try {
+      const deadline = Date.now() + 20000;
+      for (;;) {
+        if (launchError) throw new Error(`Не удалось запустить Windows update helper: ${launchError.message}`);
+        if (child.exitCode !== null) {
+          const state = await installState(dirname(work));
+          throw new Error(state?.token === token ? state.message : `Windows update helper завершился до запуска установщика (${child.exitCode}).`);
+        }
+        const response = await readFile(ready, 'utf8').then(text => JSON.parse(text) as { token: string }).catch(() => undefined);
+        if (response?.token === token) break;
+        if (Date.now() >= deadline) throw new Error('Windows не подтвердил запуск update helper за 20 секунд. Приложение оставлено открытым; проверьте блокировку запуска файла средствами организации.');
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      await readyToQuit();
+      child.unref(); app.quit();
+    } catch (error) { child.kill(); throw error; }
   } else throw new Error('Эта платформа не поддерживает установку обновления.');
 }

@@ -1,3 +1,4 @@
+import { PathField } from './ConnectionExtras';
 import { useEffect, useState } from 'react';
 import { driverDefinition, profileDriver } from './drivers';
 import type { ProfileDraft } from './shared';
@@ -48,7 +49,7 @@ export function JdbcPanel({ draft, onChange, onError }: { draft: ProfileDraft; o
   </div>;
 }
 
-export function JdbcOptions({ draft, onChange }: { draft: ProfileDraft; onChange(draft: ProfileDraft): void }) {
+export function JdbcOptions({ draft, onChange, onError }: { draft: ProfileDraft; onChange(draft: ProfileDraft): void; onError(message: string): void }) {
   const options = draft.jdbc?.options ?? {};
   const change = (values: Partial<NonNullable<JdbcSettings['options']>>) => onChange({ ...draft, jdbc: { ...draft.jdbc, options: { ...options, ...values } } });
   return <div className="jdbc-options">
@@ -57,6 +58,19 @@ export function JdbcOptions({ draft, onChange }: { draft: ProfileDraft; onChange
     <label>Transaction control<select value={options.autoCommit === false ? 'manual' : 'auto'} onChange={event => change({ autoCommit: event.target.value === 'auto' })}><option value="auto">Auto</option><option value="manual">Manual</option></select><small>В Manual завершайте транзакцию командой COMMIT или ROLLBACK.</small></label>
     <label>Transaction isolation<select value={options.isolation ?? 'default'} onChange={event => change({ isolation: event.target.value as any })}><option value="default">Driver default</option><option value="read-uncommitted">Read uncommitted</option><option value="read-committed">Read committed</option><option value="repeatable-read">Repeatable read</option><option value="serializable">Serializable</option></select></label>
     <div className="form-row"><label>Connection timeout, sec<input type="number" min={0} max={86400} value={options.connectTimeoutSeconds ?? 30} onChange={event => change({ connectTimeoutSeconds: Number(event.target.value) })} /></label><label>Query timeout, sec<input type="number" min={0} max={86400} value={options.queryTimeoutSeconds ?? 0} onChange={event => change({ queryTimeoutSeconds: Number(event.target.value) })} /><small>0 — без ограничения</small></label></div>
+    <label className="checkbox-row"><input type="checkbox" checked={options.singleSession ?? false} onChange={event => change({ singleSession: event.target.checked })} />Single session mode</label>
+    <small>Все консоли и метаданные этого подключения используют одну JDBC-сессию. Запросы выполняются последовательно; транзакция общая.</small>
+    <div className="form-row"><label>Keep-alive interval, sec<input type="number" min={0} max={86400} value={options.keepAliveSeconds ?? 0} onChange={event => change({ keepAliveSeconds: Number(event.target.value) })} /></label><label>Auto-disconnect after, sec<input type="number" min={0} max={86400} value={options.autoDisconnectSeconds ?? 0} onChange={event => change({ autoDisconnectSeconds: Number(event.target.value) })} /></label></div>
+    <label>Keep-alive query<input placeholder="Driver connection.isValid" value={options.keepAliveQuery ?? ''} onChange={event => change({ keepAliveQuery: event.target.value })} /><small>0 отключает таймер. Минимальный интервал — 5 секунд. Во время запроса или открытой транзакции keep-alive и auto-disconnect не выполняются.</small></label>
+    <h3>Introspection</h3>
+    <label className="checkbox-row"><input type="checkbox" checked={options.autoSync ?? true} onChange={event => change({ autoSync: event.target.checked })} />Auto sync</label>
+    <label>Automatic introspection interval, minutes<input type="number" min={0} max={1440} value={options.introspectionMinutes ?? 0} onChange={event => change({ introspectionMinutes: Number(event.target.value) })} /><small>0 — без периодического обновления. Ручное обновление доступно всегда.</small></label>
+    <label className="checkbox-row"><input type="checkbox" checked={options.trackSchemaChanges ?? true} onChange={event => change({ trackSchemaChanges: event.target.checked })} />Track databases / schemas creation and deletion</label>
+    <label className="checkbox-row"><input type="checkbox" checked={options.loadSystemSchemas ?? true} onChange={event => change({ loadSystemSchemas: event.target.checked })} />Load system schemas</label>
+    <h3>Before connection</h3>
+    {(options.beforeConnect ?? []).map(task => <fieldset key={task.id}><label className="checkbox-row"><input type="checkbox" checked={task.enabled} onChange={event => change({ beforeConnect: options.beforeConnect?.map(item => item.id === task.id ? { ...item, enabled: event.target.checked } : item) })} />Enabled</label><label>Name<input value={task.name} onChange={event => change({ beforeConnect: options.beforeConnect?.map(item => item.id === task.id ? { ...item, name: event.target.value } : item) })} /></label><PathField label="Executable" value={task.executable} kind="executable" onError={onError} onChange={executable => change({ beforeConnect: options.beforeConnect?.map(item => item.id === task.id ? { ...item, executable } : item) })} /><label>Arguments · один на строку<textarea rows={3} value={task.args.join('\n')} onChange={event => change({ beforeConnect: options.beforeConnect?.map(item => item.id === task.id ? { ...item, args: event.target.value ? event.target.value.split('\n') : [] } : item) })} /></label><label>Timeout, sec<input type="number" min={1} max={300} value={task.timeoutSeconds} onChange={event => change({ beforeConnect: options.beforeConnect?.map(item => item.id === task.id ? { ...item, timeoutSeconds: Number(event.target.value) } : item) })} /></label><button className="button secondary" type="button" onClick={() => change({ beforeConnect: options.beforeConnect?.filter(item => item.id !== task.id) })}>Удалить задачу</button></fieldset>)}
+    <button className="button secondary" type="button" onClick={() => change({ beforeConnect: [...(options.beforeConnect ?? []), { id: crypto.randomUUID(), name: 'Before connection', executable: '', args: [], timeoutSeconds: 30, enabled: true }] })}>Добавить задачу</button>
+    <small>Задачи выполняются по порядку перед новой JDBC-сессией, включая проверку подключения. Без shell; при ошибке подключение прекращается.</small>
     <label>Startup script<textarea rows={6} placeholder="SQL выполняется при открытии каждой JDBC-сессии" value={(options.startupStatements ?? []).join('\n-- next statement --\n')} onChange={event => change({ startupStatements: event.target.value.trim() ? event.target.value.split('\n-- next statement --\n') : [] })} /><small>Каждый блок — один SQL-запрос. Разделитель блоков: -- next statement -- на отдельной строке.</small></label>
   </div>;
 }

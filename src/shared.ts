@@ -87,7 +87,8 @@ export interface SchemaInput { profileId: string; catalog: string; schema: strin
 export interface JdbcDialect { quote: string; catalogs: boolean; schemas: boolean; catalogAtStart: boolean; catalogSeparator: string; unquotedCase: 'lower' | 'upper' | 'preserve'; fullOuterJoins: boolean }
 export interface SchemaIndex extends SchemaInput { dialect?: JdbcDialect; tables: TableMeta[]; relationships: Relationship[]; warnings: string[] }
 export interface DesktopAPI {
-  jdbc: { properties(profile: ProfileDraft): Promise<import('./jdbc').JdbcProperty[]>; preview(input: MetadataInput): Promise<string> };
+  jdbc: { properties(profile: ProfileDraft): Promise<import('./jdbc').JdbcProperty[]>; preview(input: MetadataInput): Promise<string>; browse(profile: ProfileDraft, input: Omit<MetadataInput, 'profileId'>): Promise<MetadataResult> };
+  ssh: { fingerprint(host: string, port: number): Promise<string> };
   drivers: import('./drivers').DriversAPI;
   updates: import('./updates').UpdateAPI;
   profiles: {
@@ -109,6 +110,6 @@ export interface DesktopAPI {
     removeRelation(profileId: string, id: string): Promise<void>;
   };
   exportCSV(input: { columns: Column[]; rows: Cell[][] }): Promise<boolean>;
-  files: { open(): Promise<{ name: string; sql: string } | null>; save(sql: string): Promise<boolean>; database(): Promise<string | null>; certificate(): Promise<{ name: string; pem: string } | null> };
+  files: { path(kind: 'certificate' | 'key' | 'store' | 'ddl' | 'executable'): Promise<string | null>; open(): Promise<{ name: string; sql: string } | null>; save(sql: string): Promise<boolean>; database(): Promise<string | null>; certificate(): Promise<{ name: string; pem: string } | null> };
 }
 declare global { interface Window { studio: DesktopAPI } }

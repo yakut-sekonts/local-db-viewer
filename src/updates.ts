@@ -11,6 +11,7 @@ export interface UpdateState {
   notes?: string;
   progress?: number;
   error?: string;
+  installationError?: string;
   checkedAt?: number;
 }
 export interface UpdateAPI {

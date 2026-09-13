@@ -9,7 +9,8 @@ async function invoke(channel: string, ...args: unknown[]): Promise<any> {
 }
 
 const api: DesktopAPI = {
-  jdbc: { properties: profile => invoke('jdbc:properties', profile), preview: input => invoke('jdbc:preview', input) },
+  jdbc: { properties: profile => invoke('jdbc:properties', profile), preview: input => invoke('jdbc:preview', input), browse: (profile, input) => invoke('jdbc:browse', profile, input) },
+  ssh: { fingerprint: (host, port) => invoke('ssh:fingerprint', host, port) },
   drivers: {
     state: () => invoke('drivers:state'), check: () => invoke('drivers:check'), automatic: enabled => invoke('drivers:automatic', enabled),
     install: id => invoke('drivers:install', id), select: (id, key) => invoke('drivers:select', id, key), import: (id, version) => invoke('drivers:import', id, version),
@@ -53,6 +54,6 @@ const api: DesktopAPI = {
     removeRelation: (profileId, id) => invoke('schema:remove-relation', profileId, id),
   },
   exportCSV: input => invoke('export:csv', input),
-  files: { open: () => invoke('files:open'), save: sql => invoke('files:save', sql), database: () => invoke('files:database'), certificate: () => invoke('files:certificate') },
+  files: { path: kind => invoke('files:path', kind), open: () => invoke('files:open'), save: sql => invoke('files:save', sql), database: () => invoke('files:database'), certificate: () => invoke('files:certificate') },
 };
 contextBridge.exposeInMainWorld('studio', api);

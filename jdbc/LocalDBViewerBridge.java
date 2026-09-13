@@ -25,6 +25,7 @@ public final class LocalDBViewerBridge {
     private static JsonObject config;
     private static final Properties properties = new Properties();
     private static boolean explicitTransaction;
+    private static boolean certificatesReady;
     private static final List<Path> temporaryFiles = new ArrayList<>();
 
     private static String string(JsonObject value, String key, String fallback) {
@@ -45,6 +46,9 @@ public final class LocalDBViewerBridge {
                 String secret = properties.getProperty(key); if (!secret.isEmpty()) text = text.replace(secret, "<hidden>");
             }
         }
+        if (config.has("certificates")) for (Map.Entry<String, JsonElement> field : config.getAsJsonObject("certificates").entrySet()) {
+            if (field.getKey().endsWith("Password") && field.getValue().isJsonPrimitive()) { String secret = field.getValue().getAsString(); if (!secret.isEmpty()) text = text.replace(secret, "<hidden>"); }
+        }
         return text.length() > 12000 ? text.substring(0, 12000) : text;
     }
     private static Driver driver() throws Exception {
@@ -53,6 +57,7 @@ public final class LocalDBViewerBridge {
     private static JsonObject options() { return config.has("options") ? config.getAsJsonObject("options") : new JsonObject(); }
     private static Connection connect() throws Exception {
         if (connection != null && !connection.isClosed()) return connection;
+        if (!certificatesReady) { prepareCertificates(); certificatesReady = true; }
         DriverManager.setLoginTimeout(number(options(), "connectTimeoutSeconds", 30));
         if (string(config, "engine", "").equals("sqlite") && bool(options(), "readOnly", false)) properties.putIfAbsent("open_mode", "1");
         connection = driver().connect(config.get("url").getAsString(), properties);
@@ -76,7 +81,9 @@ public final class LocalDBViewerBridge {
         } catch (Exception failure) { connection.close(); connection = null; throw failure; }
     }
     private static void prepareCertificates() throws Exception {
+        JdbcCertificates.apply(config, properties, temporaryFiles);
         String pem = string(config, "sslCa", ""); if (pem.isBlank()) return;
+        if (config.has("certificates") && !string(config.getAsJsonObject("certificates"), "trustSource", "driver").equals("driver")) return;
         String engine = string(config, "engine", "");
         Path certificate = Files.createTempFile("local-db-viewer-ca-", ".pem");
         temporaryFiles.add(certificate); Files.writeString(certificate, pem);
@@ -241,6 +248,7 @@ public final class LocalDBViewerBridge {
     }
     private static void inspect(JsonObject request) {
         String kind = string(request, "kind", ""); JsonObject result = message(kind);
+        if (request.has("requestId")) result.add("requestId", request.get("requestId"));
         try {
             String catalog = string(request, "catalog", ""), schema = string(request, "schema", ""), table = string(request, "table", "");
             switch (kind) {
@@ -250,12 +258,21 @@ public final class LocalDBViewerBridge {
                     result.addProperty("value", "Driver loaded");
                 }
                 case "test" -> { DatabaseMetaData metadata = connect().getMetaData(); result.addProperty("value", "Соединение установлено · " + metadata.getDatabaseProductName() + " · " + metadata.getDriverVersion()); }
+                case "ping" -> {
+                    if (connection == null || connection.isClosed()) throw new SQLException("Connection is closed");
+                    if (!connection.getAutoCommit() || explicitTransaction) { result.addProperty("value", true); break; }
+                    String sql = string(request, "sql", "");
+                    if (sql.isBlank()) { if (!connection.isValid(10)) throw new SQLException("Connection is no longer valid"); }
+                    else try (Statement statement = connection.createStatement()) { statement.setQueryTimeout(10); statement.setMaxRows(1); statement.execute(sql); }
+                    result.addProperty("value", true);
+                }
                 case "metadata" -> result.add("value", JdbcMetadata.read(connect(), string(request, "operation", ""), catalog, schema, table));
                 case "schema" -> result.add("value", JdbcMetadata.index(connect(), string(request, "profileId", ""), catalog, schema));
                 case "preview" -> result.addProperty("value", JdbcMetadata.preview(connect(), catalog, schema, table));
                 default -> throw new SQLException("Unknown JDBC inspection");
             }
         } catch (Throwable failure) { result.addProperty("error", error(failure)); }
+        try { result.addProperty("inTransaction", connection != null && !connection.isClosed() && (!connection.getAutoCommit() || explicitTransaction)); } catch (SQLException ignored) {}
         send(result);
     }
     private static void close() {
@@ -285,14 +302,13 @@ public final class LocalDBViewerBridge {
                 Thread.currentThread().setContextClassLoader(driverLoader);
             }
             if (config.has("properties")) for (Map.Entry<String, JsonElement> item : config.getAsJsonObject("properties").entrySet()) properties.setProperty(item.getKey(), item.getValue().getAsString());
-            prepareCertificates();
             String line;
             while ((line = reader.readLine()) != null) {
                 JsonObject request = JsonParser.parseString(line).getAsJsonObject();
                 switch (request.get("kind").getAsString()) {
                     case "run" -> { CANCELED.set(false); QUERIES.submit(() -> run(request)); }
                     case "properties" -> QUERIES.submit(LocalDBViewerBridge::describe);
-                    case "probe", "test", "metadata", "schema", "preview" -> QUERIES.submit(() -> inspect(request));
+                    case "probe", "test", "metadata", "schema", "preview", "ping" -> QUERIES.submit(() -> inspect(request));
                     case "cancel" -> {
                         CANCELED.set(true);
                         Thread.ofVirtual().start(() -> { JsonObject result = message("cancel"); try { Statement statement = runningStatement; if (statement != null) statement.cancel(); } catch (Throwable failure) { result.addProperty("error", error(failure)); } send(result); });

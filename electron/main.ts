@@ -5,6 +5,10 @@ import { randomUUID } from 'node:crypto';
 import { readFile, writeFile, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { DatabaseSession, type QueryTask } from './database';
+import { SessionPool, type SessionLease } from './session-pool';
+import { sshFingerprint } from './ssh';
+import { filterMetadata } from './metadata-settings';
+import { filterSchema, schemaAllowed, isSystemSchema } from '../src/schemaSettings';
 import { metadataSQL } from './sql';
 import { ProfileStore } from './storage';
 import { csv } from './csv';
@@ -13,6 +17,7 @@ import { loadSchema, RelationStore, validateRelation } from './schema';
 import { Updater } from './updater';
 import { fetchUpdate } from './update-transport';
 import { installUpdate } from './install-update';
+import { confirmUpdateStartup } from './update-install-state';
 import { validateJdbc } from './jdbc-config';
 import { describeDriver, inspectJdbc } from './jdbc-worker';
 import { DriverManager } from './driver-manager';
@@ -32,7 +37,8 @@ const useLegacyStorage = !explicitDataDirectory && !existsSync(newDirectory) && 
 // Existing installations retain that service and userData path after a rename.
 app.setName(useLegacyStorage ? legacyName : productName);
 app.setPath('userData', explicitDataDirectory || (useLegacyStorage ? legacyDirectory : newDirectory));
-const sessions = new Map<string, { profileId: string; session: DatabaseSession }>();
+const sessions = new Map<string, SessionLease>();
+const sessionPool = new SessionPool(prepareDriver);
 const active = new Map<string, { query: QueryTask; sessionId: string; done: Promise<unknown> }>();
 let window: BrowserWindow;
 let profiles: ProfileStore;
@@ -42,7 +48,8 @@ let drivers: DriverManager;
 let driversReady: Promise<void>;
 let installingUpdate = false;
 let pendingDatabaseOperations = 0;
-const transactions = new Set<string>();
+const openingSessions = new Set<string>();
+const hasTransactions = () => [...sessions.values()].some(entry => entry.session.inTransaction);
 const entry = join(__dirname, '../dist/index.html');
 
 function string(value: unknown, name: string, limit = 512): asserts value is string {
@@ -67,12 +74,26 @@ async function prepareDriver(connection: Connection): Promise<Connection> {
   return { ...connection, driverClasspath: await drivers.paths(profileDriver(connection), connection.jdbc.driverVersion) };
 }
 
+async function readMetadata(connection: Connection, input: Omit<MetadataInput, 'profileId'>): Promise<MetadataResult> {
+  if (!input || typeof input !== 'object') throw new Error('Некорректный metadata request.');
+  const identifiers = [input.catalog, input.schema, input.table];
+  const depth = { catalogs: 0, schemas: 1, tables: 2, columns: 3 }[input.kind];
+  if (depth === undefined) throw new Error('Неизвестный metadata request.');
+  for (let i = 0; i < depth; i++) { string(identifiers[i], 'identifier'); if (!identifiers[i] && (connection.engine !== 'jdbc' || i === 2)) throw new Error('Пустой identifier.'); }
+  const lease = await sessionPool.acquire(connection), session = lease.session;
+  try {
+    if (connection.engine === 'jdbc') return await session.inspect<MetadataResult>({ ...input, kind: 'metadata', operation: input.kind });
+    const result = await session.createQuery(randomUUID(), 10000).run(metadataSQL(connection.engine, { ...input, profileId: connection.id }));
+    if (result.state !== 'FINISHED') throw new Error(result.error ?? 'Запрос отменён.');
+    return { columns: result.columns, rows: result.rows, truncated: result.truncated };
+  } finally { await lease.release(); }
+}
+
 async function release(id: string): Promise<void> {
   if ([...active.values()].some(job => job.sessionId === id)) throw new Error('Сначала завершите или отмените запрос.');
   const stored = sessions.get(id);
-  await stored?.session.close();
+  await stored?.release();
   sessions.delete(id);
-  transactions.delete(id);
 }
 
 function handle(name: string, fn: (...args: any[]) => unknown): void {
@@ -80,7 +101,7 @@ function handle(name: string, fn: (...args: any[]) => unknown): void {
     if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || event.senderFrame.url !== pathToFileURL(entry).href) {
       throw new Error('Недоверенный IPC sender.');
     }
-    const databaseOperation = ['query:run', 'profiles:test', 'metadata', 'schema:load', 'jdbc:properties', 'jdbc:preview', 'drivers:install', 'drivers:import', 'drivers:select'].includes(name);
+    const databaseOperation = ['query:run', 'profiles:test', 'metadata', 'schema:load', 'jdbc:properties', 'jdbc:preview', 'jdbc:browse', 'ssh:fingerprint', 'drivers:install', 'drivers:import', 'drivers:select'].includes(name);
     if (!databaseOperation) return fn(...args);
     if (installingUpdate) throw new Error('Приложение обновляется.');
     pendingDatabaseOperations++;
@@ -109,15 +130,16 @@ void app.whenReady().then(() => {
     webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true },
   });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.once('did-finish-load', () => { void confirmUpdateStartup(join(app.getPath('userData'), 'updates'), app.getVersion()).catch(() => {}); });
   window.webContents.on('will-navigate', event => event.preventDefault());
   window.webContents.on('will-attach-webview', event => event.preventDefault());
   updater = new Updater(join(app.getPath('userData'), 'updates'), app.getVersion(), encryption,
     value => { if (!window.isDestroyed()) window.webContents.send('updates:change', value); },
     async (path, version) => {
-      if (active.size || transactions.size || pendingDatabaseOperations || drivers?.isBusy()) throw new Error('Завершите запросы и выполните COMMIT или ROLLBACK перед обновлением.');
+      if (active.size || hasTransactions() || pendingDatabaseOperations || drivers?.isBusy()) throw new Error('Завершите запросы и выполните COMMIT или ROLLBACK перед обновлением.');
       installingUpdate = true;
       try { await installUpdate(path, version, async () => {
-        if (active.size || transactions.size) throw new Error('Обнаружена активная сессия. Обновление отложено.');
+        if (active.size || hasTransactions()) throw new Error('Обнаружена активная сессия. Обновление отложено.');
         for (const id of [...sessions.keys()]) await release(id);
         await window.webContents.session.flushStorageData();
       }); } catch (error) { installingUpdate = false; throw error; }
@@ -159,7 +181,7 @@ void app.whenReady().then(() => {
   });
   handle('profiles:save', async (draft: ProfileDraft) => {
     validateDraft(draft);
-    if (draft.id && [...sessions.values()].some(item => item.profileId === draft.id)) throw new Error('Закройте консоли этого подключения перед изменением.');
+    if (draft.id && sessionPool.hasProfile(draft.id)) throw new Error('Отключите консоли и дождитесь загрузки метаданных перед изменением подключения.');
     return profiles.save(draft);
   });
   handle('profiles:remove', async (id: string) => {
@@ -194,10 +216,13 @@ void app.whenReady().then(() => {
     if ([...active.values()].some(job => job.sessionId === input.sessionId)) throw new Error('В этой консоли уже выполняется запрос.');
     const previous = sessions.get(input.sessionId);
     if (previous && previous.profileId !== input.profileId) throw new Error('Консоль привязана к другому подключению.');
-    const session = previous?.session ?? new DatabaseSession(await prepareDriver(connection));
-    sessions.set(input.sessionId, { profileId: input.profileId, session });
+    if (openingSessions.has(input.sessionId)) throw new Error('Сессия уже открывается.');
+    openingSessions.add(input.sessionId);
+    let lease: SessionLease;
+    try { lease = previous ?? await sessionPool.acquire(connection, input.sessionId); } finally { openingSessions.delete(input.sessionId); }
+    const session = lease.session;
+    sessions.set(input.sessionId, lease);
     const query = session.createQuery(input.requestId, input.maxRows, result => {
-      if (result.inTransaction) transactions.add(input.sessionId); else transactions.delete(input.sessionId);
       if (!window.isDestroyed()) window.webContents.send('query:update', result);
     }, input.catalog, input.schema);
     const done = query.run(input.sql).finally(() => active.delete(input.requestId));
@@ -211,15 +236,16 @@ void app.whenReady().then(() => {
     if (!input || typeof input !== 'object') throw new Error('Некорректный запрос схемы.');
     for (const name of ['profileId', 'catalog', 'schema'] as const) string(input[name], name);
     const connection = await profiles.get(input.profileId);
+    if (!schemaAllowed(connection.jdbc?.schemas, input.catalog, input.schema) || connection.jdbc?.options?.loadSystemSchemas === false && isSystemSchema(input.catalog, input.schema)) return { ...input, tables: [], relationships: [], warnings: [] };
+    const lease = await sessionPool.acquire(connection), session = lease.session;
+    try {
     if (connection.engine === 'jdbc') {
-      const index = await inspectJdbc<SchemaIndex>(await prepareDriver(connection), { ...input, kind: 'schema' });
+      const index = await session.inspect<SchemaIndex>({ ...input, kind: 'schema' });
       const visible = new Set(index.tables.map(table => JSON.stringify([table.catalog, table.schema, table.name])));
       index.relationships.push(...(await relations.list(input.profileId)).filter(relation => [relation.source, relation.target].some(table => visible.has(JSON.stringify([table.catalog, table.schema, table.name])))));
-      return index;
+      return filterSchema(index, connection.jdbc?.schemas);
     }
-    const session = new DatabaseSession(await prepareDriver(connection));
-    try {
-      return await loadSchema(connection, input, async sql => {
+      return filterSchema(await loadSchema(connection, input, async sql => {
         const id = randomUUID();
         const query = session.createQuery(id, 10000);
         const done = query.run(sql);
@@ -230,8 +256,8 @@ void app.whenReady().then(() => {
           if (result.state !== 'FINISHED') throw new Error(result.error ?? 'Загрузка метаданных отменена или превысила 60 секунд.');
           return { columns: result.columns, rows: result.rows, truncated: result.truncated };
         } finally { clearTimeout(timeout); active.delete(id); }
-      }, await relations.list(input.profileId));
-    } finally { await session.close(); }
+      }, await relations.list(input.profileId)), connection.jdbc?.schemas);
+    } finally { await lease.release(); }
   });
   handle('schema:save-relation', async (profileId: string, relation: Relationship) => {
     string(profileId, 'profileId');
@@ -245,32 +271,27 @@ void app.whenReady().then(() => {
     await relations.change(profileId, items => items.filter(item => item.id !== id));
   });
   handle('metadata', async (input: MetadataInput) => {
-    if (installingUpdate) throw new Error('Приложение обновляется.');
     if (!input || typeof input !== 'object') throw new Error('Некорректный metadata request.');
     string(input.profileId, 'profileId');
     const connection = await profiles.get(input.profileId);
-    const identifiers = [input.catalog, input.schema, input.table];
-    const depth = { catalogs: 0, schemas: 1, tables: 2, columns: 3 }[input.kind];
-    if (depth === undefined) throw new Error('Неизвестный metadata request.');
-    for (let i = 0; i < depth; i++) { string(identifiers[i], 'identifier'); if (!identifiers[i] && (connection.engine !== 'jdbc' || i === 2)) throw new Error('Пустой identifier.'); }
-    if (connection.engine === 'jdbc') return inspectJdbc<MetadataResult>(await prepareDriver(connection), { ...input, kind: 'metadata', operation: input.kind });
-    const sql = metadataSQL(connection.engine, input);
-    const id = randomUUID();
-    const session = new DatabaseSession(await prepareDriver(connection));
-    const query = session.createQuery(id, 10000);
-    const done = query.run(sql);
-    active.set(id, { query, sessionId: id, done });
-    try {
-      const result = await done;
-      if (result.state !== 'FINISHED') throw new Error(result.error ?? 'Запрос отменён.');
-      return { columns: result.columns, rows: result.rows, truncated: result.truncated };
-    } finally { active.delete(id); await session.close(); }
+    return filterMetadata(connection, input, await readMetadata(connection, input));
+  });
+  handle('jdbc:browse', async (draft: ProfileDraft, input: Omit<MetadataInput, 'profileId'>) => {
+    validateDraft(draft);
+    return readMetadata({ ...await profiles.resolve(draft), id: `draft:${randomUUID()}` }, input);
+  });
+  handle('ssh:fingerprint', sshFingerprint);
+  handle('files:path', async (kind: string) => {
+    if (!['certificate','key','store','ddl','executable'].includes(kind)) throw new Error('Неизвестный тип файла.');
+    const result = await dialog.showOpenDialog(window, { title: kind, properties: ['openFile'] });
+    return result.canceled ? null : result.filePaths[0] ?? null;
   });
   handle('jdbc:preview', async (input: MetadataInput) => {
     if (!input || typeof input !== 'object') throw new Error('Некорректный запрос таблицы.');
     for (const name of ['profileId', 'catalog', 'schema', 'table'] as const) string(input[name], name);
     if (!input.table) throw new Error('Укажите таблицу.');
-    return inspectJdbc<string>(await prepareDriver(await profiles.get(input.profileId)), { ...input, kind: 'preview' });
+    const lease = await sessionPool.acquire(await profiles.get(input.profileId));
+    try { return await lease.session.inspect<string>({ ...input, kind: 'preview' }); } finally { await lease.release(); }
   });
   handle('export:csv', async (input) => {
     if (!input || !Array.isArray(input.columns) || !Array.isArray(input.rows) || input.rows.length > 10000 || !input.rows.every(Array.isArray)) throw new Error('Некорректный результат.');
@@ -316,12 +337,13 @@ app.on('before-quit', event => {
   updater?.dispose();
   drivers?.dispose();
   event.preventDefault();
-  const shutdownTimeout = setTimeout(() => app.exit(0), 20000);
+  const shutdownTimeout = setTimeout(() => { void sessionPool.abortAll().finally(() => app.exit(0)); }, 20000);
   void (async () => {
     const jobs = [...active.values()];
     await Promise.allSettled(jobs.map(job => job.query.cancel()));
     await Promise.allSettled(jobs.map(job => job.done));
     await Promise.allSettled([...sessions.keys()].map(release));
+    await sessionPool.abortAll();
     clearTimeout(shutdownTimeout);
     app.quit();
   })();
