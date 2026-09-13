@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DesktopAPI, QuerySnapshot } from '../src/shared';
+import type { DriversState } from '../src/drivers';
 import type { UpdateState } from '../src/updates';
 
 async function invoke(channel: string, ...args: unknown[]): Promise<any> {
@@ -8,7 +9,15 @@ async function invoke(channel: string, ...args: unknown[]): Promise<any> {
 }
 
 const api: DesktopAPI = {
-  jdbc: { properties: profile => invoke('jdbc:properties', profile) },
+  jdbc: { properties: profile => invoke('jdbc:properties', profile), preview: input => invoke('jdbc:preview', input) },
+  drivers: {
+    state: () => invoke('drivers:state'), check: () => invoke('drivers:check'), automatic: enabled => invoke('drivers:automatic', enabled),
+    install: id => invoke('drivers:install', id), select: (id, key) => invoke('drivers:select', id, key), import: (id, version) => invoke('drivers:import', id, version),
+    onChange: listener => {
+      const handler = (_: Electron.IpcRendererEvent, state: DriversState) => listener(state);
+      ipcRenderer.on('drivers:change', handler); return () => ipcRenderer.removeListener('drivers:change', handler);
+    },
+  },
   updates: {
     state: () => invoke('updates:state'),
     configure: input => invoke('updates:configure', input),

@@ -1,6 +1,7 @@
 import com.google.gson.*;
 import java.io.*;
 import java.math.*;
+import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.security.*;
@@ -20,6 +21,7 @@ public final class LocalDBViewerBridge {
     private static final AtomicBoolean CANCELED = new AtomicBoolean();
     private static volatile Statement runningStatement;
     private static Connection connection;
+    private static ClassLoader driverLoader = LocalDBViewerBridge.class.getClassLoader();
     private static JsonObject config;
     private static final Properties properties = new Properties();
     private static boolean explicitTransaction;
@@ -46,7 +48,7 @@ public final class LocalDBViewerBridge {
         return text.length() > 12000 ? text.substring(0, 12000) : text;
     }
     private static Driver driver() throws Exception {
-        return (Driver) Class.forName(config.get("driverClass").getAsString()).getDeclaredConstructor().newInstance();
+        return (Driver) Class.forName(config.get("driverClass").getAsString(), true, driverLoader).getDeclaredConstructor().newInstance();
     }
     private static JsonObject options() { return config.has("options") ? config.getAsJsonObject("options") : new JsonObject(); }
     private static Connection connect() throws Exception {
@@ -124,19 +126,24 @@ public final class LocalDBViewerBridge {
                 return HexFormat.of().formatHex(data);
             }
         }
-        if (type == Types.LONGVARCHAR || type == Types.LONGNVARCHAR || type == Types.VARCHAR || type == Types.NVARCHAR || type == Types.CHAR || type == Types.NCHAR) {
+        if (type == Types.VARCHAR || type == Types.NVARCHAR || type == Types.CHAR || type == Types.NCHAR) {
             // Trino supports getString for character columns but does not
             // implement getCharacterStream. Reserve streaming for actual LOBs.
             String value = result.getString(column);
             if (value != null && value.length() > 4 * 1024 * 1024) throw new SQLException("Text cell exceeds 4 MB; select a smaller value");
             return value;
         }
-        if (type == Types.CLOB || type == Types.NCLOB) {
+        if (type == Types.CLOB || type == Types.NCLOB || type == Types.LONGVARCHAR || type == Types.LONGNVARCHAR) {
             try (Reader reader = result.getCharacterStream(column)) {
                 if (reader == null) return null;
                 char[] buffer = new char[8192]; StringBuilder output = new StringBuilder(); int count;
                 while ((count = reader.read(buffer)) != -1) { output.append(buffer, 0, count); if (output.length() > 4 * 1024 * 1024) throw new SQLException("Text cell exceeds 4 MB; select a smaller value"); }
                 return output.toString();
+            } catch (SQLFeatureNotSupportedException unsupported) {
+                // Some drivers (including Trino) do not expose character streams.
+                String value = result.getString(column);
+                if (value != null && value.length() > 4 * 1024 * 1024) throw new SQLException("Text cell exceeds 4 MB; select a smaller value");
+                return value;
             }
         }
         Object value = result.getObject(column);
@@ -159,12 +166,15 @@ public final class LocalDBViewerBridge {
             Connection active = connect();
             if (CANCELED.get()) throw new CancellationException("Query canceled");
             String catalog = string(request, "catalog", ""), schema = string(request, "schema", "");
-            if (!catalog.isEmpty() && !Objects.equals(active.getCatalog(), catalog)) active.setCatalog(catalog);
-            if (!schema.isEmpty() && !Objects.equals(active.getSchema(), schema)) active.setSchema(schema);
+            if (!catalog.isEmpty() && !Objects.equals(JdbcMetadata.catalog(active), catalog)) active.setCatalog(catalog);
+            if (!schema.isEmpty() && !Objects.equals(JdbcMetadata.schema(active), schema)) active.setSchema(schema);
             String sql = request.get("sql").getAsString();
             String command = string(request, "transactionAction", "");
-            try (Statement statement = active.createStatement()) {
+            boolean mysqlStreaming = string(config, "driverClass", "").startsWith("com.mysql.");
+            try (Statement statement = mysqlStreaming ? active.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY) : active.createStatement()) {
                 runningStatement = statement;
+                // Connector/J otherwise materializes the entire result before next().
+                if (mysqlStreaming) statement.setFetchSize(Integer.MIN_VALUE);
                 int timeout = number(options(), "queryTimeoutSeconds", 0);
                 if (timeout > 0) statement.setQueryTimeout(timeout);
                 if (CANCELED.get()) throw new CancellationException("Query canceled");
@@ -203,9 +213,11 @@ public final class LocalDBViewerBridge {
                 for (SQLWarning warning = statement.getWarnings(); warning != null && warnings.size() < 50; warning = warning.getNextWarning()) warnings.add(error(warning));
             } finally { runningStatement = null; }
             snapshot.addProperty("state", CANCELED.get() ? "CANCELED" : "FINISHED");
-            String catalogValue = active.getCatalog(), schemaValue = active.getSchema();
-            if (catalogValue != null) snapshot.addProperty("catalog", catalogValue);
-            if (schemaValue != null) snapshot.addProperty("schema", schemaValue);
+            try {
+                String catalogValue = JdbcMetadata.catalog(active), schemaValue = JdbcMetadata.schema(active);
+                if (!catalogValue.isEmpty()) snapshot.addProperty("catalog", catalogValue);
+                if (!schemaValue.isEmpty()) snapshot.addProperty("schema", schemaValue);
+            } catch (SQLException unsupported) { warnings.add("Не удалось получить текущие catalog/schema: " + error(unsupported)); }
         } catch (Throwable failure) {
             snapshot.addProperty("state", CANCELED.get() || failure instanceof CancellationException ? "CANCELED" : "FAILED");
             snapshot.addProperty("error", error(failure));
@@ -224,6 +236,25 @@ public final class LocalDBViewerBridge {
                 value.addProperty("value", info.value); value.addProperty("required", info.required); value.add("choices", JSON.toJsonTree(info.choices)); values.add(value);
             }
             result.add("properties", values);
+        } catch (Throwable failure) { result.addProperty("error", error(failure)); }
+        send(result);
+    }
+    private static void inspect(JsonObject request) {
+        String kind = string(request, "kind", ""); JsonObject result = message(kind);
+        try {
+            String catalog = string(request, "catalog", ""), schema = string(request, "schema", ""), table = string(request, "table", "");
+            switch (kind) {
+                case "probe" -> {
+                    Driver driver = driver();
+                    if (!driver.acceptsURL(string(config, "url", ""))) throw new SQLException("Driver does not accept this JDBC URL");
+                    result.addProperty("value", "Driver loaded");
+                }
+                case "test" -> { DatabaseMetaData metadata = connect().getMetaData(); result.addProperty("value", "Соединение установлено · " + metadata.getDatabaseProductName() + " · " + metadata.getDriverVersion()); }
+                case "metadata" -> result.add("value", JdbcMetadata.read(connect(), string(request, "operation", ""), catalog, schema, table));
+                case "schema" -> result.add("value", JdbcMetadata.index(connect(), string(request, "profileId", ""), catalog, schema));
+                case "preview" -> result.addProperty("value", JdbcMetadata.preview(connect(), catalog, schema, table));
+                default -> throw new SQLException("Unknown JDBC inspection");
+            }
         } catch (Throwable failure) { result.addProperty("error", error(failure)); }
         send(result);
     }
@@ -247,6 +278,12 @@ public final class LocalDBViewerBridge {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8))) {
             String first = reader.readLine(); if (first == null) return;
             config = JsonParser.parseString(first).getAsJsonObject();
+            if (config.has("driverClasspath")) {
+                List<URL> paths = new ArrayList<>();
+                for (JsonElement path : config.getAsJsonArray("driverClasspath")) paths.add(Path.of(path.getAsString()).toUri().toURL());
+                driverLoader = new URLClassLoader(paths.toArray(URL[]::new), ClassLoader.getPlatformClassLoader());
+                Thread.currentThread().setContextClassLoader(driverLoader);
+            }
             if (config.has("properties")) for (Map.Entry<String, JsonElement> item : config.getAsJsonObject("properties").entrySet()) properties.setProperty(item.getKey(), item.getValue().getAsString());
             prepareCertificates();
             String line;
@@ -255,6 +292,7 @@ public final class LocalDBViewerBridge {
                 switch (request.get("kind").getAsString()) {
                     case "run" -> { CANCELED.set(false); QUERIES.submit(() -> run(request)); }
                     case "properties" -> QUERIES.submit(LocalDBViewerBridge::describe);
+                    case "probe", "test", "metadata", "schema", "preview" -> QUERIES.submit(() -> inspect(request));
                     case "cancel" -> {
                         CANCELED.set(true);
                         Thread.ofVirtual().start(() -> { JsonObject result = message("cancel"); try { Statement statement = runningStatement; if (statement != null) statement.cancel(); } catch (Throwable failure) { result.addProperty("error", error(failure)); } send(result); });

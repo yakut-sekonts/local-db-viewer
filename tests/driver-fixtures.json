@@ -1,0 +1,38 @@
+{
+  "format": 1,
+  "drivers": {
+    "h2": {
+      "files": [
+        {
+          "path": "com/h2database/h2/2.5.250/h2-2.5.250.jar",
+          "sha256": "82a80a2ac06901b03cdb233c663d21c4f49c884bf6d0cf85022729e8db9ab86f",
+          "size": 2689845
+        }
+      ],
+      "key": "bd6051ee3e2f70e1a534439902be77f63165add9b672ea8e1afaae76b1a5bb73",
+      "version": "2.5.250"
+    },
+    "duckdb": {
+      "files": [
+        {
+          "path": "org/duckdb/duckdb_jdbc/1.5.5.1/duckdb_jdbc-1.5.5.1.jar",
+          "sha256": "22343dd258db1b0b51d37afc776c8dff5b19282829fa5b47f7d5d6fe02b3377a",
+          "size": 85435455
+        }
+      ],
+      "key": "010eaeb82765c3cee35bba86c80fa9495afcca0df4b44806b6148ae12537413b",
+      "version": "1.5.5.1"
+    },
+    "h2-old": {
+      "version": "2.3.232",
+      "files": [
+        {
+          "path": "com/h2database/h2/2.3.232/h2-2.3.232.jar",
+          "size": 2651157,
+          "sha256": "8dae62d22db8982c3dcb3826edb9c727c5d302063a67eef7d63d82de401f07d3"
+        }
+      ],
+      "key": "8b14ab4a10e0db8d8c6ceacdf722356c34b91d60712a2f2adcf3e11194f29f6d"
+    }
+  }
+}

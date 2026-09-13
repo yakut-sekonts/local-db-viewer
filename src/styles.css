@@ -26,3 +26,37 @@
 .update-indicator{display:flex;align-items:center;gap:7px;font-size:11px;color:#9da6b5;position:relative;-webkit-app-region:no-drag}.update-indicator.has-update{color:#79a8ff}.update-dot{width:6px;height:6px;background:#4e90ff;border-radius:50%}.update-toast{position:fixed;right:24px;bottom:44px;width:355px;padding:18px;background:#2b2d30;border:1px solid #526582;border-radius:8px;z-index:90;box-shadow:0 12px 48px #0007;-webkit-app-region:no-drag}.update-toast>div{display:flex;align-items:center;gap:10px}.update-toast .icon-button{margin-left:auto}.update-toast p{color:#aab0ba;font-size:12px;line-height:1.6}.update-dialog{width:690px;-webkit-app-region:no-drag}.update-dialog .dialog-heading{justify-content:space-between}.update-dialog .dialog-body{display:flex;flex-direction:column;gap:18px;max-height:65vh;overflow:auto}.release-notes{white-space:pre-wrap;font:12px/1.7 inherit;max-height:260px;overflow:auto;margin:0}.update-access{display:flex;flex-direction:column;gap:14px}.update-access small{line-height:1.5}.update-dialog progress{width:100%;accent-color:#438aff}.checkbox-row{display:flex!important;flex-direction:row!important;align-items:center;gap:8px}.checkbox-row input{width:auto!important}
 
 .jdbc-settings,.jdbc-options{display:flex;flex-direction:column;gap:15px}.jdbc-driver-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:11px}.jdbc-properties{border:1px solid #43454b;max-height:360px;overflow:auto}.jdbc-property-header,.jdbc-property{display:grid!important;grid-template-columns:minmax(200px,1fr) minmax(170px,1fr);gap:0!important;align-items:center;border-bottom:1px solid #393b40;margin:0!important}.jdbc-property-header{position:sticky;top:0;background:#303236;padding:8px;z-index:1}.jdbc-property>span{padding:8px;font:11px/1.4 monospace;overflow-wrap:anywhere}.jdbc-property input,.jdbc-property select{border:0;border-left:1px solid #393b40;border-radius:0;background:#25272b;min-height:32px}.connection-dialog:has(.jdbc-settings){width:880px}.jdbc-settings textarea,.jdbc-options textarea{width:100%;background:#24262a;border:1px solid #4c4e53;border-radius:4px;color:#ced2d8;padding:9px;font:12px/1.5 monospace;resize:vertical}.jdbc-options small{line-height:1.5}
+
+/* Versioned JDBC driver catalog */
+.driver-center-button { position: relative; }
+.driver-badge { position: absolute; top: -3px; right: -4px; background: #3574f0; color: white; border-radius: 7px; font-size: 9px; padding: 1px 4px; }
+.driver-dialog { width: min(980px, 94vw); max-height: 92vh; padding: 0; color: #cbd0d8; background: #292b2f; border: 1px solid #555960; border-radius: 8px; }
+.driver-dialog::backdrop { background: #080a0dcc; }
+.driver-center-body { display: grid; grid-template-columns: 265px minmax(0, 1fr); height: min(530px, 57vh); border-block: 1px solid #3b3d42; }
+.driver-center-body aside { padding: 12px; border-right: 1px solid #3b3d42; display: flex; flex-direction: column; min-height: 0; gap: 10px; }
+.driver-list { overflow: auto; }
+.driver-list button { display: flex; width: 100%; text-align: left; align-items: center; justify-content: space-between; gap: 10px; background: transparent; border: none; color: inherit; padding: 9px 7px; cursor: pointer; }
+.driver-list button.active { background: #30466e; }
+.driver-list small { color: #8ea8ca; white-space: nowrap; }
+.driver-center-body section { padding: 20px; overflow: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
+.driver-center-body h3, .driver-center-body p { margin: 0; line-height: 1.6; }
+.driver-center-body label { display: grid; gap: 7px; width: 100%; }
+.driver-center-body small, .driver-selection small { color: #959eac; line-height: 1.6; }
+.driver-class, .driver-documentation { overflow-wrap: anywhere; }
+.driver-catalog-footer { padding: 16px 20px; display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
+.driver-catalog-footer .form-message { width: 100%; }
+.driver-selection { border-top: 1px solid #41444b; padding-top: 16px; display: grid; gap: 10px; }
+.driver-selection label { display: grid; gap: 6px; }
+.driver-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.driver-actions input { flex: 1; min-width: 80px; width: 100px; }
+.driver-toast { position: fixed; z-index: 100; right: 20px; bottom: 45px; display: flex; gap: 14px; align-items: center; padding: 16px; background: #303842; border: 1px solid #52647a; border-radius: 6px; box-shadow: 0 6px 24px #0008; }
+.tree-error { overflow-wrap: anywhere; }
+.tree-recovery { display: grid; gap: 8px; padding: 8px 2px; font-size: 11px; }
+.tree-recovery select { min-width: 0; width: 100%; }
+.tree-recovery button { white-space: normal; height: auto; }
+.tree-catalog-override { font-size: 10px; color: #8eafdb; padding: 3px 8px; overflow-wrap: anywhere; }
+.driver-dialog input:not([type=checkbox]), .driver-dialog select { width: 100%; min-height: 34px; padding: 7px 10px; background: #24262b; border: 1px solid #4c5059; border-radius: 4px; color: #cbd0d8; font: inherit; }
+.driver-dialog input:focus, .driver-dialog select:focus { outline: 1px solid #548af7; }
+.driver-dialog input[type=checkbox] { accent-color: #3574f0; }
+.boundary-error { padding: 24px; color: #cbd0d8; background: #292b2f; line-height: 1.6; overflow-wrap: anywhere; }
+.boundary-error p { margin: 12px 0; }

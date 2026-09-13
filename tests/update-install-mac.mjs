@@ -19,6 +19,8 @@ const replacement = join(work, 'replacement/Local DB Viewer.app');
 const dataDirectory = join(work, 'user-data');
 await mkdir(join(dataDirectory, 'updates'), { recursive: true });
 await writeFile(join(dataDirectory, 'updates/settings.json'), JSON.stringify({ repository: 'fixture/public', automatic: false }));
+await mkdir(join(dataDirectory, 'drivers'), { recursive: true });
+await writeFile(join(dataDirectory, 'drivers/settings.json'), JSON.stringify({ automatic: false, installed: {}, selected: {} }));
 const marker = join(work, 'restarted.json');
 const progressPath = join(work, 'restart-progress.json');
 const sourceVersion = JSON.parse(asar.extractFile(join(original, 'Contents/Resources/app.asar'), 'package.json').toString('utf8')).version;

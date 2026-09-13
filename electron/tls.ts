@@ -34,9 +34,9 @@ export function tlsOptions(settings: Settings) {
   validateSSL(settings);
   const mode = settings.sslVerification ?? 'FULL';
   return {
-    ca: [...roots(), ...(settings.sslCa ? [settings.sslCa] : [])],
+    ca: settings.sslCa ? [validateCertificate(settings.sslCa)] : roots(),
     rejectUnauthorized: mode !== 'NONE',
-    checkServerIdentity: mode === 'FULL' ? checkServerIdentity : () => undefined,
+    checkServerIdentity,
     minVersion: 'TLSv1.2' as const,
   };
 }

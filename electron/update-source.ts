@@ -21,7 +21,7 @@ export function newerVersion(candidate: string, current: string): boolean {
     return values;
   };
   const a = parse(candidate), b = parse(current);
-  for (let index = 0; index < 3; index++) if (a[index] !== b[index]) return a[index] > b[index];
+  for (let index = 0; index < 3; index++) if ((a[index] ?? 0) !== (b[index] ?? 0)) return (a[index] ?? 0) > (b[index] ?? 0);
   return false;
 }
 export function selectRelease(data: any, current: string, platform: NodeJS.Platform, arch: string): UpdateRelease | undefined {
@@ -91,6 +91,15 @@ export async function latestRelease(repository: string, token: string | undefine
   const response = await apiRequest(`https://api.github.com/repos/${validRepository(repository)}/releases/latest`, token, 'application/vnd.github+json', {
     redirect: 'error', signal: AbortSignal.timeout(30000),
   }, fetchUpdate);
+  return readGitHubJSON(response);
+}
+export async function driverCatalog(repository: string, token: string | undefined, fetchUpdate: UpdateFetch): Promise<unknown> {
+  const response = await apiRequest(`https://api.github.com/repos/${validRepository(repository)}/contents/catalog.json?ref=driver-catalog`, token, 'application/vnd.github.raw+json', {
+    redirect: 'error', signal: AbortSignal.timeout(30000),
+  }, fetchUpdate);
+  return readGitHubJSON(response);
+}
+async function readGitHubJSON(response: Response): Promise<unknown> {
   if (!response.ok) { await response.body?.cancel(); throw responseError(response); }
   if (!response.body) throw new Error('GitHub вернул пустой ответ вместо описания релиза.');
   const reader = response.body!.getReader();

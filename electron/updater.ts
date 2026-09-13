@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { downloadAsset, latestRelease, selectRelease, validRepository, type UpdateRelease, type UpdateFetch } from './update-source';
+import { downloadAsset, latestRelease, driverCatalog, selectRelease, validRepository, type UpdateRelease, type UpdateFetch } from './update-source';
 import type { UpdateState } from '../src/updates';
 
 interface StoredSettings { repository: string; automatic: boolean; encryptedToken?: string }
@@ -31,6 +31,9 @@ export class Updater {
     this.timer = setInterval(() => { if (this.settings.automatic && this.configured() && !this.busy && this.status.phase !== 'ready') void this.check().catch(() => {}); }, 15 * 60 * 1000);
     this.timer.unref();
     if (this.settings.automatic && this.configured()) void this.check().catch(() => {});
+  }
+  readDriverCatalog(): Promise<unknown> {
+    return driverCatalog(this.settings.repository || 'yakut-sekonts/local-db-viewer', this.token(), this.fetchUpdate);
   }
   dispose(): void { clearInterval(this.timer); }
   state(): UpdateState { return structuredClone(this.status); }

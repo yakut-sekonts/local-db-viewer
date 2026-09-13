@@ -9,6 +9,7 @@ import { Connection as SQLServerConnection, Request } from 'tedious';
 import { DatabaseSync } from 'node:sqlite';
 import type { Connection } from './trino';
 import type { Column, QuerySnapshot } from '../src/shared';
+import { limitLineBytes } from './line-limit';
 import { singleStatement, identifier } from './sql';
 import { tlsOptions, httpAgent, connectionError } from './tls';
 
@@ -97,7 +98,7 @@ function pgType(oid: number): string {
 
 function mysqlConfig() {
   return { host: endpoint!.hostname, port: Number(endpoint!.port || 3306), database: decodeURIComponent(endpoint!.pathname.slice(1)) || undefined,
-    user: profile.user, password: profile.secret, ssl: profile.tls ? { ...tlsOptions(profile), verifyIdentity: (profile.sslVerification ?? 'FULL') === 'FULL' } : undefined,
+    user: profile.user, password: profile.secret, ssl: profile.tls ? { ...tlsOptions(profile), verifyIdentity: profile.sslVerification !== 'NONE' } : undefined,
     supportBigNumbers: true, bigNumberStrings: true, dateStrings: true, jsonStrings: true, decimalNumbers: false,
     connectTimeout: 15000, multipleStatements: false,
   };
@@ -195,13 +196,13 @@ async function clickhouse(sql: string, catalog: string): Promise<void> {
     throw new Error(`ClickHouse HTTP ${response.status}: ${first?.value ? new TextDecoder().decode(first.value).slice(0, 4000) : ''}`);
   }
   if (!response.body) return;
-  const stream = Readable.fromWeb(response.body as any);
+  const source = Readable.fromWeb(response.body as any);
+  const stream = Readable.from(limitLineBytes(source, 32 * 1024 * 1024));
   const lines = createInterface({ input: stream, crlfDelay: Infinity });
   let lineIndex = 0;
   try {
     for await (const line of lines) {
       if (!line.trim()) continue;
-      if (line.length > 32 * 1024 * 1024) throw new Error('Строка ClickHouse превышает 32 MB.');
       const row = lossless(line);
       if (!Array.isArray(row)) throw new Error('Ожидался ClickHouse JSONCompactEachRowWithNamesAndTypes. Уберите явный FORMAT.');
       if (lineIndex === 0) snapshot.columns = row.map(name => ({ name: String(name), type: '' }));
@@ -209,7 +210,7 @@ async function clickhouse(sql: string, catalog: string): Promise<void> {
       else addRow(row);
       lineIndex++;
     }
-  } finally { lines.close(); stream.destroy(); }
+  } finally { lines.close(); stream.destroy(); source.destroy(); controller.abort(); }
   } finally { await agent?.close(); }
 }
 
@@ -235,7 +236,7 @@ port.on('message', async (message) => {
   const started = Date.now();
   snapshot = { requestId: message.requestId, queryId: '', state: 'RUNNING', columns: [], rows: [], totalRows: 0, truncated: false, stats: {}, warnings: [], inTransaction, catalog: message.catalog, schema: message.schema };
   try {
-    const sql = singleStatement(message.sql);
+    const sql = singleStatement(message.sql, profile.engine);
     if (profile.engine === 'postgres') await postgres(sql, message.schema);
     else if (profile.engine === 'mysql' || profile.engine === 'mariadb') await mysqlQuery(sql, message.catalog);
     else if (profile.engine === 'mssql') await sqlserver(sql);

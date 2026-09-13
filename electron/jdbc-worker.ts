@@ -1,11 +1,13 @@
 import { EventEmitter } from 'node:events';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join, delimiter } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 import { jdbcConfig } from './jdbc-config';
 import type { Connection } from './trino';
 import type { JdbcProperty } from '../src/jdbc';
+import { runtimePaths, bundledDrivers } from './runtime-paths';
+import { profileDriver } from '../src/drivers';
 
 export class JdbcWorker extends EventEmitter {
   private child: ChildProcessWithoutNullStreams;
@@ -13,14 +15,10 @@ export class JdbcWorker extends EventEmitter {
   private closed = false;
   constructor(profile: Connection) {
     super();
-    const resources = process.resourcesPath;
-    const packaged = resources && existsSync(join(resources, 'jdbc'));
-    const root = packaged ? resources : join(__dirname, '../runtime');
-    const java = packaged ? join(root, 'jre/bin', process.platform === 'win32' ? 'java.exe' : 'java')
-      : join(root, process.platform === 'win32' ? 'windows-x64' : 'mac-arm64', 'bin', process.platform === 'win32' ? 'java.exe' : 'java');
-    const common = join(root, packaged ? 'jdbc' : 'common');
+    const { java, common } = runtimePaths();
     if (!existsSync(java) || !existsSync(join(common, 'local-db-viewer-bridge.jar'))) throw new Error('Встроенный JDBC runtime не найден. Выполните подготовку runtime и сборку приложения.');
-    const classpath = [join(common, '*'), ...(profile.jdbc?.classpath ?? [])].join(delimiter);
+    const driverClasspath = profile.driverClasspath ?? [...(profile.jdbc?.classpath ?? []), ...(bundledDrivers(common)[profileDriver(profile)]?.paths ?? [])];
+    const classpath = [join(common, 'local-db-viewer-bridge.jar'), ...readdirSync(common).filter(name => /^gson-.*\.jar$/.test(name)).map(name => join(common, name))].join(delimiter);
     this.child = spawn(java, ['-Xmx512m', '-Dfile.encoding=UTF-8', '--enable-native-access=ALL-UNNAMED', ...(profile.jdbc?.vmOptions ?? []), '-cp', classpath, 'LocalDBViewerBridge'], {
       windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], cwd: profile.jdbc?.workingDirectory || undefined,
       env: { ...process.env, ...(profile.jdbc?.environment ?? {}) },
@@ -42,7 +40,7 @@ export class JdbcWorker extends EventEmitter {
     this.child.stdin.on('error', error => { if (!this.closed) this.emit('error', error); });
     this.child.on('error', error => this.emit('error', error));
     this.child.on('exit', code => { this.closed = true; this.emit('exit', code); });
-    this.postMessage({ ...jdbcConfig(profile), engine: profile.engine, sslCa: profile.sslCa ?? '' });
+    this.postMessage({ ...jdbcConfig(profile), engine: profile.engine, sslCa: profile.sslCa ?? '', driverClasspath });
   }
   postMessage(value: unknown): void {
     if (this.closed) throw new Error('JDBC-сессия закрыта.');
@@ -59,19 +57,31 @@ export class JdbcWorker extends EventEmitter {
   }
 }
 
-export async function describeDriver(profile: Connection): Promise<JdbcProperty[]> {
+export async function inspectJdbc<T>(profile: Connection, request: { kind: string; [key: string]: unknown }, timeout = 60000): Promise<T> {
   const worker = new JdbcWorker(profile);
   try {
-    return await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('JDBC-драйвер не вернул свойства за 20 секунд.')), 20000);
+    return await new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`JDBC-драйвер не ответил за ${timeout / 1000} секунд.`)), timeout);
       worker.on('error', error => { clearTimeout(timer); reject(error); });
-      worker.on('exit', () => { clearTimeout(timer); reject(new Error('JDBC bridge завершился до чтения свойств.')); });
+      worker.on('exit', () => { clearTimeout(timer); reject(new Error('JDBC bridge завершился до получения ответа.')); });
       worker.on('message', message => {
-        if (message.kind !== 'properties') return;
+        if (message.kind !== request.kind) return;
         clearTimeout(timer);
-        if (message.error) reject(new Error(message.error)); else resolve(message.properties);
+        if (message.error) reject(new Error(message.error)); else resolve(request.kind === 'properties' ? message.properties : message.value);
       });
-      worker.postMessage({ kind: 'properties' });
+      worker.postMessage(request);
     });
-  } finally { await worker.terminate(); }
+  } finally {
+    // Embedded engines own file locks and server lifetimes. Release the JDBC
+    // connection before terminating its JVM; SIGTERM alone can leave stale locks.
+    await new Promise<void>(resolve => {
+      const finish = () => { clearTimeout(timer); worker.off('message', message); worker.off('exit', finish); resolve(); };
+      const message = (value: any) => { if (value.kind === 'closed') finish(); };
+      const timer = setTimeout(finish, 3000);
+      worker.on('message', message); worker.once('exit', finish);
+      try { worker.postMessage({ kind: 'close' }); } catch { finish(); }
+    });
+    await worker.terminate();
+  }
 }
+export function describeDriver(profile: Connection): Promise<JdbcProperty[]> { return inspectJdbc(profile, { kind: 'properties' }, 20000); }

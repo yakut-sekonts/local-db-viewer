@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { TrinoQuery, TrinoSession, type Connection } from './trino';
 import type { QuerySnapshot } from '../src/shared';
 import { singleStatement, transactionAction } from './sql';
+import { sqlEngine } from '../src/drivers';
 import { JdbcWorker } from './jdbc-worker';
 
 export interface QueryTask { run(sql: string): Promise<QuerySnapshot>; cancel(): Promise<void> }
@@ -43,12 +44,12 @@ export class DatabaseSession {
     if (this.connection.engine === 'trino' && !this.connection.jdbc) {
       this.trino.catalog = catalog; this.trino.schema = schema;
       const task = new TrinoQuery(this.connection, this.trino, requestId, maxRows, notify);
-      return { run: sql => task.run(singleStatement(sql)), cancel: () => task.cancel() };
+      return { run: sql => task.run(singleStatement(sql, sqlEngine(this.connection))), cancel: () => task.cancel() };
     }
     return {
       run: sql => {
         if (this.current) throw new Error('В сессии уже выполняется запрос.');
-        const statement = singleStatement(sql);
+        const statement = singleStatement(sql, sqlEngine(this.connection));
         const worker = this.ensureWorker();
         return new Promise(resolve => {
           this.current = { requestId, resolve, notify, latest: { requestId, queryId: '', state: 'RUNNING', columns: [], rows: [], totalRows: 0, truncated: false, stats: {}, warnings: [], inTransaction: false, catalog, schema } };

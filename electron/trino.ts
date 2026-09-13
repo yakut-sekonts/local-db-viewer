@@ -4,8 +4,9 @@ import { isAbsolute } from 'node:path';
 import { sslEnabled } from '../src/connectionSettings';
 import { connectionError, httpAgent, validateSSL } from './tls';
 import { validateJdbc } from './jdbc-config';
+import { profileDriver, driverDefinition } from '../src/drivers';
 
-export type Connection = Omit<Profile, 'hasSecret'> & { secret?: string };
+export type Connection = Omit<Profile, 'hasSecret'> & { secret?: string; driverClasspath?: string[] };
 export const quoteIdentifier = (value: string): string => `"${value.replaceAll('"', '""')}"`;
 
 export function validateConnection(input: Connection): Connection {
@@ -20,6 +21,14 @@ export function validateConnection(input: Connection): Connection {
   if (input.engine === 'sqlite') {
     if (!isAbsolute(input.endpoint) && !input.jdbc?.url) throw new Error('Выберите SQLite-файл с абсолютным путём.');
     return { ...input, tls: false, auth: 'none', secret: undefined };
+  }
+  if (input.engine === 'jdbc') {
+    if (!input.jdbc) throw new Error('Укажите JDBC-драйвер.');
+    validateJdbc({ ...input.jdbc, url: input.jdbc.url || input.endpoint });
+    if (!(input.jdbc.url || input.endpoint).startsWith('jdbc:')) throw new Error('URL должен начинаться с jdbc:.');
+    if (!input.jdbc.driverClass && !driverDefinition(profileDriver(input)).className) throw new Error('Укажите Driver class в Advanced.');
+    if (!['none', 'basic', 'bearer'].includes(input.auth)) throw new Error('Неизвестный метод аутентификации.');
+    return { ...input, tls: false };
   }
   const endpoint = new URL(input.endpoint);
   const protocols = { trino: ['http:', 'https:'], clickhouse: ['http:', 'https:'], postgres: ['postgresql:', 'postgres:'], mysql: ['mysql:'], mariadb: ['mysql:'], mssql: ['mssql:'] }[input.engine];

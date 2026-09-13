@@ -1,5 +1,8 @@
 import type { DatabaseEngine } from './shared';
 export interface JdbcSettings {
+  driverId?: string;
+  productId?: string;
+  driverVersion?: string;
   url?: string;
   driverClass?: string;
   properties?: Record<string, string>;
@@ -18,6 +21,7 @@ export interface JdbcSettings {
 }
 export interface JdbcProperty { name: string; description?: string; value?: string; required: boolean; choices?: string[] }
 export const DRIVER_CLASSES: Record<DatabaseEngine, string> = {
+  jdbc: '',
   trino: 'io.trino.jdbc.TrinoDriver', postgres: 'org.postgresql.Driver', mysql: 'com.mysql.cj.jdbc.Driver',
   mariadb: 'org.mariadb.jdbc.Driver', sqlite: 'org.sqlite.JDBC', mssql: 'com.microsoft.sqlserver.jdbc.SQLServerDriver', clickhouse: 'com.clickhouse.jdbc.ClickHouseDriver',
 };

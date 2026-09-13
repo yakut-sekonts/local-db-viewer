@@ -14,8 +14,13 @@ import { Updater } from './updater';
 import { fetchUpdate } from './update-transport';
 import { installUpdate } from './install-update';
 import { validateJdbc } from './jdbc-config';
-import { describeDriver } from './jdbc-worker';
-import type { MetadataInput, ProfileDraft, QueryInput, Relationship, SchemaInput } from '../src/shared';
+import { describeDriver, inspectJdbc } from './jdbc-worker';
+import { DriverManager } from './driver-manager';
+import { bundledDrivers } from './runtime-paths';
+import { profileDriver, driverDefinition } from '../src/drivers';
+import driverCatalogLock from '../drivers/catalog-lock.json';
+import type { Connection } from './trino';
+import type { SchemaIndex, MetadataResult, MetadataInput, ProfileDraft, QueryInput, Relationship, SchemaInput } from '../src/shared';
 
 const productName = 'Local DB Viewer';
 const legacyName = 'DataKhrip';
@@ -33,6 +38,8 @@ let window: BrowserWindow;
 let profiles: ProfileStore;
 let relations: RelationStore;
 let updater: Updater;
+let drivers: DriverManager;
+let driversReady: Promise<void>;
 let installingUpdate = false;
 let pendingDatabaseOperations = 0;
 const transactions = new Set<string>();
@@ -51,6 +58,15 @@ function validateDraft(value: ProfileDraft): void {
   if (value.secret !== undefined) string(value.secret, 'secret', 16384);
 }
 
+async function prepareDriver(connection: Connection): Promise<Connection> {
+  if (!connection.jdbc) return connection;
+  await driversReady;
+  const extra = connection.jdbc.classpath ?? [];
+  // Explicit external classpaths are self-contained; they must not be shadowed by bundled classes.
+  if (extra.length) return { ...connection, driverClasspath: extra };
+  return { ...connection, driverClasspath: await drivers.paths(profileDriver(connection), connection.jdbc.driverVersion) };
+}
+
 async function release(id: string): Promise<void> {
   if ([...active.values()].some(job => job.sessionId === id)) throw new Error('Сначала завершите или отмените запрос.');
   const stored = sessions.get(id);
@@ -64,7 +80,7 @@ function handle(name: string, fn: (...args: any[]) => unknown): void {
     if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || event.senderFrame.url !== pathToFileURL(entry).href) {
       throw new Error('Недоверенный IPC sender.');
     }
-    const databaseOperation = ['query:run', 'profiles:test', 'metadata', 'schema:load', 'jdbc:properties'].includes(name);
+    const databaseOperation = ['query:run', 'profiles:test', 'metadata', 'schema:load', 'jdbc:properties', 'jdbc:preview', 'drivers:install', 'drivers:import', 'drivers:select'].includes(name);
     if (!databaseOperation) return fn(...args);
     if (installingUpdate) throw new Error('Приложение обновляется.');
     pendingDatabaseOperations++;
@@ -98,7 +114,7 @@ void app.whenReady().then(() => {
   updater = new Updater(join(app.getPath('userData'), 'updates'), app.getVersion(), encryption,
     value => { if (!window.isDestroyed()) window.webContents.send('updates:change', value); },
     async (path, version) => {
-      if (active.size || transactions.size || pendingDatabaseOperations) throw new Error('Завершите запросы и выполните COMMIT или ROLLBACK перед обновлением.');
+      if (active.size || transactions.size || pendingDatabaseOperations || drivers?.isBusy()) throw new Error('Завершите запросы и выполните COMMIT или ROLLBACK перед обновлением.');
       installingUpdate = true;
       try { await installUpdate(path, version, async () => {
         if (active.size || transactions.size) throw new Error('Обнаружена активная сессия. Обновление отложено.');
@@ -111,7 +127,24 @@ void app.whenReady().then(() => {
   handle('updates:check', () => updater.check());
   handle('updates:download', () => updater.download());
   handle('updates:install', () => updater.install());
-  void readFile(join(process.resourcesPath, 'update-config.json'), 'utf8').then(value => JSON.parse(value).repository ?? '').catch(() => '').then(repository => updater.initialize(repository));
+  drivers = new DriverManager(join(app.getPath('userData'), 'drivers'), bundledDrivers(), driverCatalogLock, fetchUpdate,
+    () => updater.readDriverCatalog(), async (id, paths) => {
+      const driver = driverDefinition(id);
+      await inspectJdbc({ id: 'driver-probe', name: driver.name, engine: 'jdbc', endpoint: driver.url, user: '', auth: 'none', tls: false, catalog: '', schema: '', jdbc: { driverId: id }, driverClasspath: paths }, { kind: 'probe' });
+    }, value => { if (!window.isDestroyed()) window.webContents.send('drivers:change', value); });
+  driversReady = readFile(join(process.resourcesPath, 'update-config.json'), 'utf8').then(value => JSON.parse(value).repository ?? '').catch(() => '')
+    .then(repository => updater.initialize(repository)).then(() => drivers.initialize());
+  handle('drivers:state', async () => { await driversReady; return drivers.state(); });
+  handle('drivers:check', async () => { await driversReady; return drivers.check(); });
+  handle('drivers:automatic', async enabled => { await driversReady; return drivers.automatic(enabled); });
+  handle('drivers:install', async id => { await driversReady; return drivers.install(id); });
+  handle('drivers:select', async (id, key) => { await driversReady; return drivers.select(id, key); });
+  handle('drivers:import', async (id, version) => {
+    await driversReady; driverDefinition(id);
+    const result = await dialog.showOpenDialog(window, { properties: ['openFile', 'multiSelections'], filters: [{ name: 'JDBC driver and dependencies', extensions: ['jar'] }] });
+    if (result.canceled) return false;
+    await drivers.import(id, version, result.filePaths); return true;
+  });
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: 'Local DB Viewer', submenu: [{ role: 'about' }, { type: 'separator' }, { role: 'hide' }, { role: 'quit' }] },
     { label: 'Правка', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
@@ -122,7 +155,7 @@ void app.whenReady().then(() => {
   handle('jdbc:properties', async (draft: ProfileDraft) => {
     validateDraft(draft);
     // DriverPropertyInfo does not require opening a database connection.
-    return describeDriver({ ...draft, id: draft.id ?? randomUUID() });
+    return describeDriver(await prepareDriver({ ...draft, id: draft.id ?? randomUUID() }));
   });
   handle('profiles:save', async (draft: ProfileDraft) => {
     validateDraft(draft);
@@ -137,7 +170,9 @@ void app.whenReady().then(() => {
   handle('profiles:test', async (draft: ProfileDraft) => {
     if (installingUpdate) throw new Error('Приложение обновляется.');
     validateDraft(draft);
-    const session = new DatabaseSession(await profiles.resolve(draft));
+    const connection = await prepareDriver(await profiles.resolve(draft));
+    if (connection.jdbc) return inspectJdbc<string>(connection, { kind: 'test' }, (connection.jdbc.options?.connectTimeoutSeconds || 30) * 1000);
+    const session = new DatabaseSession(await prepareDriver(connection));
     const query = session.createQuery(randomUUID(), 1);
     const id = randomUUID();
     const done = query.run('SELECT 1');
@@ -159,7 +194,7 @@ void app.whenReady().then(() => {
     if ([...active.values()].some(job => job.sessionId === input.sessionId)) throw new Error('В этой консоли уже выполняется запрос.');
     const previous = sessions.get(input.sessionId);
     if (previous && previous.profileId !== input.profileId) throw new Error('Консоль привязана к другому подключению.');
-    const session = previous?.session ?? new DatabaseSession(connection);
+    const session = previous?.session ?? new DatabaseSession(await prepareDriver(connection));
     sessions.set(input.sessionId, { profileId: input.profileId, session });
     const query = session.createQuery(input.requestId, input.maxRows, result => {
       if (result.inTransaction) transactions.add(input.sessionId); else transactions.delete(input.sessionId);
@@ -176,7 +211,13 @@ void app.whenReady().then(() => {
     if (!input || typeof input !== 'object') throw new Error('Некорректный запрос схемы.');
     for (const name of ['profileId', 'catalog', 'schema'] as const) string(input[name], name);
     const connection = await profiles.get(input.profileId);
-    const session = new DatabaseSession(connection);
+    if (connection.engine === 'jdbc') {
+      const index = await inspectJdbc<SchemaIndex>(await prepareDriver(connection), { ...input, kind: 'schema' });
+      const visible = new Set(index.tables.map(table => JSON.stringify([table.catalog, table.schema, table.name])));
+      index.relationships.push(...(await relations.list(input.profileId)).filter(relation => [relation.source, relation.target].some(table => visible.has(JSON.stringify([table.catalog, table.schema, table.name])))));
+      return index;
+    }
+    const session = new DatabaseSession(await prepareDriver(connection));
     try {
       return await loadSchema(connection, input, async sql => {
         const id = randomUUID();
@@ -211,10 +252,11 @@ void app.whenReady().then(() => {
     const identifiers = [input.catalog, input.schema, input.table];
     const depth = { catalogs: 0, schemas: 1, tables: 2, columns: 3 }[input.kind];
     if (depth === undefined) throw new Error('Неизвестный metadata request.');
-    for (let i = 0; i < depth; i++) { string(identifiers[i], 'identifier'); if (!identifiers[i]) throw new Error('Пустой identifier.'); }
+    for (let i = 0; i < depth; i++) { string(identifiers[i], 'identifier'); if (!identifiers[i] && (connection.engine !== 'jdbc' || i === 2)) throw new Error('Пустой identifier.'); }
+    if (connection.engine === 'jdbc') return inspectJdbc<MetadataResult>(await prepareDriver(connection), { ...input, kind: 'metadata', operation: input.kind });
     const sql = metadataSQL(connection.engine, input);
     const id = randomUUID();
-    const session = new DatabaseSession(connection);
+    const session = new DatabaseSession(await prepareDriver(connection));
     const query = session.createQuery(id, 10000);
     const done = query.run(sql);
     active.set(id, { query, sessionId: id, done });
@@ -223,6 +265,12 @@ void app.whenReady().then(() => {
       if (result.state !== 'FINISHED') throw new Error(result.error ?? 'Запрос отменён.');
       return { columns: result.columns, rows: result.rows, truncated: result.truncated };
     } finally { active.delete(id); await session.close(); }
+  });
+  handle('jdbc:preview', async (input: MetadataInput) => {
+    if (!input || typeof input !== 'object') throw new Error('Некорректный запрос таблицы.');
+    for (const name of ['profileId', 'catalog', 'schema', 'table'] as const) string(input[name], name);
+    if (!input.table) throw new Error('Укажите таблицу.');
+    return inspectJdbc<string>(await prepareDriver(await profiles.get(input.profileId)), { ...input, kind: 'preview' });
   });
   handle('export:csv', async (input) => {
     if (!input || !Array.isArray(input.columns) || !Array.isArray(input.rows) || input.rows.length > 10000 || !input.rows.every(Array.isArray)) throw new Error('Некорректный результат.');
@@ -235,17 +283,19 @@ void app.whenReady().then(() => {
     const result = await dialog.showOpenDialog(window, { properties: ['openFile'], filters: [{ name: 'SQL', extensions: ['sql'] }] });
     if (result.canceled) return null;
     const path = result.filePaths[0];
+    if (!path) throw new Error('Файл не выбран.');
     if ((await stat(path)).size > 1_000_000) throw new Error('SQL-файл превышает 1 MB.');
     return { name: path.split(/[\\/]/).pop()!, sql: await readFile(path, 'utf8') };
   });
   handle('files:database', async () => {
     const result = await dialog.showOpenDialog(window, { properties: ['openFile'], filters: [{ name: 'SQLite', extensions: ['db', 'sqlite', 'sqlite3'] }, { name: 'Все файлы', extensions: ['*'] }] });
-    return result.canceled ? null : result.filePaths[0];
+    return result.canceled ? null : result.filePaths[0] ?? null;
   });
   handle('files:certificate', async () => {
     const result = await dialog.showOpenDialog(window, { properties: ['openFile'], filters: [{ name: 'CA certificates (PEM)', extensions: ['pem', 'crt', 'cer'] }] });
     if (result.canceled) return null;
     const path = result.filePaths[0];
+    if (!path) throw new Error('Файл не выбран.');
     if ((await stat(path)).size > MAX_CA_BYTES) throw new Error('CA bundle превышает 256 KB.');
     return { name: path.split(/[\\/]/).pop()!, pem: validateCertificate(await readFile(path, 'utf8')) };
   });
@@ -264,6 +314,7 @@ app.on('before-quit', event => {
   if (exiting) return;
   exiting = true;
   updater?.dispose();
+  drivers?.dispose();
   event.preventDefault();
   const shutdownTimeout = setTimeout(() => app.exit(0), 20000);
   void (async () => {

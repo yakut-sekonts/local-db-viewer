@@ -1,0 +1,499 @@
+[
+  {
+    "id": "trino",
+    "name": "Trino",
+    "className": "io.trino.jdbc.TrinoDriver",
+    "url": "jdbc:trino://localhost:8080",
+    "documentation": "https://trino.io/docs/current/client/jdbc.html",
+    "maven": {
+      "group": "io.trino",
+      "artifact": "trino-jdbc"
+    }
+  },
+  {
+    "id": "postgres",
+    "name": "PostgreSQL",
+    "className": "org.postgresql.Driver",
+    "url": "jdbc:postgresql://localhost:5432/postgres",
+    "documentation": "https://jdbc.postgresql.org/documentation/",
+    "maven": {
+      "group": "org.postgresql",
+      "artifact": "postgresql"
+    }
+  },
+  {
+    "id": "mysql",
+    "name": "MySQL",
+    "className": "com.mysql.cj.jdbc.Driver",
+    "url": "jdbc:mysql://localhost:3306/mysql",
+    "documentation": "https://dev.mysql.com/doc/connector-j/en/",
+    "maven": {
+      "group": "com.mysql",
+      "artifact": "mysql-connector-j"
+    }
+  },
+  {
+    "id": "mariadb",
+    "name": "MariaDB",
+    "className": "org.mariadb.jdbc.Driver",
+    "url": "jdbc:mariadb://localhost:3306/mysql",
+    "documentation": "https://mariadb.com/docs/connectors/mariadb-connector-j",
+    "maven": {
+      "group": "org.mariadb.jdbc",
+      "artifact": "mariadb-java-client"
+    }
+  },
+  {
+    "id": "sqlite",
+    "name": "SQLite",
+    "className": "org.sqlite.JDBC",
+    "url": "jdbc:sqlite:/path/database.sqlite",
+    "documentation": "https://github.com/xerial/sqlite-jdbc",
+    "maven": {
+      "group": "org.xerial",
+      "artifact": "sqlite-jdbc"
+    }
+  },
+  {
+    "id": "mssql",
+    "name": "Microsoft SQL Server",
+    "className": "com.microsoft.sqlserver.jdbc.SQLServerDriver",
+    "url": "jdbc:sqlserver://localhost:1433;databaseName=master",
+    "documentation": "https://learn.microsoft.com/sql/connect/jdbc/overview-of-the-jdbc-driver",
+    "maven": {
+      "group": "com.microsoft.sqlserver",
+      "artifact": "mssql-jdbc",
+      "versionPattern": "^\\d+\\.\\d+\\.\\d+\\.jre11$"
+    }
+  },
+  {
+    "id": "clickhouse",
+    "name": "ClickHouse",
+    "className": "com.clickhouse.jdbc.ClickHouseDriver",
+    "url": "jdbc:clickhouse:http://localhost:8123/default",
+    "documentation": "https://clickhouse.com/docs/integrations/java/jdbc",
+    "maven": {
+      "group": "com.clickhouse",
+      "artifact": "clickhouse-jdbc",
+      "classifier": "all"
+    }
+  },
+  {
+    "id": "oracle",
+    "name": "Oracle Database",
+    "className": "oracle.jdbc.OracleDriver",
+    "url": "jdbc:oracle:thin:@//localhost:1521/FREEPDB1",
+    "documentation": "https://www.oracle.com/database/technologies/appdev/jdbc.html",
+    "maven": {
+      "group": "com.oracle.database.jdbc",
+      "artifact": "ojdbc11"
+    }
+  },
+  {
+    "id": "h2",
+    "name": "H2",
+    "className": "org.h2.Driver",
+    "url": "jdbc:h2:mem:localdb;DB_CLOSE_DELAY=-1",
+    "documentation": "https://h2database.com/html/features.html",
+    "maven": {
+      "group": "com.h2database",
+      "artifact": "h2"
+    },
+    "note": "Embedded-файл H2 для одновременной работы консолей и Explorer открывайте с ;AUTO_SERVER=TRUE. In-memory базы существуют отдельно в каждой сессии."
+  },
+  {
+    "id": "duckdb",
+    "name": "DuckDB",
+    "className": "org.duckdb.DuckDBDriver",
+    "url": "jdbc:duckdb:/path/database.duckdb",
+    "documentation": "https://duckdb.org/docs/stable/clients/java",
+    "maven": {
+      "group": "org.duckdb",
+      "artifact": "duckdb_jdbc"
+    },
+    "note": "Файл DuckDB в режиме записи доступен одному процессу. Для одновременного просмотра файла несколькими сессиями используйте read-only режим драйвера. jdbc:duckdb: создаёт отдельную in-memory БД для каждой сессии."
+  },
+  {
+    "id": "hsqldb",
+    "name": "HSQLDB",
+    "className": "org.hsqldb.jdbc.JDBCDriver",
+    "url": "jdbc:hsqldb:mem:localdb",
+    "documentation": "https://hsqldb.org/doc/2.0/guide/",
+    "maven": {
+      "group": "org.hsqldb",
+      "artifact": "hsqldb"
+    }
+  },
+  {
+    "id": "derby",
+    "name": "Apache Derby (embedded)",
+    "className": "org.apache.derby.iapi.jdbc.AutoloadedDriver",
+    "url": "jdbc:derby:memory:localdb;create=true",
+    "documentation": "https://db.apache.org/derby/",
+    "maven": {
+      "group": "org.apache.derby",
+      "artifact": "derby"
+    },
+    "note": "Embedded-база принадлежит процессу сессии. Для нескольких консолей и Explorer используйте Apache Derby (server)."
+  },
+  {
+    "id": "derby-client",
+    "name": "Apache Derby (server)",
+    "className": "org.apache.derby.client.ClientAutoloadedDriver",
+    "url": "jdbc:derby://localhost:1527/database",
+    "documentation": "https://db.apache.org/derby/",
+    "maven": {
+      "group": "org.apache.derby",
+      "artifact": "derbyclient"
+    }
+  },
+  {
+    "id": "db2",
+    "name": "IBM Db2 LUW",
+    "className": "com.ibm.db2.jcc.DB2Driver",
+    "url": "jdbc:db2://localhost:50000/database",
+    "documentation": "https://www.ibm.com/docs/en/db2",
+    "maven": {
+      "group": "com.ibm.db2",
+      "artifact": "jcc"
+    }
+  },
+  {
+    "id": "db2i",
+    "name": "IBM Db2 for i",
+    "className": "com.ibm.as400.access.AS400JDBCDriver",
+    "url": "jdbc:as400://localhost",
+    "documentation": "https://jt400.sourceforge.net/",
+    "maven": {
+      "group": "net.sf.jt400",
+      "artifact": "jt400"
+    }
+  },
+  {
+    "id": "firebird",
+    "name": "Firebird",
+    "className": "org.firebirdsql.jdbc.FBDriver",
+    "url": "jdbc:firebirdsql://localhost:3050/path/database.fdb",
+    "documentation": "https://firebirdsql.org/en/jdbc-driver/",
+    "maven": {
+      "group": "org.firebirdsql.jdbc",
+      "artifact": "jaybird"
+    }
+  },
+  {
+    "id": "snowflake",
+    "name": "Snowflake",
+    "className": "net.snowflake.client.jdbc.SnowflakeDriver",
+    "url": "jdbc:snowflake://account.snowflakecomputing.com",
+    "documentation": "https://docs.snowflake.com/en/developer-guide/jdbc/jdbc",
+    "maven": {
+      "group": "net.snowflake",
+      "artifact": "snowflake-jdbc"
+    }
+  },
+  {
+    "id": "redshift",
+    "name": "Amazon Redshift",
+    "className": "com.amazon.redshift.jdbc.Driver",
+    "url": "jdbc:redshift://localhost:5439/database",
+    "documentation": "https://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html",
+    "maven": {
+      "group": "com.amazon.redshift",
+      "artifact": "redshift-jdbc42"
+    }
+  },
+  {
+    "id": "vertica",
+    "name": "Vertica",
+    "className": "com.vertica.jdbc.Driver",
+    "url": "jdbc:vertica://localhost:5433/database",
+    "documentation": "https://docs.vertica.com/latest/en/connecting-to/client-libraries/accessing/java/",
+    "maven": {
+      "group": "com.vertica.jdbc",
+      "artifact": "vertica-jdbc"
+    }
+  },
+  {
+    "id": "exasol",
+    "name": "Exasol",
+    "className": "com.exasol.jdbc.EXADriver",
+    "url": "jdbc:exa:localhost:8563",
+    "documentation": "https://docs.exasol.com/db/latest/connect_exasol/drivers/jdbc.htm",
+    "maven": {
+      "group": "com.exasol",
+      "artifact": "exasol-jdbc"
+    }
+  },
+  {
+    "id": "hana",
+    "name": "SAP HANA",
+    "className": "com.sap.db.jdbc.Driver",
+    "url": "jdbc:sap://localhost:30015",
+    "documentation": "https://help.sap.com/docs/SAP_HANA_PLATFORM",
+    "maven": {
+      "group": "com.sap.cloud.db.jdbc",
+      "artifact": "ngdbc"
+    }
+  },
+  {
+    "id": "presto",
+    "name": "PrestoDB",
+    "className": "com.facebook.presto.jdbc.PrestoDriver",
+    "url": "jdbc:presto://localhost:8080",
+    "documentation": "https://prestodb.io/docs/current/installation/jdbc.html",
+    "maven": {
+      "group": "com.facebook.presto",
+      "artifact": "presto-jdbc"
+    }
+  },
+  {
+    "id": "hive",
+    "name": "Apache Hive / Spark Thrift",
+    "className": "org.apache.hive.jdbc.HiveDriver",
+    "url": "jdbc:hive2://localhost:10000/default",
+    "documentation": "https://hive.apache.org/docs/latest/admin/hive-jdbc/",
+    "maven": {
+      "group": "org.apache.hive",
+      "artifact": "hive-jdbc",
+      "classifier": "standalone"
+    }
+  },
+  {
+    "id": "databricks",
+    "name": "Databricks",
+    "className": "com.databricks.client.jdbc.Driver",
+    "url": "jdbc:databricks://host:443/default;httpPath=/sql/1.0/warehouses/id",
+    "documentation": "https://docs.databricks.com/en/integrations/jdbc-oss/",
+    "maven": {
+      "group": "com.databricks",
+      "artifact": "databricks-jdbc"
+    }
+  },
+  {
+    "id": "informix",
+    "name": "IBM Informix",
+    "className": "com.informix.jdbc.IfxDriver",
+    "url": "jdbc:informix-sqli://localhost:9088/database:INFORMIXSERVER=server",
+    "documentation": "https://www.ibm.com/docs/en/informix-servers",
+    "maven": {
+      "group": "com.ibm.informix",
+      "artifact": "jdbc"
+    }
+  },
+  {
+    "id": "teradata",
+    "name": "Teradata",
+    "className": "com.teradata.jdbc.TeraDriver",
+    "url": "jdbc:teradata://localhost/DATABASE=database",
+    "documentation": "https://teradata-docs.s3.amazonaws.com/doc/connectivity/jdbc/reference/current/frameset.html",
+    "maven": {
+      "group": "com.teradata.jdbc",
+      "artifact": "terajdbc"
+    }
+  },
+  {
+    "id": "phoenix",
+    "name": "Apache Phoenix (thin)",
+    "className": "org.apache.phoenix.queryserver.client.Driver",
+    "url": "jdbc:phoenix:thin:url=http://localhost:8765",
+    "documentation": "https://phoenix.apache.org/server.html",
+    "maven": {
+      "group": "org.apache.phoenix",
+      "artifact": "phoenix-queryserver-client"
+    }
+  },
+  {
+    "id": "ignite",
+    "name": "Apache Ignite 3",
+    "className": "org.apache.ignite.jdbc.IgniteJdbcDriver",
+    "url": "jdbc:ignite:thin://localhost:10800",
+    "documentation": "https://ignite.apache.org/docs/ignite3/latest/developers-guide/clients/jdbc-driver",
+    "maven": {
+      "group": "org.apache.ignite",
+      "artifact": "ignite-jdbc"
+    }
+  },
+  {
+    "id": "calcite",
+    "name": "Apache Calcite Avatica",
+    "className": "org.apache.calcite.avatica.remote.Driver",
+    "url": "jdbc:avatica:remote:url=http://localhost:8765",
+    "documentation": "https://calcite.apache.org/avatica/docs/",
+    "maven": {
+      "group": "org.apache.calcite.avatica",
+      "artifact": "avatica-core"
+    }
+  },
+  {
+    "id": "neo4j",
+    "name": "Neo4j (JDBC)",
+    "className": "org.neo4j.jdbc.Neo4jDriver",
+    "url": "jdbc:neo4j://localhost:7687/neo4j",
+    "documentation": "https://neo4j.com/docs/jdbc-manual/current/",
+    "maven": {
+      "group": "org.neo4j",
+      "artifact": "neo4j-jdbc-full-bundle"
+    },
+    "note": "Требуется JDBC-совместимый режим сервера; нативная консоль NoSQL не включена."
+  },
+  {
+    "id": "mongodb",
+    "name": "MongoDB SQL Interface",
+    "className": "com.mongodb.jdbc.MongoDriver",
+    "url": "jdbc:mongodb://host.a.query.mongodb.net/database",
+    "documentation": "https://www.mongodb.com/docs/sql-interface/install-driver/",
+    "maven": {
+      "group": "org.mongodb",
+      "artifact": "mongodb-jdbc"
+    },
+    "note": "Для MongoDB SQL Interface / Atlas SQL. Обычный MongoDB endpoint без SQL Interface этим драйвером не поддерживается."
+  },
+  {
+    "id": "spanner",
+    "name": "Google Cloud Spanner",
+    "className": "com.google.cloud.spanner.jdbc.JdbcDriver",
+    "url": "jdbc:cloudspanner:/projects/project/instances/instance/databases/database",
+    "documentation": "https://cloud.google.com/spanner/docs/use-oss-jdbc",
+    "maven": {
+      "group": "com.google.cloud",
+      "artifact": "google-cloud-spanner-jdbc"
+    }
+  },
+  {
+    "id": "ydb",
+    "name": "YDB",
+    "className": "tech.ydb.jdbc.YdbDriver",
+    "url": "jdbc:ydb:grpcs://localhost:2135/local",
+    "documentation": "https://ydb.tech/docs/en/reference/languages-and-apis/jdbc-driver/",
+    "maven": {
+      "group": "tech.ydb.jdbc",
+      "artifact": "ydb-jdbc-driver"
+    }
+  },
+  {
+    "id": "ucanaccess",
+    "name": "Microsoft Access (UCanAccess)",
+    "className": "net.ucanaccess.jdbc.UcanaccessDriver",
+    "url": "jdbc:ucanaccess:///path/database.accdb",
+    "documentation": "https://ucanaccess.sourceforge.net/site.html",
+    "maven": {
+      "group": "io.github.spannm",
+      "artifact": "ucanaccess"
+    }
+  },
+  {
+    "id": "jtds",
+    "name": "Sybase ASE / SQL Server (jTDS)",
+    "className": "net.sourceforge.jtds.jdbc.Driver",
+    "url": "jdbc:jtds:sybase://localhost:5000/database",
+    "documentation": "https://jtds.sourceforge.net/",
+    "maven": {
+      "group": "net.sourceforge.jtds",
+      "artifact": "jtds"
+    }
+  },
+  {
+    "id": "athena",
+    "name": "Amazon Athena",
+    "className": "com.amazon.athena.jdbc.AthenaDriver",
+    "url": "jdbc:athena://AwsRegion=us-east-1",
+    "documentation": "https://docs.aws.amazon.com/athena/latest/ug/connect-with-jdbc.html",
+    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+  },
+  {
+    "id": "bigquery",
+    "name": "Google BigQuery (Simba)",
+    "className": "com.simba.googlebigquery.jdbc.Driver",
+    "url": "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443",
+    "documentation": "https://cloud.google.com/bigquery/docs/reference/odbc-jdbc-drivers",
+    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+  },
+  {
+    "id": "impala",
+    "name": "Apache Impala",
+    "className": "com.cloudera.impala.jdbc.Driver",
+    "url": "jdbc:impala://localhost:21050/default",
+    "documentation": "https://impala.apache.org/docs/build/html/topics/impala_jdbc.html",
+    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+  },
+  {
+    "id": "elasticsearch",
+    "name": "Elasticsearch SQL",
+    "className": "org.elasticsearch.xpack.sql.jdbc.EsDriver",
+    "url": "jdbc:es://https://localhost:9200",
+    "documentation": "https://www.elastic.co/docs/reference/query-languages/sql/sql-jdbc",
+    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+  },
+  {
+    "id": "redis",
+    "name": "Redis (сторонний JDBC)",
+    "className": "",
+    "url": "jdbc:redis:",
+    "documentation": "https://www.cdata.com/drivers/redis/jdbc/",
+    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+  },
+  {
+    "id": "cassandra",
+    "name": "Apache Cassandra (сторонний JDBC)",
+    "className": "",
+    "url": "jdbc:cassandra:",
+    "documentation": "https://www.datastax.com/drivers",
+    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+  },
+  {
+    "id": "couchbase",
+    "name": "Couchbase (сторонний JDBC)",
+    "className": "",
+    "url": "jdbc:couchbase:",
+    "documentation": "https://www.cdata.com/drivers/couchbase/jdbc/",
+    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+  },
+  {
+    "id": "dynamodb",
+    "name": "Amazon DynamoDB (сторонний JDBC)",
+    "className": "",
+    "url": "jdbc:dynamodb:",
+    "documentation": "https://www.cdata.com/drivers/dynamodb/jdbc/",
+    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+  },
+  {
+    "id": "iris",
+    "name": "InterSystems IRIS",
+    "className": "com.intersystems.jdbc.IRISDriver",
+    "url": "jdbc:IRIS://localhost:1972/USER",
+    "documentation": "https://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=BGJD",
+    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+  },
+  {
+    "id": "denodo",
+    "name": "Denodo",
+    "className": "com.denodo.vdp.jdbc.Driver",
+    "url": "jdbc:vdb://localhost:9999/database",
+    "documentation": "https://community.denodo.com/docs/html/browse/",
+    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+  },
+  {
+    "id": "openedge",
+    "name": "Progress OpenEdge",
+    "className": "com.ddtek.jdbc.openedge.OpenEdgeDriver",
+    "url": "jdbc:datadirect:openedge://localhost:2000;databaseName=database",
+    "documentation": "https://docs.progress.com/",
+    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+  },
+  {
+    "id": "tibero",
+    "name": "Tibero",
+    "className": "com.tmax.tibero.jdbc.TbDriver",
+    "url": "jdbc:tibero:thin:@localhost:8629:database",
+    "documentation": "https://docs.tmaxtibero.com/",
+    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+  },
+  {
+    "id": "custom",
+    "name": "Другой JDBC-драйвер",
+    "className": "",
+    "url": "jdbc:",
+    "documentation": "",
+    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+  }
+]

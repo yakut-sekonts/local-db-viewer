@@ -1,8 +1,8 @@
 {
   "name": "local-db-viewer",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "private": true,
-  "description": "Desktop database IDE for Trino, PostgreSQL, MySQL, MariaDB, SQLite, SQL Server and ClickHouse",
+  "description": "Desktop database IDE with a versioned JDBC driver catalog",
   "main": "dist-electron/main.cjs",
   "scripts": {
     "build": "npm run build:jdbc && tsc --noEmit && vite build --logLevel warn && node scripts/build-electron.mjs",
@@ -98,7 +98,7 @@
           "path": "build/INSTALL-macOS.txt"
         }
       ],
-      "title": "Local DB Viewer — установка для пользователя"
+      "title": "Local DB Viewer \u2014 \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0430 \u0434\u043b\u044f \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044f"
     },
     "extraResources": [
       {

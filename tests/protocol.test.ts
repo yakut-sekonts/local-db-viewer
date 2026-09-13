@@ -98,8 +98,8 @@ test('Cancellation before initial POST response deletes the issued query', async
 
 test('SQL lexer respects quoted strings, comments, dollar bodies and rejects batches', () => {
   assert.equal(singleStatement("SELECT ';'; -- a comment"), "SELECT ';'");
-  assert.equal(singleStatement('SELECT $$a;b$$;'), 'SELECT $$a;b$$');
-  assert.equal(singleStatement('SELECT 1 /* outer /* inner */ outer */;'), 'SELECT 1 /* outer /* inner */ outer */');
+  assert.equal(singleStatement('SELECT $$a;b$$;', 'postgres'), 'SELECT $$a;b$$');
+  assert.equal(singleStatement('SELECT 1 /* outer /* inner */ outer */;', 'trino'), 'SELECT 1 /* outer /* inner */ outer */');
   assert.throws(() => singleStatement('SELECT 1; DELETE FROM accounts'), /одну SQL-команду/);
   assert.throws(() => singleStatement("SELECT 'broken"), /Незакрытая/);
 });

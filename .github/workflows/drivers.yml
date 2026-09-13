@@ -1,0 +1,41 @@
+name: JDBC driver catalog
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: jdbc-driver-catalog
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Restore last published catalog
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/contents/catalog.json?ref=driver-catalog" -H 'Accept: application/vnd.github.raw+json' > previous-catalog.json; then
+            cp previous-catalog.json drivers/catalog-lock.json
+          else
+            echo 'Using catalog bundled with application source'
+          fi
+      - name: Resolve new versions and verify driver class loading
+        run: python3 scripts/refresh-drivers.py --allow-partial
+      - name: Publish catalog separately from application releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/publish-driver-catalog.py

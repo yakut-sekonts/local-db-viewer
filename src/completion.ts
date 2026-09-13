@@ -1,4 +1,4 @@
-import type { Column, DatabaseEngine, Relationship, SchemaIndex, TableMeta, TableRef } from './shared';
+import type { JdbcDialect, Column, DatabaseEngine, Relationship, SchemaIndex, TableMeta, TableRef } from './shared';
 import { identifier } from '../electron/sql';
 
 interface Token { text: string; value: string; start: number; end: number; container: number; kind: 'name' | 'symbol' | 'string' | 'comment'; quoted?: boolean; closed?: boolean }
@@ -13,7 +13,7 @@ function tokenize(sql: string): { tokens: Token[]; containers: Container[] } {
   let container = 0;
   let i = 0;
   while (i < sql.length) {
-    if (/\s/u.test(sql[i])) { i++; continue; }
+    if (/\s/u.test(sql.charAt(i))) { i++; continue; }
     const start = i;
     if (sql.startsWith('--', i) || sql.startsWith('/*', i)) {
       let closed = true;
@@ -30,22 +30,22 @@ function tokenize(sql: string): { tokens: Token[]; containers: Container[] } {
       const end = sql.indexOf(dollar, i + dollar.length); i = end < 0 ? sql.length : end + dollar.length;
       tokens.push({ text: sql.slice(start, i), value: '', start, end: i, container, kind: 'string', closed: end >= 0 }); continue;
     }
-    if (['"', "'", '`', '['].includes(sql[i])) {
-      const opening = sql[i++]; const closing = opening === '[' ? ']' : opening;
+    if (['"', "'", '`', '['].includes(sql.charAt(i))) {
+      const opening = sql.charAt(i++); const closing = opening === '[' ? ']' : opening;
       let value = ''; let closed = false;
       while (i < sql.length) {
-        if (sql[i] === closing) {
-          if (sql[i + 1] === closing) { value += closing; i += 2; }
+        if (sql.charAt(i) === closing) {
+          if (sql.charAt(i + 1) === closing) { value += closing; i += 2; }
           else { i++; closed = true; break; }
-        } else if (sql[i] === '\\' && opening === "'") { value += sql.slice(i, i + 2); i += 2; }
-        else value += sql[i++];
+        } else if (sql.charAt(i) === '\\' && opening === "'") { value += sql.slice(i, i + 2); i += 2; }
+        else value += sql.charAt(i++);
       }
       tokens.push({ text: sql.slice(start, i), value, start, end: i, container, kind: opening === "'" ? 'string' : 'name', quoted: true, closed }); continue;
     }
     const word = sql.slice(i).match(/^[\p{L}_$][\p{L}\p{N}_$]*/u)?.[0];
     if (word) { i += word.length; tokens.push({ text: word, value: word, start, end: i, container, kind: 'name' }); continue; }
-    const value = sql[i++];
-    if (value === ')') { containers[container].end = start; container = Math.max(0, containers[container].parent); }
+    const value = sql.charAt(i++);
+    if (value === ')') { const current = containers[container]; if (current) { current.end = start; container = Math.max(0, current.parent); } }
     tokens.push({ text: value, value, start, end: i, container, kind: 'symbol' });
     if (value === '(') { containers.push({ parent: container, start: i, end: sql.length }); container = containers.length - 1; }
   }
@@ -53,19 +53,32 @@ function tokenize(sql: string): { tokens: Token[]; containers: Container[] } {
 }
 const isKeyword = (token: Token | undefined, word: string) => Boolean(token && !token.quoted && token.value.toUpperCase() === word);
 const isName = (token: Token | undefined): token is Token => Boolean(token && token.kind === 'name' && (token.quoted || !keywords.has(token.value.toUpperCase())));
-const identifierName = (token: Token, engine: DatabaseEngine) => engine === 'postgres' && !token.quoted ? token.value.toLowerCase() : token.value;
-function nameMatches(token: Token, name: string, engine: DatabaseEngine): boolean {
+const identifierName = (token: Token, engine: DatabaseEngine, dialect?: JdbcDialect) => token.quoted ? token.value : engine === 'postgres' || dialect?.unquotedCase === 'lower' ? token.value.toLowerCase() : dialect?.unquotedCase === 'upper' ? token.value.toUpperCase() : token.value;
+const catalogOnly = (engine: DatabaseEngine, dialect?: JdbcDialect) => ['mysql', 'mariadb', 'clickhouse'].includes(engine) || (engine === 'jdbc' && dialect?.catalogs && !dialect.schemas);
+function quoteName(name: string, engine: DatabaseEngine, dialect?: JdbcDialect): string {
+  if (engine !== 'jdbc' || !dialect) return identifier(name, engine);
+  const end = dialect.quote === '[' ? ']' : dialect.quote;
+  if (!dialect.quote) { if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) throw new Error('JDBC-драйвер не поддерживает quoting этого имени.'); return name; }
+  return dialect.quote + name.replaceAll(end, end + end) + end;
+}
+function nameMatches(token: Token | undefined, name: string, engine: DatabaseEngine): boolean {
+  if (!token) return false;
   if (token.quoted) return token.value === name;
   return engine === 'postgres' ? token.value.toLowerCase() === name : token.value.toLowerCase() === name.toLowerCase();
 }
 export const tableKey = (table: TableRef) => JSON.stringify([table.catalog, table.schema, table.name]);
-export function tablePath(table: TableRef, engine: DatabaseEngine): string {
+export function tablePath(table: TableRef, engine: DatabaseEngine, dialect?: JdbcDialect): string {
+  if (engine === 'jdbc' && dialect) {
+    const q = (name: string) => quoteName(name, engine, dialect);
+    const name = [dialect.schemas ? table.schema : '', table.name].filter(Boolean).map(q).join('.');
+    return !dialect.catalogs || !table.catalog ? name : dialect.catalogAtStart ? q(table.catalog) + dialect.catalogSeparator + name : name + dialect.catalogSeparator + q(table.catalog);
+  }
   const parts = ['mysql', 'mariadb', 'clickhouse'].includes(engine) ? [table.catalog, table.name] : engine === 'postgres' || engine === 'sqlite' ? [table.schema, table.name] : [table.catalog, table.schema, table.name];
   return parts.filter(Boolean).map(name => identifier(name, engine)).join('.');
 }
 function pathAt(tokens: Token[], start: number): { parts: Token[]; next: number } {
   const parts: Token[] = []; let i = start;
-  while (isName(tokens[i])) { parts.push(tokens[i++]); if (tokens[i]?.value !== '.' || !isName(tokens[i + 1])) break; i++; }
+  for (;;) { const token = tokens[i]; if (!isName(token)) break; parts.push(token); i++; if (tokens[i]?.value !== '.' || !isName(tokens[i + 1])) break; i++; }
   return { parts, next: i };
 }
 function resolveTable(parts: Token[], index: SchemaIndex, engine: DatabaseEngine, ctes: TableMeta[]): TableMeta | undefined {
@@ -74,22 +87,26 @@ function resolveTable(parts: Token[], index: SchemaIndex, engine: DatabaseEngine
   const candidates = [...ctes, ...index.tables].filter(table => nameMatches(last, table.name, engine));
   if (parts.length === 1) return candidates.find(table => ctes.includes(table) || (table.catalog === index.catalog && table.schema === index.schema));
   return candidates.find(table => parts.length === 2
-    ? nameMatches(parts[0], ['mysql', 'mariadb', 'clickhouse'].includes(engine) ? table.catalog : table.schema, engine)
+    ? nameMatches(parts[0], catalogOnly(engine, index.dialect) ? table.catalog : table.schema, engine)
     : nameMatches(parts[0], table.catalog, engine) && nameMatches(parts[1], table.schema, engine));
 }
 function bindings(tokens: Token[], index: SchemaIndex, engine: DatabaseEngine, ctes: TableMeta[]): Binding[] {
   const result: Binding[] = []; let from = false;
   for (let i = 0; i < tokens.length; i++) {
-    const upper = tokens[i].quoted ? '' : tokens[i].value.toUpperCase();
+    const token = tokens[i]; if (!token) continue;
+    const upper = token.quoted ? '' : token.value.toUpperCase();
     if (['WHERE', 'GROUP', 'ORDER', 'HAVING', 'LIMIT', 'UNION', 'SET', 'RETURNING'].includes(upper)) from = false;
-    if (!['FROM', 'JOIN', 'UPDATE', 'INTO'].includes(upper) && !(from && tokens[i].value === ',')) continue;
+    if (!['FROM', 'JOIN', 'UPDATE', 'INTO'].includes(upper) && !(from && token.value === ',')) continue;
     from = true;
     const path = pathAt(tokens, i + 1);
     if (!path.parts.length || tokens[path.next]?.value === '(') continue;
     const table = resolveTable(path.parts, index, engine, ctes);
     let next = path.next;
     if (isKeyword(tokens[next], 'AS')) next++;
-    const alias = identifierName(isName(tokens[next]) ? tokens[next] : path.parts.at(-1)!, engine);
+    const nextToken = tokens[next], lastPart = path.parts.at(-1);
+    const aliasToken = isName(nextToken) ? nextToken : lastPart;
+    if (!aliasToken) continue;
+    const alias = identifierName(aliasToken, engine, index.dialect);
     if (table) result.push({ table, alias, explicitAlias: isName(tokens[next]) });
     i = isName(tokens[next]) ? next : path.next - 1;
   }
@@ -103,33 +120,36 @@ function cteTables(tokens: Token[], containers: Container[], index: SchemaIndex,
   if (!isKeyword(root[0], 'WITH')) return ctes;
   for (let i = 1; i < root.length; i++) {
     if (isKeyword(root[i], 'SELECT')) break;
-    if (!isName(root[i])) continue;
-    const name = identifierName(root[i], engine);
+    const rootToken = root[i]; if (!isName(rootToken)) continue;
+    const name = identifierName(rootToken, engine, index.dialect);
     let next = i + 1;
     let names: string[] = [];
-    if (root[next]?.value === '(') {
-      const group = containers.findIndex(item => item.start === root[next].end);
-      names = tokens.filter(token => token.container === group && isName(token)).map(token => identifierName(token, engine));
+    const nameList = root[next];
+    if (nameList?.value === '(') {
+      const group = containers.findIndex(item => item.start === nameList.end);
+      names = tokens.filter(token => token.container === group && isName(token)).map(token => identifierName(token, engine, index.dialect));
       next += 2;
     }
-    if (!isKeyword(root[next], 'AS') || root[next + 1]?.value !== '(') continue;
     const opening = root[next + 1];
+    if (!isKeyword(root[next], 'AS') || !opening || opening.value !== '(') continue;
     const group = containers.findIndex(item => item.start === opening.end);
     const inner = tokens.filter(token => token.container === group);
     const refs = bindings(inner, index, engine, ctes);
     const columns: Column[] = [];
     const from = inner.findIndex(token => isKeyword(token, 'FROM'));
     const projection = inner.slice(1, from < 0 ? undefined : from);
-    const pieces: Token[][] = [[]];
-    for (const token of projection) { if (token.value === ',') pieces.push([]); else pieces.at(-1)!.push(token); }
+    let currentPiece: Token[] = []; const pieces = [currentPiece];
+    for (const token of projection) { if (token.value === ',') { currentPiece = []; pieces.push(currentPiece); } else currentPiece.push(token); }
     for (const piece of pieces) {
       const aliasAt = piece.findIndex(token => isKeyword(token, 'AS'));
-      if (aliasAt >= 0 && isName(piece[aliasAt + 1])) columns.push({ name: identifierName(piece[aliasAt + 1], engine), type: 'CTE expression' });
+      const aliasToken = aliasAt >= 0 ? piece[aliasAt + 1] : undefined;
+      if (isName(aliasToken)) columns.push({ name: identifierName(aliasToken, engine, index.dialect), type: 'CTE expression' });
       else if (piece.at(-1)?.value === '*') {
         const sources = piece.length === 3 ? refs.filter(ref => nameMatches(piece[0], ref.alias, engine)) : refs;
         columns.push(...sources.flatMap(ref => ref.table.columns));
       } else if (piece.length === 1 && isName(piece[0]) || piece.length === 3 && piece[1]?.value === '.' && isName(piece[2])) {
-        const columnName = identifierName(piece.at(-1)!, engine);
+        const lastToken = piece.at(-1); if (!lastToken) continue;
+        const columnName = identifierName(lastToken, engine, index.dialect);
         columns.push({ name: columnName, type: refs.flatMap(ref => ref.table.columns).find(column => column.name === columnName)?.type ?? 'CTE column' });
       }
     }
@@ -149,7 +169,7 @@ function context(sql: string, offset: number) {
   let scope = 0;
   for (let i = 1; i < full.containers.length; i++) {
     const group = full.containers[i];
-    if (group.start <= offset && offset <= group.end && tokens.some(token => token.container === i && isKeyword(token, 'SELECT'))) scope = i;
+    if (group && group.start <= offset && offset <= group.end && tokens.some(token => token.container === i && isKeyword(token, 'SELECT'))) scope = i;
   }
   let scoped = tokens.filter(token => token.container === scope);
   const unionBefore = scoped.filter(token => ['UNION', 'EXCEPT', 'INTERSECT'].some(word => isKeyword(token, word)) && token.start < offset).at(-1)?.end ?? start;
@@ -161,7 +181,9 @@ function context(sql: string, offset: number) {
     let group = token.container;
     while (group !== scope) {
       if (group < 0 || queryContainers.has(group)) return false;
-      group = full.containers[group].parent;
+      const parent = full.containers[group]?.parent;
+      if (parent === undefined) return false;
+      group = parent;
     }
     return true;
   });
@@ -170,7 +192,7 @@ function context(sql: string, offset: number) {
   const before = expressions.filter(token => token.end <= replaceStart);
   const qualifier: Token[] = [];
   let position = before.length - 1;
-  while (before[position]?.value === '.' && isName(before[position - 1])) { qualifier.unshift(before[position - 1]); position -= 2; }
+  while (before[position]?.value === '.') { const token = before[position - 1]; if (!isName(token)) break; qualifier.unshift(token); position -= 2; }
   const prior = before.slice(0, position + 1);
   return { blocked, tokens, containers: full.containers, scoped, word, replaceStart, replaceEnd: word?.end ?? offset, before, qualifier, prior };
 }
@@ -183,10 +205,11 @@ export function requestedSchemas(sql: string, offset: number, index: SchemaIndex
   const paths: Token[][] = [];
   for (let i = 0; i < current.scoped.length; i++) if (['FROM', 'JOIN', 'UPDATE', 'INTO'].some(word => isKeyword(current.scoped[i], word))) paths.push(pathAt(current.scoped, i + 1).parts);
   if (current.qualifier.length && ['FROM', 'JOIN'].some(word => isKeyword(current.prior.at(-1), word))) paths.push([...current.qualifier, { value: '', kind: 'name' } as Token]);
-  const contexts = paths.filter(path => path.length > 1).map(path => {
-    const name = (token: Token) => engine === 'postgres' && !token.quoted ? token.value.toLowerCase() : token.value;
-    if (['mysql', 'mariadb', 'clickhouse'].includes(engine)) return { catalog: name(path[0]), schema: name(path[0]) };
-    return path.length > 2 ? { catalog: name(path[0]), schema: name(path[1]) } : { catalog: index.catalog, schema: name(path[0]) };
+  const contexts = paths.flatMap(path => {
+    const [first, second] = path; if (!first || !second) return [];
+    const name = (token: Token) => identifierName(token, engine, index.dialect);
+    if (catalogOnly(engine, index.dialect)) return [{ catalog: name(first), schema: name(first) }];
+    return [path.length > 2 ? { catalog: name(first), schema: name(second) } : { catalog: index.catalog, schema: name(first) }];
   });
   return [...new Map(contexts.filter(item => item.catalog && item.schema && (item.catalog !== index.catalog || item.schema !== index.schema)).map(item => [JSON.stringify(item), item])).values()].slice(0, 6);
 }
@@ -197,7 +220,7 @@ export function completeSQL(sql: string, offset: number, index: SchemaIndex, eng
   const ctes = cteTables(ctx.tokens, ctx.containers, index, engine);
   const refs = bindings(ctx.scoped, index, engine, ctes);
   const suggestions: SqlSuggestion[] = [];
-  const q = (name: string) => identifier(name, engine);
+  const q = (name: string) => quoteName(name, engine, index.dialect);
   const add = (label: string, insertText: string, detail: string, kind: SqlSuggestion['kind'], rank = 2, filterText?: string) => suggestions.push({ label, insertText, detail, kind, rank, filterText, start: ctx.replaceStart, end: ctx.replaceEnd });
   const last = ctx.prior.at(-1);
   const fromClause = [...ctx.prior].reverse().find(token => ['FROM', 'JOIN', 'WHERE', 'ON', 'GROUP', 'ORDER', 'SELECT'].some(word => isKeyword(token, word)));
@@ -212,9 +235,9 @@ export function completeSQL(sql: string, offset: number, index: SchemaIndex, eng
     for (const table of [...ctes, ...index.tables]) {
       const parts = ctx.qualifier;
       const matches = !parts.length ? ctes.includes(table) || table.catalog === index.catalog && table.schema === index.schema
-        : parts.length === 1 ? nameMatches(parts[0], ['mysql', 'mariadb', 'clickhouse'].includes(engine) ? table.catalog : table.schema, engine)
+        : parts.length === 1 ? nameMatches(parts[0], catalogOnly(engine, index.dialect) ? table.catalog : table.schema, engine)
         : nameMatches(parts[0], table.catalog, engine) && nameMatches(parts[1], table.schema, engine);
-      if (matches) add(table.name, ctes.includes(table) || parts.length ? q(table.name) : tablePath(table, engine), ctes.includes(table) ? 'CTE' : `${table.catalog}.${table.schema} · ${table.columns.length} columns`, 'table', 1);
+      if (matches) add(table.name, ctes.includes(table) || parts.length ? q(table.name) : tablePath(table, engine, index.dialect), ctes.includes(table) ? 'CTE' : `${table.catalog}.${table.schema} · ${table.columns.length} columns`, 'table', 1);
     }
   } else {
     const counts = new Map<string, number>();
@@ -238,7 +261,7 @@ export function completeSQL(sql: string, offset: number, index: SchemaIndex, eng
     }
   }
   const currentWord = ctx.word?.value.toUpperCase() ?? '';
-  const joins = ['LEFT JOIN', 'INNER JOIN', 'RIGHT JOIN', ...(engine === 'mysql' || engine === 'mariadb' || engine === 'sqlite' ? [] : ['FULL JOIN'])];
+  const joins = ['LEFT JOIN', 'INNER JOIN', 'RIGHT JOIN', ...(engine === 'mysql' || engine === 'mariadb' || engine === 'sqlite' || (engine === 'jdbc' && !index.dialect?.fullOuterJoins) ? [] : ['FULL JOIN'])];
   const canJoin = joinContext || !ctx.qualifier.length && refs.length > 0 && (currentWord === 'JOIN' || joins.some(join => currentWord && join.startsWith(currentWord)) || isKeyword(fromClause, 'FROM') || isKeyword(fromClause, 'ON'));
   if (canJoin && !isKeyword(last, 'ON')) for (const base of refs.filter(ref => !ctes.includes(ref.table))) for (const relation of index.relationships) {
     const forward = tableKey(base.table) === tableKey(relation.source);
@@ -251,7 +274,7 @@ export function completeSQL(sql: string, offset: number, index: SchemaIndex, eng
     const seed = alias;
     for (let suffix = 2; used.has(alias.toLowerCase()); suffix++) alias = seed + suffix;
     const condition = forward ? predicate(relation, base.alias, alias) : predicate(relation, alias, base.alias);
-    const clause = `${tablePath(target, engine)} ${q(alias)} ON ${condition}`;
+    const clause = `${tablePath(target, engine, index.dialect)} ${q(alias)} ON ${condition}`;
     if (joinContext) {
       const suggestion = { label: `${target.name} — ON ${condition}`, insertText: clause, detail: relationDetail(relation), kind: 'join' as const, rank: 0, filterText: target.name, start: ctx.qualifier[0]?.start ?? ctx.replaceStart, end: ctx.replaceEnd };
       if (!ctx.qualifier.length || resolveTable([...ctx.qualifier, { value: target.name, quoted: true, kind: 'name' } as Token], { ...index, tables: [{ ...target, columns: [] }] }, engine, []) ) suggestions.push(suggestion);

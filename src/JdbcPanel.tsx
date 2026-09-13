@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { driverDefinition, profileDriver } from './drivers';
 import type { ProfileDraft } from './shared';
-import { DRIVER_CLASSES, secretProperty, type JdbcProperty, type JdbcSettings } from './jdbc';
+import { secretProperty, type JdbcProperty, type JdbcSettings } from './jdbc';
 
 export function JdbcPanel({ draft, onChange, onError }: { draft: ProfileDraft; onChange(draft: ProfileDraft): void; onError(message: string): void }) {
   const [properties, setProperties] = useState<JdbcProperty[]>([]);
@@ -21,11 +22,11 @@ export function JdbcPanel({ draft, onChange, onError }: { draft: ProfileDraft; o
     catch (error) { onError((error as Error).message); }
     finally { setBusy(false); }
   }
-  useEffect(() => { void load(); }, [draft.engine]);
+  useEffect(() => { void load(); }, [draft.engine, draft.jdbc?.driverId, draft.jdbc?.driverVersion]);
   const names = [...new Set([...properties.map(item => item.name), ...Object.keys(settings.properties ?? {}), ...(draft.jdbcSecrets ?? [])])].sort();
   const help = new Map(properties.map(item => [item.name, item]));
   return <div className="jdbc-settings">
-    <div className="jdbc-driver-heading"><strong>JDBC · {settings.driverClass || DRIVER_CLASSES[draft.engine]}</strong><button type="button" className="button secondary" disabled={busy} onClick={() => void load()}>{busy ? 'Чтение…' : 'Обновить свойства'}</button></div>
+    <div className="jdbc-driver-heading"><strong>JDBC · {settings.driverClass || driverDefinition(profileDriver(draft)).className}</strong><button type="button" className="button secondary" disabled={busy} onClick={() => void load()}>{busy ? 'Чтение…' : 'Обновить свойства'}</button></div>
     <input aria-label="Поиск JDBC-параметров" placeholder="Поиск: SSL, accessToken, Kerberos…" value={search} onChange={event => setSearch(event.target.value)} />
     <div className="jdbc-properties"><div className="jdbc-property-header"><span>Name</span><span>Value</span></div>{names.filter(name => name.toLowerCase().includes(search.toLowerCase())).map(name => {
       const info = help.get(name); const saved = draft.jdbcSecrets?.includes(name);
@@ -34,9 +35,9 @@ export function JdbcPanel({ draft, onChange, onError }: { draft: ProfileDraft; o
     <div className="form-row"><input aria-label="Имя пользовательского JDBC-параметра" placeholder="Дополнительный параметр" value={customName} onChange={event => setCustomName(event.target.value)} /><button type="button" className="button secondary" disabled={!customName.trim()} onClick={() => { property(customName.trim(), ''); setSearch(customName.trim()); setCustomName(''); }}>Добавить</button></div>
     <small>Заданные значения передаются JDBC-драйверу напрямую и заменяют значения General. Параметры в JDBC URL имеют приоритет.</small>
     <label>JDBC URL <span>переопределяет General</span><input value={settings.url ?? ''} placeholder="jdbc:…" onChange={event => change({ url: event.target.value })} /></label>
-    <label>Driver class<input value={settings.driverClass ?? ''} placeholder={DRIVER_CLASSES[draft.engine]} onChange={event => change({ driverClass: event.target.value })} /></label>
+    <label>Driver class<input value={settings.driverClass ?? ''} placeholder={driverDefinition(profileDriver(draft)).className} onChange={event => change({ driverClass: event.target.value })} /></label>
     <label>VM options <span>один аргумент на строку</span><textarea rows={3} placeholder={'-Xmx1024m\n-Djava.security.krb5.conf=/path/to/krb5.conf'} value={(settings.vmOptions ?? []).join('\n')} onChange={event => change({ vmOptions: event.target.value.split('\n') })} /></label>
-    <label>Дополнительные JAR <span>абсолютные пути, по одному на строку</span><textarea rows={2} value={(settings.classpath ?? []).join('\n')} onChange={event => change({ classpath: event.target.value.split('\n') })} /></label>
+    <label>Внешний комплект JAR <span>заменяет управляемый драйвер; абсолютные пути, по одному на строку</span><textarea rows={2} value={(settings.classpath ?? []).join('\n')} onChange={event => change({ classpath: event.target.value.split('\n') })} /></label>
     <label>Working directory<input value={settings.workingDirectory ?? ''} placeholder="По умолчанию приложения" onChange={event => change({ workingDirectory: event.target.value })} /></label>
     <label>VM environment <span>NAME=value, по одному на строку</span><textarea rows={3} placeholder={draft.jdbcEnvironmentNames?.length ? `Сохранены: ${draft.jdbcEnvironmentNames.join(', ')}. Укажите NAME= для очистки значения.` : 'KRB5_CONFIG=/path/to/krb5.conf'} value={environmentText} onChange={event => {
       setEnvironmentText(event.target.value);

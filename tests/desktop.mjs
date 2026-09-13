@@ -13,6 +13,8 @@ await mkdir(artifacts, { recursive: true });
 const dataDirectory = await mkdtemp(join(tmpdir(), 'local-db-viewer-desktop-'));
 await mkdir(join(dataDirectory, 'updates'));
 await writeFile(join(dataDirectory, 'updates/settings.json'), JSON.stringify({ repository: 'fixture/public', automatic: false }));
+await mkdir(join(dataDirectory, 'drivers'), { recursive: true });
+await writeFile(join(dataDirectory, 'drivers/settings.json'), JSON.stringify({ automatic: false, installed: {}, selected: {} }));
 const app = await electron.launch({ executablePath: process.env.LOCAL_DB_VIEWER_EXECUTABLE, args: process.env.LOCAL_DB_VIEWER_EXECUTABLE ? [] : [root], env: { ...process.env, LOCAL_DB_VIEWER_DATA_DIR: dataDirectory }, timeout: 30000 });
 const errors = [];
 const page = await app.firstWindow();

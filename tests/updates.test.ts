@@ -36,8 +36,8 @@ test('download authenticates only to GitHub API and verifies complete bytes befo
     const file = join(directory, asset.name);
     await downloadAsset('owner/releases', 'device-token', asset, file, () => {}, fetchUpdate);
     assert.deepEqual(await readFile(file), bytes);
-    assert.equal(calls[0].authorization, 'Bearer device-token');
-    assert.equal(calls[1].authorization, null);
+    assert.equal(calls[0]?.authorization, 'Bearer device-token');
+    assert.equal(calls[1]?.authorization, null);
     await assert.rejects(downloadAsset('owner/releases', 'device-token', { ...asset, digest: `sha256:${'f'.repeat(64)}` }, join(directory, 'bad.exe'), () => {}, fetchUpdate), /SHA256/);
     assert.deepEqual(await readdir(directory), ['installer.exe']);
     await assert.rejects(downloadAsset('owner/releases', 'device-token', { ...asset, size: 2 }, join(directory, 'large.exe'), () => {}, fetchUpdate), /Размер/);
@@ -83,9 +83,9 @@ test('public updates need no encryption or token, including automatic checks on 
     assert.equal(updater.state().phase, 'idle');
     assert.equal(updater.state().settings.hasToken, false);
     assert.equal(requests.length, 1);
-    assert.equal(new Headers(requests[0].headers).has('authorization'), false);
-    assert.equal(requests[0].cache, 'no-store');
-    assert.equal(requests[0].credentials, 'omit');
+    assert.equal(new Headers(requests[0]?.headers).has('authorization'), false);
+    assert.equal(requests[0]?.cache, 'no-store');
+    assert.equal(requests[0]?.credentials, 'omit');
   } finally { updater.dispose(); await rm(directory, { recursive: true, force: true }); }
 });
 

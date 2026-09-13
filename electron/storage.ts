@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { Profile, ProfileDraft } from '../src/shared';
+import { ENGINES, type Profile, type ProfileDraft } from '../src/shared';
 import { validateConnection, type Connection } from './trino';
 import { sslEnabled } from '../src/connectionSettings';
 import { secretProperty, type JdbcSettings } from '../src/jdbc';
@@ -16,7 +16,23 @@ export class ProfileStore {
   private async read(): Promise<StoredProfile[]> {
     try {
       const data: unknown = JSON.parse(await readFile(this.path, 'utf8'));
-      if (!Array.isArray(data)) throw new Error('Файл подключений повреждён.');
+      if (!Array.isArray(data) || data.length > 1000) throw new Error('Файл подключений повреждён.');
+      const ids = new Set<string>();
+      for (const [index, value] of data.entries()) {
+        const invalid = () => new Error(`Файл подключений повреждён: запись ${index + 1}. Исходный файл сохранён без изменений.`);
+        if (!value || typeof value !== 'object' || Array.isArray(value)) throw invalid();
+        for (const name of ['id', 'name', 'endpoint', 'user', 'auth', 'catalog', 'schema', 'engine']) if (typeof value[name] !== 'string' || /[\r\n\0]/.test(value[name])) throw invalid();
+        if (!value.id || ids.has(value.id) || !Object.hasOwn(ENGINES, value.engine) || !['none', 'basic', 'bearer'].includes(value.auth) || typeof value.tls !== 'boolean') throw invalid();
+        ids.add(value.id);
+        for (const name of ['encryptedSecret', 'encryptedJdbc']) if (value[name] !== undefined && (typeof value[name] !== 'string' || !value[name])) throw invalid();
+        try {
+          validateJdbc(value.jdbc);
+          if (!['sqlite', 'jdbc'].includes(value.engine)) {
+            const endpoint = new URL(value.endpoint);
+            if (!endpoint.hostname || endpoint.username || endpoint.password) throw invalid();
+          }
+        } catch { throw invalid(); }
+      }
       return data as StoredProfile[];
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
@@ -26,6 +42,7 @@ export class ProfileStore {
   private public(profile: StoredProfile): Profile {
     const { encryptedSecret, encryptedJdbc, ...rest } = profile;
     const jdbc: JdbcSettings | undefined = encryptedJdbc ? JSON.parse(this.encryption.decrypt(encryptedJdbc)) : rest.jdbc;
+    validateJdbc(jdbc);
     const jdbcSecrets = Object.keys(jdbc?.properties ?? {}).filter(secretProperty);
     const jdbcEnvironmentNames = Object.keys(jdbc?.environment ?? {});
     const visibleJdbc = jdbc ? { ...jdbc, properties: Object.fromEntries(Object.entries(jdbc.properties ?? {}).filter(([name]) => !secretProperty(name))), environment: {} } : undefined;

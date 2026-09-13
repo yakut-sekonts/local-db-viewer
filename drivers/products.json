@@ -1,0 +1,451 @@
+[
+  {
+    "id": "trino",
+    "name": "Trino",
+    "driverId": "trino",
+    "engine": "trino"
+  },
+  {
+    "id": "postgres",
+    "name": "PostgreSQL",
+    "driverId": "postgres",
+    "engine": "postgres"
+  },
+  {
+    "id": "mysql",
+    "name": "MySQL",
+    "driverId": "mysql",
+    "engine": "mysql"
+  },
+  {
+    "id": "mariadb",
+    "name": "MariaDB",
+    "driverId": "mariadb",
+    "engine": "mariadb"
+  },
+  {
+    "id": "sqlite",
+    "name": "SQLite",
+    "driverId": "sqlite",
+    "engine": "sqlite"
+  },
+  {
+    "id": "mssql",
+    "name": "Microsoft SQL Server",
+    "driverId": "mssql",
+    "engine": "mssql"
+  },
+  {
+    "id": "clickhouse",
+    "name": "ClickHouse",
+    "driverId": "clickhouse",
+    "engine": "clickhouse"
+  },
+  {
+    "id": "oracle",
+    "name": "Oracle Database",
+    "driverId": "oracle",
+    "engine": "jdbc"
+  },
+  {
+    "id": "h2",
+    "name": "H2",
+    "driverId": "h2",
+    "engine": "jdbc"
+  },
+  {
+    "id": "duckdb",
+    "name": "DuckDB",
+    "driverId": "duckdb",
+    "engine": "jdbc"
+  },
+  {
+    "id": "hsqldb",
+    "name": "HSQLDB",
+    "driverId": "hsqldb",
+    "engine": "jdbc"
+  },
+  {
+    "id": "derby",
+    "name": "Apache Derby (embedded)",
+    "driverId": "derby",
+    "engine": "jdbc"
+  },
+  {
+    "id": "derby-client",
+    "name": "Apache Derby (server)",
+    "driverId": "derby-client",
+    "engine": "jdbc"
+  },
+  {
+    "id": "db2",
+    "name": "IBM Db2 LUW",
+    "driverId": "db2",
+    "engine": "jdbc"
+  },
+  {
+    "id": "db2i",
+    "name": "IBM Db2 for i",
+    "driverId": "db2i",
+    "engine": "jdbc"
+  },
+  {
+    "id": "firebird",
+    "name": "Firebird",
+    "driverId": "firebird",
+    "engine": "jdbc"
+  },
+  {
+    "id": "snowflake",
+    "name": "Snowflake",
+    "driverId": "snowflake",
+    "engine": "jdbc"
+  },
+  {
+    "id": "redshift",
+    "name": "Amazon Redshift",
+    "driverId": "redshift",
+    "engine": "jdbc"
+  },
+  {
+    "id": "vertica",
+    "name": "Vertica",
+    "driverId": "vertica",
+    "engine": "jdbc"
+  },
+  {
+    "id": "exasol",
+    "name": "Exasol",
+    "driverId": "exasol",
+    "engine": "jdbc"
+  },
+  {
+    "id": "hana",
+    "name": "SAP HANA",
+    "driverId": "hana",
+    "engine": "jdbc"
+  },
+  {
+    "id": "presto",
+    "name": "PrestoDB",
+    "driverId": "presto",
+    "engine": "jdbc"
+  },
+  {
+    "id": "hive",
+    "name": "Apache Hive / Spark Thrift",
+    "driverId": "hive",
+    "engine": "jdbc"
+  },
+  {
+    "id": "databricks",
+    "name": "Databricks",
+    "driverId": "databricks",
+    "engine": "jdbc"
+  },
+  {
+    "id": "informix",
+    "name": "IBM Informix",
+    "driverId": "informix",
+    "engine": "jdbc"
+  },
+  {
+    "id": "teradata",
+    "name": "Teradata",
+    "driverId": "teradata",
+    "engine": "jdbc"
+  },
+  {
+    "id": "phoenix",
+    "name": "Apache Phoenix (thin)",
+    "driverId": "phoenix",
+    "engine": "jdbc"
+  },
+  {
+    "id": "ignite",
+    "name": "Apache Ignite 3",
+    "driverId": "ignite",
+    "engine": "jdbc"
+  },
+  {
+    "id": "calcite",
+    "name": "Apache Calcite Avatica",
+    "driverId": "calcite",
+    "engine": "jdbc"
+  },
+  {
+    "id": "neo4j",
+    "name": "Neo4j (JDBC)",
+    "driverId": "neo4j",
+    "engine": "jdbc"
+  },
+  {
+    "id": "mongodb",
+    "name": "MongoDB SQL Interface",
+    "driverId": "mongodb",
+    "engine": "jdbc"
+  },
+  {
+    "id": "spanner",
+    "name": "Google Cloud Spanner",
+    "driverId": "spanner",
+    "engine": "jdbc"
+  },
+  {
+    "id": "ydb",
+    "name": "YDB",
+    "driverId": "ydb",
+    "engine": "jdbc"
+  },
+  {
+    "id": "ucanaccess",
+    "name": "Microsoft Access (UCanAccess)",
+    "driverId": "ucanaccess",
+    "engine": "jdbc"
+  },
+  {
+    "id": "jtds",
+    "name": "Sybase ASE / SQL Server (jTDS)",
+    "driverId": "jtds",
+    "engine": "jdbc"
+  },
+  {
+    "id": "athena",
+    "name": "Amazon Athena",
+    "driverId": "athena",
+    "engine": "jdbc"
+  },
+  {
+    "id": "bigquery",
+    "name": "Google BigQuery (Simba)",
+    "driverId": "bigquery",
+    "engine": "jdbc"
+  },
+  {
+    "id": "impala",
+    "name": "Apache Impala",
+    "driverId": "impala",
+    "engine": "jdbc"
+  },
+  {
+    "id": "elasticsearch",
+    "name": "Elasticsearch SQL",
+    "driverId": "elasticsearch",
+    "engine": "jdbc"
+  },
+  {
+    "id": "redis",
+    "name": "Redis (сторонний JDBC)",
+    "driverId": "redis",
+    "engine": "jdbc"
+  },
+  {
+    "id": "cassandra",
+    "name": "Apache Cassandra (сторонний JDBC)",
+    "driverId": "cassandra",
+    "engine": "jdbc"
+  },
+  {
+    "id": "couchbase",
+    "name": "Couchbase (сторонний JDBC)",
+    "driverId": "couchbase",
+    "engine": "jdbc"
+  },
+  {
+    "id": "dynamodb",
+    "name": "Amazon DynamoDB (сторонний JDBC)",
+    "driverId": "dynamodb",
+    "engine": "jdbc"
+  },
+  {
+    "id": "iris",
+    "name": "InterSystems IRIS",
+    "driverId": "iris",
+    "engine": "jdbc"
+  },
+  {
+    "id": "denodo",
+    "name": "Denodo",
+    "driverId": "denodo",
+    "engine": "jdbc"
+  },
+  {
+    "id": "openedge",
+    "name": "Progress OpenEdge",
+    "driverId": "openedge",
+    "engine": "jdbc"
+  },
+  {
+    "id": "tibero",
+    "name": "Tibero",
+    "driverId": "tibero",
+    "engine": "jdbc"
+  },
+  {
+    "id": "custom",
+    "name": "Другой JDBC-драйвер",
+    "driverId": "custom",
+    "engine": "jdbc"
+  },
+  {
+    "id": "cockroach",
+    "name": "CockroachDB",
+    "driverId": "postgres",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "greenplum",
+    "name": "Greenplum",
+    "driverId": "postgres",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "timescale",
+    "name": "TimescaleDB",
+    "driverId": "postgres",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "yugabyte",
+    "name": "YugabyteDB",
+    "driverId": "postgres",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "questdb",
+    "name": "QuestDB (PostgreSQL wire)",
+    "driverId": "postgres",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "cratedb",
+    "name": "CrateDB (PostgreSQL wire)",
+    "driverId": "postgres",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "materialize",
+    "name": "Materialize",
+    "driverId": "postgres",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "risingwave",
+    "name": "RisingWave",
+    "driverId": "postgres",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "alloydb",
+    "name": "Google AlloyDB",
+    "driverId": "postgres",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "aurora-pg",
+    "name": "Amazon Aurora PostgreSQL",
+    "driverId": "postgres",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "neon",
+    "name": "Neon",
+    "driverId": "postgres",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "supabase",
+    "name": "Supabase",
+    "driverId": "postgres",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "tidb",
+    "name": "TiDB",
+    "driverId": "mysql",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "singlestore",
+    "name": "SingleStore",
+    "driverId": "mysql",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "oceanbase",
+    "name": "OceanBase (MySQL mode)",
+    "driverId": "mysql",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "doris",
+    "name": "Apache Doris",
+    "driverId": "mysql",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "starrocks",
+    "name": "StarRocks",
+    "driverId": "mysql",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "vitess",
+    "name": "Vitess",
+    "driverId": "mysql",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "percona",
+    "name": "Percona Server",
+    "driverId": "mysql",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "aurora-mysql",
+    "name": "Amazon Aurora MySQL",
+    "driverId": "mysql",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "dolt",
+    "name": "Dolt",
+    "driverId": "mysql",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "azure-sql",
+    "name": "Azure SQL Database",
+    "driverId": "mssql",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  },
+  {
+    "id": "azure-synapse",
+    "name": "Azure Synapse SQL",
+    "driverId": "mssql",
+    "engine": "jdbc",
+    "note": "Подключение через совместимый JDBC-протокол. Возможности метаданных зависят от сервера."
+  }
+]

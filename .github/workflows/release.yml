@@ -44,24 +44,33 @@ jobs:
         run: node scripts/write-update-config.mjs
         env:
           UPDATE_REPOSITORY: ${{ vars.UPDATE_REPOSITORY || github.repository }}
+      - name: Prepare JDBC integration fixtures
+        run: python scripts/prepare-test-drivers.py
       - run: npm test
       - run: npm run package:${{ matrix.package }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - name: Test packaged desktop
-        timeout-minutes: 8
+        timeout-minutes: 12
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then
             export LOCAL_DB_VIEWER_EXECUTABLE="$GITHUB_WORKSPACE/release/mac-arm64/Local DB Viewer.app/Contents/MacOS/Local DB Viewer"
             export LOCAL_DB_VIEWER_RESOURCES="$GITHUB_WORKSPACE/release/mac-arm64/Local DB Viewer.app/Contents/Resources"
             node tests/jdbc-runtime.mjs
+            node tests/jdbc-streaming.mjs
             npm run test:ui
+            node tests/driver-desktop.mjs
+            node tests/hardening-desktop.mjs
             node tests/update-install-mac.mjs
           else
             export LOCAL_DB_VIEWER_RESOURCES="$GITHUB_WORKSPACE/release/win-unpacked/resources"
             node tests/jdbc-runtime.mjs
+            node tests/jdbc-streaming.mjs
             node tests/windows-install.mjs
+            export LOCAL_DB_VIEWER_EXECUTABLE="$GITHUB_WORKSPACE/release/win-unpacked/Local DB Viewer.exe"
+            node tests/driver-desktop.mjs
+            node tests/hardening-desktop.mjs
           fi
       - uses: actions/upload-artifact@v7
         with:

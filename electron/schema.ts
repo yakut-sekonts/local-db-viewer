@@ -84,7 +84,7 @@ export async function loadSchema(connection: Connection, input: SchemaInput, rea
 export function validateRelation(value: Relationship): void {
   const name = (item: unknown) => typeof item === 'string' && item.length > 0 && item.length <= 512 && !/[\r\n\0]/.test(item);
   if (!value || !name(value.id) || !name(value.name) || value.kind !== 'virtual' || !Array.isArray(value.columns) || !value.columns.length || value.columns.length > 32) throw new Error('Некорректная виртуальная связь.');
-  for (const table of [value.source, value.target]) if (!table || ![table.catalog, table.schema, table.name].every(name)) throw new Error('Укажите catalog, schema и таблицу для связи.');
+  for (const table of [value.source, value.target]) if (!table || !name(table.name) || ![table.catalog, table.schema].every(item => typeof item === 'string' && item.length <= 512 && !/[\r\n\0]/.test(item))) throw new Error('Укажите catalog, schema и таблицу для связи.');
   if (!value.columns.every(pair => pair && name(pair.source) && name(pair.target)) || new Set(value.columns.map(pair => pair.source)).size !== value.columns.length || new Set(value.columns.map(pair => pair.target)).size !== value.columns.length) throw new Error('Укажите уникальные пары колонок.');
 }
 
@@ -103,8 +103,9 @@ export class RelationStore {
   change(profileId: string, transform: (items: Relationship[]) => Relationship[]): Promise<void> {
     const task = this.queue.then(async () => {
       const data = await this.read();
-      Object.defineProperty(data, profileId, { value: transform(Object.hasOwn(data, profileId) ? data[profileId] : []), enumerable: true, writable: true, configurable: true });
-      if (data[profileId].length > 1000) throw new Error('Лимит: 1 000 виртуальных связей на подключение.');
+      const next = transform(Object.hasOwn(data, profileId) ? data[profileId] ?? [] : []);
+      Object.defineProperty(data, profileId, { value: next, enumerable: true, writable: true, configurable: true });
+      if (next.length > 1000) throw new Error('Лимит: 1 000 виртуальных связей на подключение.');
       await mkdir(dirname(this.path), { recursive: true });
       const temporary = `${this.path}.${randomUUID()}.tmp`;
       await writeFile(temporary, JSON.stringify(data, null, 2), { mode: 0o600 });

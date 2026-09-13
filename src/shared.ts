@@ -1,7 +1,8 @@
 export type AuthMode = 'none' | 'basic' | 'bearer';
 export type SSLVerification = 'FULL' | 'CA' | 'NONE';
-export type DatabaseEngine = 'trino' | 'postgres' | 'mysql' | 'mariadb' | 'sqlite' | 'mssql' | 'clickhouse';
+export type DatabaseEngine = 'trino' | 'postgres' | 'mysql' | 'mariadb' | 'sqlite' | 'mssql' | 'clickhouse' | 'jdbc';
 export const ENGINES: Record<DatabaseEngine, { name: string; endpoint: string; user: string }> = {
+  jdbc: { name: 'JDBC', endpoint: 'jdbc:', user: '' },
   trino: { name: 'Trino', endpoint: 'http://localhost:8080', user: '' },
   postgres: { name: 'PostgreSQL', endpoint: 'postgresql://localhost:5432/postgres', user: 'postgres' },
   mysql: { name: 'MySQL', endpoint: 'mysql://localhost:3306', user: 'root' },
@@ -83,9 +84,11 @@ export interface Relationship {
   kind: 'foreign-key' | 'virtual';
 }
 export interface SchemaInput { profileId: string; catalog: string; schema: string }
-export interface SchemaIndex extends SchemaInput { tables: TableMeta[]; relationships: Relationship[]; warnings: string[] }
+export interface JdbcDialect { quote: string; catalogs: boolean; schemas: boolean; catalogAtStart: boolean; catalogSeparator: string; unquotedCase: 'lower' | 'upper' | 'preserve'; fullOuterJoins: boolean }
+export interface SchemaIndex extends SchemaInput { dialect?: JdbcDialect; tables: TableMeta[]; relationships: Relationship[]; warnings: string[] }
 export interface DesktopAPI {
-  jdbc: { properties(profile: ProfileDraft): Promise<import('./jdbc').JdbcProperty[]> };
+  jdbc: { properties(profile: ProfileDraft): Promise<import('./jdbc').JdbcProperty[]>; preview(input: MetadataInput): Promise<string> };
+  drivers: import('./drivers').DriversAPI;
   updates: import('./updates').UpdateAPI;
   profiles: {
     list(): Promise<Profile[]>;
