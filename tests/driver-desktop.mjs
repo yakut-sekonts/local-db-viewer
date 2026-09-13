@@ -3,6 +3,8 @@ import { mkdir, mkdtemp, readFile, writeFile, copyFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createServer } from 'node:http';
+import { spawn } from 'node:child_process';
+import { createInterface } from 'node:readline';
 const fixtures = JSON.parse(await readFile('tests/driver-fixtures.json', 'utf8')).drivers;
 const directory = await mkdtemp(join(tmpdir(), 'local-db-viewer-jdbc-ui-'));
 await mkdir(join(directory, 'drivers/objects'), { recursive: true });
@@ -16,7 +18,7 @@ await writeFile(join(directory, 'drivers/catalog.json'), JSON.stringify({ format
 const app = await electron.launch({ executablePath: process.env.LOCAL_DB_VIEWER_EXECUTABLE, args: process.env.LOCAL_DB_VIEWER_EXECUTABLE ? [] : [resolve('.')], env: { ...process.env, LOCAL_DB_VIEWER_DATA_DIR: directory } });
 const page = await app.firstWindow(), errors = [];
 page.on('pageerror', error => errors.push(error.message));
-let server;
+let server, h2Server;
 try {
   await expect(page.locator('.monaco-editor')).toBeVisible();
   await app.evaluate(({ net }, { fixtures, root }) => {
@@ -64,7 +66,21 @@ try {
   await page.getByRole('button', { name: 'Добавить подключение', exact: true }).click();
   await page.getByLabel('СУБД', { exact: true }).selectOption('h2');
   await page.getByLabel('Название', { exact: true }).fill('H2 metadata');
-  const endpoint = 'jdbc:h2:' + join(directory, 'metadata').replaceAll('\\', '/') + ';AUTO_SERVER=TRUE';
+  // A dedicated H2 server keeps file ownership stable while independent JDBC
+  // sessions connect and close, just as for the other remote database engines.
+  const resources = process.env.LOCAL_DB_VIEWER_RESOURCES;
+  const javaHome = resources ? join(resources, 'jre') : resolve('runtime', process.platform === 'win32' ? 'windows-x64' : 'mac-arm64');
+  h2Server = spawn(join(javaHome, 'bin', process.platform === 'win32' ? 'java.exe' : 'java'), ['-Dh2.bindAddress=127.0.0.1', '-cp', resolve('.runtime-cache/maven/repository', fixtures.h2.files[0].path), 'org.h2.tools.Server', '-tcp', '-tcpPort', '0', '-baseDir', directory, '-ifNotExists'], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  const h2Lines = createInterface({ input: h2Server.stdout });
+  let h2Errors = ''; h2Server.stderr.on('data', chunk => { h2Errors = (h2Errors + chunk).slice(-4000); });
+  const h2Port = await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('H2 server startup timeout: ' + h2Errors)), 30000);
+    h2Server.once('error', error => { clearTimeout(timer); reject(error); });
+    h2Server.once('exit', code => { clearTimeout(timer); reject(new Error(`H2 server exited ${code}: ${h2Errors}`)); });
+    h2Lines.on('line', line => { const port = /tcp:\/\/[^:]+:(\d+)/.exec(line)?.[1]; if (port) { clearTimeout(timer); resolve(port); } });
+  });
+  h2Lines.close();
+  const endpoint = `jdbc:h2:tcp://127.0.0.1:${h2Port}/metadata`;
   await page.locator('.endpoint-field input').fill(endpoint);
   await page.getByLabel('Пользователь', { exact: true }).fill('sa');
   await page.getByRole('button', { name: 'Проверить', exact: true }).click();
@@ -144,4 +160,4 @@ try {
   console.log('PASS: Hive/Iceberg metadata error, explicit catalog selection, corrected columns and preview; no silent substitution');
   await writeFile('test-artifacts/driver-desktop-results.json', JSON.stringify({ passed: true, platform: process.platform, arch: await app.evaluate(() => process.arch), versions: [old.version, fixtures.h2.version], checks: ['updates','session-isolation','rollback','H2-metadata','composite-FK','DuckDB','Iceberg-routing'] }, null, 2));
 } catch (error) { await page.screenshot({ path: 'test-artifacts/driver-failure.png' }).catch(() => {}); throw error; }
-finally { server?.close(); await app.close(); }
+finally { server?.close(); try { await app.close(); } finally { h2Server?.kill(); } }

@@ -63,6 +63,18 @@ test('SHA failure, oversized response, and probe failure never activate a driver
     assert.equal(manager.isBusy(), false);
   }
 });
+test('a new session waits for an in-flight driver version selection', async t => {
+  const { manager, setCatalog } = await fixture(t);
+  await manager.install('h2');
+  const oldPaths = await manager.paths('h2'), oldKey = release('2.5.250').key;
+  // Selection must be persisted even when versions reuse the same artifact.
+  setCatalog({ format: 1, drivers: { h2: release('2.6.0') } }); await manager.check(); await manager.install('h2');
+  const selection = manager.select('h2', oldKey);
+  const paths = await manager.paths('h2');
+  assert.equal(manager.state().drivers.find(item => item.id === 'h2')?.selected, oldKey);
+  assert.deepEqual(paths, oldPaths);
+  await selection;
+});
 test('failed update preserves selected version; tampered installed JAR is refused', async t => {
   let fail = false;
   const { manager, setCatalog } = await fixture(t, { probe: async () => { if (fail) throw new Error('Incompatible Java'); } });

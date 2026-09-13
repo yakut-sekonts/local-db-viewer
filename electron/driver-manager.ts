@@ -83,8 +83,8 @@ export class DriverManager {
     try { await writeFile(temporary, JSON.stringify(value), { mode: 0o600 }); await rename(temporary, path); }
     finally { await rm(temporary, { force: true }); }
   }
-  private change(transform: (settings: Settings) => void): Promise<void> {
-    const task = this.queue.then(async () => { const next = structuredClone(this.settings); transform(next); await this.atomic('settings.json', next); this.settings = next; this.publish(); });
+  private change(transform: (settings: Settings) => void | Promise<void>): Promise<void> {
+    const task = this.queue.then(async () => { const next = structuredClone(this.settings); await transform(next); await this.atomic('settings.json', next); this.settings = next; this.publish(); });
     this.queue = task.catch(() => {}); return task;
   }
   automatic(enabled: boolean): Promise<void> { if (typeof enabled !== 'boolean') throw new Error('Некорректная настройка.'); return this.change(settings => { settings.automatic = enabled; }); }
@@ -98,6 +98,9 @@ export class DriverManager {
   }
   async paths(id: string, key?: string): Promise<string[]> {
     driverDefinition(id);
+    // A query dispatched immediately after a version selection must observe
+    // that selection once its verification and persistence have completed.
+    await this.queue;
     const installed = this.installations(id), selected = key || this.settings.selected[id] || installed[0]?.key;
     const installation = installed.find(item => item.key === selected);
     if (!installation) throw new Error(`Драйвер ${driverDefinition(id).name} не установлен. Откройте «Драйверы» и установите его.`);
@@ -110,9 +113,14 @@ export class DriverManager {
     if (info.size !== file.size || (this.verified.get(path) !== fingerprint && await digest(path) !== file.sha256)) throw new Error('JDBC-драйвер изменён или повреждён. Установите его повторно.');
     this.verified.set(path, fingerprint);
   }
-  async select(id: string, key: string): Promise<void> {
-    await this.paths(id, key);
-    await this.change(settings => { settings.selected[id] = key; });
+  select(id: string, key: string): Promise<void> {
+    driverDefinition(id);
+    return this.change(async settings => {
+      const installation = this.installations(id).find(item => item.key === key);
+      if (!installation) throw new Error('Выбранная версия JDBC-драйвера не установлена.');
+      if (installation.source !== 'bundled') for (const file of installation.files) await this.verify(file);
+      settings.selected[id] = key;
+    });
   }
   private async download(file: DriverFile, progress: (size: number) => void): Promise<void> {
     try { await this.verify(file); progress(file.size); return; } catch { /* Fetch a verified replacement. */ }
