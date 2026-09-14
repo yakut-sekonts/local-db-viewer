@@ -108,7 +108,8 @@ export async function openSshTunnel(settings: SshSettings, signal: AbortSignal, 
           }
         }
         const stream = await channel(host, port);
-        stream.on('error', () => socket.destroy()); socket.once('close', () => stream.destroy()); stream.once('close', () => socket.destroy());
+        stream.on('error', () => socket.destroy()); socket.once('close', () => stream.destroy());
+        stream.once('close', () => { if (!stream.readableEnded) socket.destroy(); });
         clearTimeout(timer); reader.release(); if (connected.length) socket.write(connected); if (httpRequest) stream.write(httpRequest);
         socket.pipe(stream).pipe(socket); socket.resume();
       })().catch(() => { clearTimeout(timer); reader.release(); socket.destroy(); });

@@ -1,6 +1,10 @@
 import { spawn } from 'node:child_process';
 import type { JdbcSettings } from '../src/jdbc';
 
+export function startupTimeout(settings: JdbcSettings | undefined): number {
+  return ((settings?.ssh?.enabled ? settings.ssh.connectTimeoutSeconds ?? 15 : 0) + (settings?.options?.beforeConnect ?? []).filter(task => task.enabled).reduce((total, task) => total + task.timeoutSeconds, 0)) * 1000;
+}
+
 export async function beforeConnect(settings: JdbcSettings | undefined, signal: AbortSignal): Promise<void> {
   for (const task of settings?.options?.beforeConnect ?? []) {
     if (!task.enabled) continue;

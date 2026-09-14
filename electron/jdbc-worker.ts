@@ -1,6 +1,8 @@
 import { EventEmitter } from 'node:events';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join, delimiter } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 import { jdbcConfig } from './jdbc-config';
@@ -10,7 +12,7 @@ import { runtimePaths, bundledDrivers } from './runtime-paths';
 import { profileDriver } from '../src/drivers';
 import { openSshTunnel, type SshTunnel } from './ssh';
 import { sshProperties } from './ssh-jdbc';
-import { beforeConnect } from './before-connect';
+import { beforeConnect, startupTimeout } from './before-connect';
 
 export class JdbcWorker extends EventEmitter {
   private child?: ChildProcessWithoutNullStreams;
@@ -18,6 +20,8 @@ export class JdbcWorker extends EventEmitter {
   private tunnel?: SshTunnel;
   private queued: unknown[] = [];
   private initialization: Promise<void>;
+  private certificateDirectory?: string;
+  private cleanup?: Promise<void>;
   private output = '';
   private closed = false;
   constructor(profile: Connection, inspectionOnly = false) {
@@ -42,6 +46,8 @@ export class JdbcWorker extends EventEmitter {
       }
     }
     if (this.closed) { this.tunnel?.close(); return; }
+    this.certificateDirectory = await mkdtemp(join(tmpdir(), 'local-db-viewer-jdbc-'));
+    if (this.closed) { await this.cleanFiles(); return; }
     const classpath = [join(common, 'local-db-viewer-bridge.jar'), ...readdirSync(common).filter(name => /^gson-.*\.jar$/.test(name)).map(name => join(common, name))].join(delimiter);
     this.child = spawn(java, ['-Xmx512m', '-Dfile.encoding=UTF-8', '--enable-native-access=ALL-UNNAMED', ...(profile.jdbc?.vmOptions ?? []), ...(this.tunnel ? [`-Dlocaldbviewer.ssh.port=${this.tunnel.port}`] : []), '-cp', classpath, 'LocalDBViewerBridge'], {
       windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], cwd: profile.jdbc?.workingDirectory || undefined,
@@ -63,8 +69,8 @@ export class JdbcWorker extends EventEmitter {
     this.child.stderr.resume();
     this.child.stdin.on('error', error => { if (!this.closed) this.emit('error', error); });
     this.child.on('error', error => this.emit('error', error));
-    this.child.on('exit', code => { this.closed = true; this.controller.abort(); this.tunnel?.close(); this.emit('exit', code); });
-    this.postMessage({ ...config, engine: profile.engine, driverId: profileDriver(profile), certificates: profile.jdbc?.certificates ?? {}, sslCa: profile.sslCa ?? '', driverClasspath });
+    this.child.on('exit', code => { this.closed = true; this.controller.abort(); this.tunnel?.close(); void this.cleanFiles(); this.emit('exit', code); });
+    this.postMessage({ ...config, engine: profile.engine, driverId: profileDriver(profile), certificateDirectory: this.certificateDirectory, certificates: profile.jdbc?.certificates ?? {}, sslCa: profile.sslCa ?? '', driverClasspath });
     for (const message of this.queued.splice(0)) this.postMessage(message);
   }
   postMessage(value: unknown): void {
@@ -73,21 +79,27 @@ export class JdbcWorker extends EventEmitter {
     else this.queued.push(value);
   }
   async terminate(): Promise<number> {
-    if (this.closed) return this.child?.exitCode ?? 0;
+    if (this.closed) { await this.cleanFiles(); return this.child?.exitCode ?? 0; }
     this.closed = true;
     this.controller.abort(); this.tunnel?.close(); this.queued = [];
     const child = this.child;
-    if (!child) { await this.initialization; this.emit('exit', 0); return 0; }
+    if (!child) { await this.initialization; await this.cleanFiles(); this.emit('exit', 0); return 0; }
     return new Promise(resolve => {
       const timer = setTimeout(() => child.kill('SIGKILL'), 3000); timer.unref();
-      child.once('exit', code => { clearTimeout(timer); resolve(code ?? 0); });
+      child.once('exit', code => { clearTimeout(timer); void this.cleanFiles().then(() => resolve(code ?? 0)); });
       child.kill();
     });
+  }
+  private cleanFiles(): Promise<void> {
+    if (!this.certificateDirectory) return Promise.resolve();
+    this.cleanup ??= rm(this.certificateDirectory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }).catch(() => {});
+    return this.cleanup;
   }
 }
 
 export async function inspectJdbc<T>(profile: Connection, request: { kind: string; [key: string]: unknown }, timeout = 60000): Promise<T> {
   const worker = new JdbcWorker(profile, ['properties', 'probe'].includes(request.kind));
+  if (!['properties', 'probe'].includes(request.kind)) timeout += startupTimeout(profile.jdbc);
   try {
     return await new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error(`JDBC-драйвер не ответил за ${timeout / 1000} секунд.`)), timeout);

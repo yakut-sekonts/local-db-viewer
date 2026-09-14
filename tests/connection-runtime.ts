@@ -12,7 +12,8 @@ import { promisify } from 'node:util';
 import { DatabaseSession } from '../electron/database';
 import { SessionPool } from '../electron/session-pool';
 import { runtimePaths } from '../electron/runtime-paths';
-import { sshFingerprint } from '../electron/ssh';
+import { sshFingerprint, openSshTunnel } from '../electron/ssh';
+import { ProxyAgent, fetch } from 'undici';
 import { inspectJdbc } from '../electron/jdbc-worker';
 import { beforeConnect } from '../electron/before-connect';
 import type { Connection } from '../electron/trino';
@@ -61,6 +62,13 @@ try {
   await inspectJdbc({ ...profile, jdbc: { ...profile.jdbc, ssh: { ...profile.jdbc!.ssh!, host: 'not-an-ssh-host.invalid' } } }, { kind: 'properties' });
   assert.equal(forwards, before);
   console.log('PASS: wrong SSH host key rejected; driver property inspection opens no SSH/network connection');
+  const controller = new AbortController(), tunnel = await openSshTunnel(profile.jdbc!.ssh!, controller.signal, error => { throw error; });
+  const proxy = new ProxyAgent({ uri: `http://127.0.0.1:${tunnel.port}`, requestTls: { pfx: await readFile(store), passphrase: password, ca } });
+  try {
+    const response = await fetch(profile.endpoint, { method: 'POST', body: 'SELECT 7', dispatcher: proxy });
+    assert.deepEqual((await response.json() as { data: number[][] }).data, [[7]]);
+  } finally { await proxy.close(); tunnel.close(); }
+  console.log('PASS: SSH HTTP CONNECT proxy preserves TLS hostname and client authentication');
   const pool = new SessionPool(async connection => connection);
   const sqlite: Connection = { id: 'single', name: 'single', engine: 'sqlite', endpoint: ':memory:', user: '', auth: 'none', tls: false, catalog: '', schema: '', jdbc: { options: { singleSession: true, startupStatements: ['CREATE TABLE t(value INTEGER)', 'INSERT INTO t VALUES (0)'], keepAliveSeconds: 5, autoDisconnectSeconds: 5 } } };
   const [a, b] = await Promise.all([pool.acquire(sqlite, 'a'), pool.acquire(sqlite, 'b')]);

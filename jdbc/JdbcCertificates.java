@@ -8,6 +8,7 @@ import java.util.*;
 
 /** Maps explicit certificate choices to driver properties, without weakening TLS. */
 final class JdbcCertificates {
+    private static Path directory;
     private static String text(JsonObject object, String key, String fallback) { return object.has(key) ? object.get(key).getAsString() : fallback; }
     private static Path checked(String path) throws IOException {
         Path file = Path.of(path);
@@ -15,9 +16,10 @@ final class JdbcCertificates {
         return file;
     }
     private static Path temporary(String suffix, List<Path> files) throws IOException {
-        Path path = Files.createTempFile("local-db-viewer-tls-", suffix); files.add(path); return path;
+        Path path = directory == null ? Files.createTempFile("local-db-viewer-tls-", suffix) : Files.createTempFile(directory, "tls-", suffix); files.add(path); return path;
     }
     static void apply(JsonObject config, Properties properties, List<Path> files) throws Exception {
+        if (config.has("certificateDirectory")) directory = Path.of(config.get("certificateDirectory").getAsString());
         JsonObject c = config.has("certificates") ? config.getAsJsonObject("certificates") : new JsonObject();
         String driver = text(config, "driverId", text(config, "engine", ""));
         String trust = text(c, "trustSource", "driver"), client = text(c, "clientMode", "none");

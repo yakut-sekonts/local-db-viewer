@@ -5,6 +5,7 @@ import type { QuerySnapshot } from '../src/shared';
 import { singleStatement, transactionAction } from './sql';
 import { sqlEngine } from '../src/drivers';
 import { JdbcWorker } from './jdbc-worker';
+import { startupTimeout } from './before-connect';
 
 export interface QueryTask { run(sql: string): Promise<QuerySnapshot>; cancel(): Promise<void> }
 export class DatabaseSession {
@@ -90,6 +91,7 @@ export class DatabaseSession {
   inspect<T>(request: { kind: string; [key: string]: unknown }, timeout = 60000): Promise<T> { return this.enqueue(() => this.inspectNow<T>(request, timeout)); }
   private async inspectNow<T>(request: { kind: string; [key: string]: unknown }, timeout: number): Promise<T> {
     if (!this.connection.jdbc) throw new Error('Inspection требует JDBC.');
+    if (!this.worker) timeout += startupTimeout(this.connection.jdbc);
     const worker = this.ensureWorker(), requestId = crypto.randomUUID();
     return new Promise<T>((resolve, reject) => {
       const cleanup = () => { clearTimeout(timer); worker.off('message', message); worker.off('error', failure); worker.off('exit', exited); };

@@ -8,7 +8,7 @@ import { validateConnectionOptions } from './connection-options';
 
 export function validateJdbc(input: JdbcSettings | undefined): void {
   if (input === undefined) return;
-  if (!input || typeof input !== 'object' || JSON.stringify(input).length > 256000) throw new Error('Некорректные настройки JDBC.');
+  if (!input || typeof input !== 'object' || Array.isArray(input) || JSON.stringify(input).length > 256000) throw new Error('Некорректные настройки JDBC.');
   validateConnectionOptions(input);
   if (input.driverId) driverDefinition(input.driverId);
   if (input.productId && !DATABASE_PRODUCTS.some(product => product.id === input.productId)) throw new Error('Неизвестный тип СУБД.');

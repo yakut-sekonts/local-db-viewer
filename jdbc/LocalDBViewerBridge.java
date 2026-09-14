@@ -272,7 +272,7 @@ public final class LocalDBViewerBridge {
                 default -> throw new SQLException("Unknown JDBC inspection");
             }
         } catch (Throwable failure) { result.addProperty("error", error(failure)); }
-        try { result.addProperty("inTransaction", connection != null && !connection.isClosed() && (!connection.getAutoCommit() || explicitTransaction)); } catch (SQLException ignored) {}
+        try { result.addProperty("inTransaction", explicitTransaction || (!kind.equals("ping") && connection != null && !connection.isClosed() && !connection.getAutoCommit())); } catch (SQLException ignored) {}
         send(result);
     }
     private static void close() {
