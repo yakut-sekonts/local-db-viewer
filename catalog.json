@@ -194,13 +194,13 @@
     "hana": {
       "files": [
         {
-          "path": "com/sap/cloud/db/jdbc/ngdbc/2.30.7/ngdbc-2.30.7.jar",
-          "sha256": "f7b682d0d004086f12df11a512bc0b044030170253560c74dcba793a9c497a00",
-          "size": 1587598
+          "path": "com/sap/cloud/db/jdbc/ngdbc/2.30.11/ngdbc-2.30.11.jar",
+          "sha256": "38654a00df1ea9616f9f4cea745f1f8a5a923a1c98acbd10ce4962ba4a2c1fb8",
+          "size": 1588075
         }
       ],
-      "key": "3ac3df2425768cdc1021fcd6f41d00d6fac599699e6e2f028312d69f44054535",
-      "version": "2.30.7"
+      "key": "0c37cde36c57c881274a3cd936bf02caad09b48eeffc5f547b921ad5c4620287",
+      "version": "2.30.11"
     },
     "hive": {
       "files": [
