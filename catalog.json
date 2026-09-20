@@ -3,24 +3,24 @@
     "calcite": {
       "files": [
         {
-          "path": "org/apache/calcite/avatica/avatica-core/1.28.0/avatica-core-1.28.0.jar",
-          "sha256": "59d279a2175b148ac9f73218aba1dd302fc2536bee40cf6f01fe441f886f66a2",
-          "size": 1317040
+          "path": "org/apache/calcite/avatica/avatica-core/1.29.0/avatica-core-1.29.0.jar",
+          "sha256": "d3ca2f34492909aec7b3ee745ca941f68928b37a3ce075493aa0a463eb50343f",
+          "size": 1318555
         },
         {
-          "path": "org/apache/calcite/avatica/avatica-metrics/1.28.0/avatica-metrics-1.28.0.jar",
-          "sha256": "ea64431d3c7cb229df4fb8f35ad0f69de900c9142dfe421222b0f15824bf78fe",
+          "path": "org/apache/calcite/avatica/avatica-metrics/1.29.0/avatica-metrics-1.29.0.jar",
+          "sha256": "9d6e4f9aca37bc3d527bde29efd67dd9ea8f11fc69e78d07fd8af071caf8558c",
           "size": 15682
         },
         {
-          "path": "com/fasterxml/jackson/core/jackson-annotations/2.18.6/jackson-annotations-2.18.6.jar",
-          "sha256": "face5c37bee1f0768f5f198d077fc29d163becca95de9e0f13962c84d1047662",
-          "size": 78412
+          "path": "com/fasterxml/jackson/core/jackson-annotations/2.22/jackson-annotations-2.22.jar",
+          "sha256": "21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0",
+          "size": 84211
         },
         {
-          "path": "com/fasterxml/jackson/core/jackson-databind/2.18.6/jackson-databind-2.18.6.jar",
-          "sha256": "45d124736ea29dc374171fc1a8a9958e0f44407c1e0aae0297d8eee267fb592e",
-          "size": 1659211
+          "path": "com/fasterxml/jackson/core/jackson-databind/2.22.2/jackson-databind-2.22.2.jar",
+          "sha256": "d0da14c12b16b5d54719aa172d83b542ff4abeb8b0fb7db476fde8ceece760ca",
+          "size": 1708473
         },
         {
           "path": "com/google/protobuf/protobuf-java/3.25.8/protobuf-java-3.25.8.jar",
@@ -33,9 +33,9 @@
           "size": 18045
         },
         {
-          "path": "com/fasterxml/jackson/core/jackson-core/2.18.6/jackson-core-2.18.6.jar",
-          "sha256": "e7e1bfa50f0a79db37e6aa37db111cf03aebf4a484b359d21127ab43ab2398c6",
-          "size": 589904
+          "path": "com/fasterxml/jackson/core/jackson-core/2.22.2/jackson-core-2.22.2.jar",
+          "sha256": "ff167a6317be15895706c26668f45b898efe40ab8780970658210fe1393d52a6",
+          "size": 594200
         },
         {
           "path": "org/apache/httpcomponents/client5/httpclient5/5.5/httpclient5-5.5.jar",
@@ -58,8 +58,8 @@
           "size": 41125
         }
       ],
-      "key": "2ea27b7b34cf7e368349092984ad3198bdac64b66faacac4419992df4230af37",
-      "version": "1.28.0"
+      "key": "3e69c57eb8649e8b964a9237a9aa34ee91980c0b3fe977f43723843b47250520",
+      "version": "1.29.0"
     },
     "clickhouse": {
       "files": [
