@@ -80,13 +80,13 @@
     "databricks": {
       "files": [
         {
-          "path": "com/databricks/databricks-jdbc/3.4.2/databricks-jdbc-3.4.2.jar",
-          "sha256": "697c5804d8ce9fca5bed0810cb1d6093d19db602f56d8aeb4519129d40efe4c4",
-          "size": 41301251
+          "path": "com/databricks/databricks-jdbc/3.4.3/databricks-jdbc-3.4.3.jar",
+          "sha256": "191917c5a45629d33f4734ff599f9a4d4f4bdfc82f159ed7dc9f2b285a1d35d2",
+          "size": 41479811
         }
       ],
-      "key": "d8b9019420a45c138cd16a309bdb8d463c316f702367854e4b3ce7b8fffa9f97",
-      "version": "3.4.2"
+      "key": "9e106a60a26282ec1c978abb73d13261d82668b4ddc888a11ef759266625444a",
+      "version": "3.4.3"
     },
     "db2": {
       "files": [
