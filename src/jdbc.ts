@@ -1,5 +1,8 @@
 import type { DatabaseEngine } from './shared';
 export interface JdbcSettings {
+  sessionTemplates?: SessionTemplate[];
+  defaultSessionTemplate?: string;
+  introspectionSessionTemplate?: string;
   ssh?: SshSettings;
   certificates?: CertificateSettings;
   schemas?: SchemaSettings;
@@ -30,6 +33,15 @@ export interface JdbcSettings {
     loadSystemSchemas?: boolean;
     beforeConnect?: BeforeConnectTask[];
   };
+}
+export interface SessionTemplate {
+  id: string;
+  name: string;
+  authentication?: { user: string; auth: import('./shared').AuthMode; secret?: string; hasSecret?: boolean };
+  driverVersion?: string;
+  driverClass?: string;
+  classpath?: string[];
+  options?: Pick<NonNullable<JdbcSettings['options']>, 'readOnly' | 'autoCommit' | 'isolation' | 'startupStatements' | 'queryTimeoutSeconds'>;
 }
 export interface SshSettings {
   enabled: boolean;

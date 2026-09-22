@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { DatabaseSession } from '../electron/database';
+import { sessionTemplate } from '../electron/session-template';
 import { SessionPool } from '../electron/session-pool';
 import { runtimePaths } from '../electron/runtime-paths';
 import { sshFingerprint, openSshTunnel } from '../electron/ssh';
@@ -87,6 +88,21 @@ try {
     assert.deepEqual((await b.session.createQuery('idle-reconnected').run('SELECT COUNT(*) FROM t')).rows, [['1']]);
   } finally { await b.release(); }
   console.log('PASS: single-session shared state, lease lifetime, protected transaction and idle reconnect');
+  const templated: Connection = { ...sqlite, id: 'templates', endpoint: join(work, 'templates.sqlite'), jdbc: { options: { singleSession: true }, sessionTemplates: [
+    { id: 'console', name: 'Console', options: { startupStatements: ['CREATE TEMP TABLE session_marker(value TEXT)', "INSERT INTO session_marker VALUES ('console')"] } },
+    { id: 'metadata', name: 'Metadata', options: { startupStatements: ['CREATE TEMP TABLE session_marker(value TEXT)', "INSERT INTO session_marker VALUES ('metadata')"] } },
+  ], defaultSessionTemplate: 'console', introspectionSessionTemplate: 'metadata' } };
+  const consoleLease = await pool.acquire(sessionTemplate(templated,'console'),'template-console');
+  const sameLease = await pool.acquire(sessionTemplate(templated,'console'),'template-console-2');
+  const metadataLease = await pool.acquire(sessionTemplate(templated,'introspection'),'template-metadata');
+  try {
+    assert.equal(consoleLease.session,sameLease.session); assert.notEqual(consoleLease.session,metadataLease.session);
+    const first=await consoleLease.session.createQuery('template-console-read').run('SELECT value FROM session_marker');
+    const second=await metadataLease.session.createQuery('template-meta-read').run('SELECT value FROM session_marker');
+    assert.equal(first.state,'FINISHED',first.error); assert.equal(second.state,'FINISHED',second.error);
+    assert.deepEqual(first.rows,[['console']]); assert.deepEqual(second.rows,[['metadata']]);
+  } finally { await sameLease.release(); await consoleLease.release(); await metadataLease.release(); }
+  console.log('PASS: session templates apply startup SQL; console and introspection identities use separate physical sessions');
   const output = join(work, 'before.txt');
   await beforeConnect({ options: { beforeConnect: [{ id: 'a', name: 'fixture', executable: process.execPath, args: ['-e', 'require("fs").writeFileSync(process.argv[1], "ready")', output], timeoutSeconds: 10, enabled: true }] } }, new AbortController().signal);
   assert.equal(await readFile(output, 'utf8'), 'ready');

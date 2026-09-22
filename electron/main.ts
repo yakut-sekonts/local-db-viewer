@@ -6,6 +6,11 @@ import { readFile, writeFile, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { DatabaseSession, type QueryTask } from './database';
 import { SessionPool, type SessionLease } from './session-pool';
+import { sessionTemplate } from './session-template';
+import { DdlStore } from './ddl-store';
+import { readDdl } from './ddl-reader';
+import { ddlIndex } from '../src/ddl-index';
+import type { DdlMapping } from '../src/ddl';
 import { sshFingerprint } from './ssh';
 import { filterMetadata } from './metadata-settings';
 import { filterSchema, schemaAllowed, isSystemSchema } from '../src/schemaSettings';
@@ -22,7 +27,7 @@ import { validateJdbc } from './jdbc-config';
 import { describeDriver, inspectJdbc } from './jdbc-worker';
 import { DriverManager } from './driver-manager';
 import { bundledDrivers } from './runtime-paths';
-import { profileDriver, driverDefinition } from '../src/drivers';
+import { profileDriver, driverDefinition, sqlEngine } from '../src/drivers';
 import driverCatalogLock from '../drivers/catalog-lock.json';
 import type { Connection } from './trino';
 import type { SchemaIndex, MetadataResult, MetadataInput, ProfileDraft, QueryInput, Relationship, SchemaInput } from '../src/shared';
@@ -75,6 +80,7 @@ async function prepareDriver(connection: Connection): Promise<Connection> {
 }
 
 async function readMetadata(connection: Connection, input: Omit<MetadataInput, 'profileId'>): Promise<MetadataResult> {
+  connection = sessionTemplate(connection, 'introspection');
   if (!input || typeof input !== 'object') throw new Error('Некорректный metadata request.');
   const identifiers = [input.catalog, input.schema, input.table];
   const depth = { catalogs: 0, schemas: 1, tables: 2, columns: 3 }[input.kind];
@@ -89,9 +95,10 @@ async function readMetadata(connection: Connection, input: Omit<MetadataInput, '
   } finally { await lease.release(); }
 }
 
-async function release(id: string): Promise<void> {
+async function release(id: string, requireNoTransaction = false): Promise<void> {
   if ([...active.values()].some(job => job.sessionId === id)) throw new Error('Сначала завершите или отмените запрос.');
   const stored = sessions.get(id);
+  if (requireNoTransaction && stored?.session.inTransaction) throw new Error('В общей сессии открыта транзакция. Выполните COMMIT или ROLLBACK перед переключением.');
   await stored?.release();
   sessions.delete(id);
 }
@@ -101,7 +108,7 @@ function handle(name: string, fn: (...args: any[]) => unknown): void {
     if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || event.senderFrame.url !== pathToFileURL(entry).href) {
       throw new Error('Недоверенный IPC sender.');
     }
-    const databaseOperation = ['query:run', 'profiles:test', 'metadata', 'schema:load', 'jdbc:properties', 'jdbc:preview', 'jdbc:browse', 'ssh:fingerprint', 'drivers:install', 'drivers:import', 'drivers:select'].includes(name);
+    const databaseOperation = ['ddl:preview', 'ddl:write-preview', 'ddl:write-file', 'query:run', 'profiles:test', 'metadata', 'schema:load', 'jdbc:properties', 'jdbc:preview', 'jdbc:browse', 'ssh:fingerprint', 'drivers:install', 'drivers:import', 'drivers:select'].includes(name);
     if (!databaseOperation) return fn(...args);
     if (installingUpdate) throw new Error('Приложение обновляется.');
     pendingDatabaseOperations++;
@@ -173,6 +180,38 @@ void app.whenReady().then(() => {
     { label: 'Вид', submenu: [{ role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { role: 'togglefullscreen' }] },
   ]));
 
+  const ddl = new DdlStore(join(app.getPath('userData'), 'ddl-mappings.json'));
+  handle('ddl:list', () => ddl.list());
+  handle('ddl:directory', async () => {
+    const result = await dialog.showOpenDialog(window, { title: 'Каталог SQL-файлов для DDL mapping', properties: ['openDirectory', 'createDirectory'] });
+    return result.canceled ? null : result.filePaths[0] ?? null;
+  });
+  handle('ddl:save', async (mapping: DdlMapping) => { await profiles.get(mapping?.profileId); return ddl.save(mapping); });
+  handle('ddl:remove', (id: string) => { string(id, 'mappingId'); return ddl.remove(id); });
+  handle('ddl:files', (id: string) => { string(id, 'mappingId'); return ddl.files(id); });
+  handle('ddl:write-file', (id: string, file: string, sql: string, hash: string) => ddl.writeFile(id, file, sql, hash));
+  handle('ddl:write-preview', (token: string, files: string[]) => ddl.writePreview(token, files));
+  handle('ddl:index', async (id: string) => {
+    string(id, 'mappingId'); const mapping = await ddl.get(id), profile = await profiles.get(mapping.profileId);
+    return ddlIndex(mapping, await ddl.files(id), sqlEngine(profile));
+  });
+  handle('ddl:preview', async (id: string) => {
+    string(id, 'mappingId'); const mapping = await ddl.get(id);
+    const connection = sessionTemplate(await profiles.get(mapping.profileId), 'introspection');
+    const lease = await sessionPool.acquire(connection);
+    try {
+      const result = await readDdl(connection, mapping, async sql => {
+        const query = lease.session.createQuery(randomUUID(), 10000, undefined, mapping.catalog, mapping.schema);
+        const timer = setTimeout(() => { void query.cancel().catch(() => {}); }, 60000);
+        try {
+          const result = await query.run(sql);
+          if (result.state !== 'FINISHED') throw new Error(result.error || 'Чтение DDL отменено.');
+          return { columns: result.columns, rows: result.rows, truncated: result.truncated };
+        } finally { clearTimeout(timer); }
+      });
+      return await ddl.preview(id, result.files, result.warnings);
+    } finally { await lease.release(); }
+  });
   handle('profiles:list', () => profiles.list());
   handle('jdbc:properties', async (draft: ProfileDraft) => {
     validateDraft(draft);
@@ -192,7 +231,7 @@ void app.whenReady().then(() => {
   handle('profiles:test', async (draft: ProfileDraft) => {
     if (installingUpdate) throw new Error('Приложение обновляется.');
     validateDraft(draft);
-    const connection = await prepareDriver(await profiles.resolve(draft));
+    const connection = await prepareDriver(sessionTemplate(await profiles.resolve(draft), 'console'));
     if (connection.jdbc) return inspectJdbc<string>(connection, { kind: 'test' }, (connection.jdbc.options?.connectTimeoutSeconds || 30) * 1000);
     const session = new DatabaseSession(await prepareDriver(connection));
     const query = session.createQuery(randomUUID(), 1);
@@ -210,12 +249,19 @@ void app.whenReady().then(() => {
     if (!input || typeof input !== 'object' || typeof input.sql !== 'string' || !input.sql.trim() || input.sql.length > 1_000_000) throw new Error('Некорректный SQL.');
     for (const key of ['requestId', 'sessionId', 'profileId', 'catalog', 'schema'] as const) string(input[key], key);
     if (!input.requestId || !input.sessionId || active.has(input.requestId)) throw new Error('Некорректный request ID.');
+    if (input.ddlMappingId !== undefined) {
+      string(input.ddlMappingId, 'ddlMappingId', 100);
+      const mapping = await ddl.get(input.ddlMappingId);
+      if (mapping.profileId !== input.profileId || mapping.catalog !== input.catalog || mapping.schema !== input.schema) throw new Error('DDL mapping изменился. Откройте новую консоль из mapping, чтобы проверить подключение и schema.');
+    }
     if ([...active.values()].some(job => job.sessionId === input.sessionId)) throw new Error('В этой консоли уже выполняется запрос.');
-    const connection = await profiles.get(input.profileId);
+    if (input.templateId !== undefined) string(input.templateId, 'templateId', 100);
+    const connection = sessionTemplate(await profiles.get(input.profileId), 'console', input.templateId);
     if (installingUpdate) throw new Error('Приложение обновляется.');
     if ([...active.values()].some(job => job.sessionId === input.sessionId)) throw new Error('В этой консоли уже выполняется запрос.');
     const previous = sessions.get(input.sessionId);
     if (previous && previous.profileId !== input.profileId) throw new Error('Консоль привязана к другому подключению.');
+    if (previous && previous.templateId !== (connection.sessionTemplateId ?? '')) throw new Error('Отключите консоль перед сменой шаблона сессии.');
     if (openingSessions.has(input.sessionId)) throw new Error('Сессия уже открывается.');
     openingSessions.add(input.sessionId);
     let lease: SessionLease;
@@ -230,12 +276,12 @@ void app.whenReady().then(() => {
     void done.catch(() => {});
   });
   handle('query:cancel', async (id: string) => { string(id, 'requestId'); await active.get(id)?.query.cancel(); });
-  handle('query:release', async (id: string) => { string(id, 'sessionId'); await release(id); });
+  handle('query:release', async (id: string, guard?: boolean) => { string(id, 'sessionId'); if (guard !== undefined && typeof guard !== 'boolean') throw new Error('Некорректный session guard.'); await release(id, guard); });
   handle('schema:load', async (input: SchemaInput) => {
     if (installingUpdate) throw new Error('Приложение обновляется.');
     if (!input || typeof input !== 'object') throw new Error('Некорректный запрос схемы.');
     for (const name of ['profileId', 'catalog', 'schema'] as const) string(input[name], name);
-    const connection = await profiles.get(input.profileId);
+    const connection = sessionTemplate(await profiles.get(input.profileId), 'introspection');
     if (!schemaAllowed(connection.jdbc?.schemas, input.catalog, input.schema) || connection.jdbc?.options?.loadSystemSchemas === false && isSystemSchema(input.catalog, input.schema)) return { ...input, tables: [], relationships: [], warnings: [] };
     const lease = await sessionPool.acquire(connection), session = lease.session;
     try {
@@ -290,7 +336,7 @@ void app.whenReady().then(() => {
     if (!input || typeof input !== 'object') throw new Error('Некорректный запрос таблицы.');
     for (const name of ['profileId', 'catalog', 'schema', 'table'] as const) string(input[name], name);
     if (!input.table) throw new Error('Укажите таблицу.');
-    const lease = await sessionPool.acquire(await profiles.get(input.profileId));
+    const lease = await sessionPool.acquire(sessionTemplate(await profiles.get(input.profileId), 'introspection'));
     try { return await lease.session.inspect<string>({ ...input, kind: 'preview' }); } finally { await lease.release(); }
   });
   handle('export:csv', async (input) => {
@@ -342,7 +388,7 @@ app.on('before-quit', event => {
     const jobs = [...active.values()];
     await Promise.allSettled(jobs.map(job => job.query.cancel()));
     await Promise.allSettled(jobs.map(job => job.done));
-    await Promise.allSettled([...sessions.keys()].map(release));
+    await Promise.allSettled([...sessions.keys()].map(id => release(id)));
     await sessionPool.abortAll();
     clearTimeout(shutdownTimeout);
     app.quit();

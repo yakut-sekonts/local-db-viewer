@@ -9,6 +9,7 @@ async function invoke(channel: string, ...args: unknown[]): Promise<any> {
 }
 
 const api: DesktopAPI = {
+  ddl: { list: () => invoke('ddl:list'), chooseDirectory: () => invoke('ddl:directory'), save: value => invoke('ddl:save', value), remove: id => invoke('ddl:remove', id), files: id => invoke('ddl:files', id), writeFile: (id, file, sql, hash) => invoke('ddl:write-file', id, file, sql, hash), preview: id => invoke('ddl:preview', id), writePreview: (token, files) => invoke('ddl:write-preview', token, files), index: id => invoke('ddl:index', id) },
   jdbc: { properties: profile => invoke('jdbc:properties', profile), preview: input => invoke('jdbc:preview', input), browse: (profile, input) => invoke('jdbc:browse', profile, input) },
   ssh: { fingerprint: (host, port) => invoke('ssh:fingerprint', host, port) },
   drivers: {
@@ -40,7 +41,7 @@ const api: DesktopAPI = {
   query: {
     run: input => invoke('query:run', input),
     cancel: id => invoke('query:cancel', id),
-    release: id => invoke('query:release', id),
+    release: (id, guard) => invoke('query:release', id, guard),
     onUpdate: listener => {
       const handler = (_: Electron.IpcRendererEvent, value: QuerySnapshot) => listener(value);
       ipcRenderer.on('query:update', handler);

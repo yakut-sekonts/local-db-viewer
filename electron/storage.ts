@@ -54,6 +54,11 @@ export class ProfileStore {
       const { trustStorePassword, clientKeyPassword, clientStorePassword, ...certificates } = visibleJdbc.certificates;
       visibleJdbc.certificates = { ...certificates, savedSecrets: Object.entries({ trustStorePassword, clientKeyPassword, clientStorePassword }).filter(([, value]) => value).map(([key]) => key) };
     }
+    if (visibleJdbc?.sessionTemplates) visibleJdbc.sessionTemplates = visibleJdbc.sessionTemplates.map(template => {
+      if (!template.authentication) return template;
+      const { secret, ...authentication } = template.authentication;
+      return { ...template, authentication: { ...authentication, hasSecret: Boolean(secret) } };
+    });
     return { ...rest, jdbc: visibleJdbc, jdbcSecrets, jdbcEnvironmentNames, tls: sslEnabled(rest), sslVerification: rest.sslVerification ?? 'FULL', hasSecret: Boolean(encryptedSecret) };
   }
   async list(): Promise<Profile[]> { return (await this.read()).map(profile => this.public(profile)); }
@@ -69,6 +74,11 @@ export class ProfileStore {
     const jdbc = draft.jdbc ? { ...draft.jdbc,
       properties: { ...Object.fromEntries(Object.entries(previous?.jdbc?.properties ?? {}).filter(([name]) => secretProperty(name))), ...draft.jdbc.properties },
       environment: { ...previous?.jdbc?.environment, ...draft.jdbc.environment },
+      sessionTemplates: draft.jdbc.sessionTemplates?.map(template => {
+        const auth = template.authentication;
+        const old = previous?.jdbc?.sessionTemplates?.find(item => item.id === template.id)?.authentication;
+        return { ...template, authentication: auth ? { ...auth, secret: auth.auth === 'none' ? undefined : auth.secret ?? (old?.auth === auth.auth && old.user === auth.user ? old.secret : undefined), hasSecret: undefined } : undefined };
+      }),
       ssh: draft.jdbc.ssh ? { ...draft.jdbc.ssh, password: draft.jdbc.ssh.password ?? previous?.jdbc?.ssh?.password, passphrase: draft.jdbc.ssh.passphrase ?? previous?.jdbc?.ssh?.passphrase } : undefined,
       certificates: draft.jdbc.certificates ? { ...draft.jdbc.certificates,
         trustStorePassword: draft.jdbc.certificates.trustStorePassword ?? previous?.jdbc?.certificates?.trustStorePassword,

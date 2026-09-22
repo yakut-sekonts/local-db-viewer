@@ -7,37 +7,41 @@ interface Binding { table: TableMeta; alias: string; explicitAlias: boolean }
 export interface SqlSuggestion { label: string; insertText: string; detail: string; kind: 'column' | 'table' | 'join' | 'keyword'; start: number; end: number; rank: number; filterText?: string }
 const keywords = new Set('SELECT DISTINCT ALL FROM WHERE JOIN LEFT RIGHT FULL INNER OUTER CROSS NATURAL ON USING GROUP BY ORDER HAVING LIMIT OFFSET FETCH UNION EXCEPT INTERSECT AS AND OR NOT NULL IS IN EXISTS CASE WHEN THEN ELSE END ASC DESC WITH RECURSIVE UPDATE SET INSERT INTO DELETE VALUES RETURNING QUALIFY WINDOW FOR LATERAL TABLESAMPLE'.split(' '));
 
-function tokenize(sql: string): { tokens: Token[]; containers: Container[] } {
+export function tokenize(sql: string, engine?: DatabaseEngine, maximumTokens = Number.POSITIVE_INFINITY): { tokens: Token[]; containers: Container[] } {
   const tokens: Token[] = [];
   const containers: Container[] = [{ parent: -1, start: 0, end: sql.length }];
   let container = 0;
   let i = 0;
   while (i < sql.length) {
+    if (tokens.length >= maximumTokens) throw new Error('DDL содержит слишком много SQL tokens; разделите файл.');
     if (/\s/u.test(sql.charAt(i))) { i++; continue; }
     const start = i;
-    if (sql.startsWith('--', i) || sql.startsWith('/*', i)) {
+    const mysql = engine === 'mysql' || engine === 'mariadb';
+    const lineComment = sql.startsWith('--', i) && (!mysql || !sql.charAt(i + 2) || /\s/.test(sql.charAt(i + 2))) || mysql && sql.charAt(i) === '#';
+    if (lineComment || sql.startsWith('/*', i)) {
       let closed = true;
-      if (sql.startsWith('--', i)) { const end = sql.indexOf('\n', i); closed = end >= 0; i = end < 0 ? sql.length : end; }
+      if (lineComment) { const end = sql.indexOf('\n', i); closed = end >= 0; i = end < 0 ? sql.length : end; }
       else {
         let depth = 1; i += 2;
-        while (i < sql.length && depth) { if (sql.startsWith('/*', i)) { depth++; i += 2; } else if (sql.startsWith('*/', i)) { depth--; i += 2; } else i++; }
+        while (i < sql.length && depth) { if ((!engine || ['postgres','trino','mssql'].includes(engine)) && sql.startsWith('/*', i)) { depth++; i += 2; } else if (sql.startsWith('*/', i)) { depth--; i += 2; } else i++; }
         closed = depth === 0;
       }
       tokens.push({ text: sql.slice(start, i), value: '', start, end: i, container, kind: 'comment', closed }); continue;
     }
-    const dollar = sql.slice(i).match(/^\$(?:[a-zA-Z_]\w*)?\$/)?.[0];
+    const dollar = !engine || engine === 'postgres' ? sql.slice(i).match(/^\$(?:[a-zA-Z_]\w*)?\$/)?.[0] : undefined;
     if (dollar) {
       const end = sql.indexOf(dollar, i + dollar.length); i = end < 0 ? sql.length : end + dollar.length;
       tokens.push({ text: sql.slice(start, i), value: '', start, end: i, container, kind: 'string', closed: end >= 0 }); continue;
     }
     if (['"', "'", '`', '['].includes(sql.charAt(i))) {
       const opening = sql.charAt(i++); const closing = opening === '[' ? ']' : opening;
+      const escaped = opening === "'" && (!engine || mysql || engine === 'clickhouse' || engine === 'postgres' && /e/i.test(sql.charAt(start - 1)) && !/[\p{L}\p{N}_$]/u.test(sql.charAt(start - 2))) || opening === '"' && mysql || opening === '`' && engine === 'clickhouse';
       let value = ''; let closed = false;
       while (i < sql.length) {
         if (sql.charAt(i) === closing) {
           if (sql.charAt(i + 1) === closing) { value += closing; i += 2; }
           else { i++; closed = true; break; }
-        } else if (sql.charAt(i) === '\\' && opening === "'") { value += sql.slice(i, i + 2); i += 2; }
+        } else if (sql.charAt(i) === '\\' && escaped) { value += sql.slice(i, i + 2); i += 2; }
         else value += sql.charAt(i++);
       }
       tokens.push({ text: sql.slice(start, i), value, start, end: i, container, kind: opening === "'" ? 'string' : 'name', quoted: true, closed }); continue;

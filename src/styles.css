@@ -60,3 +60,24 @@
 .driver-dialog input[type=checkbox] { accent-color: #3574f0; }
 .boundary-error { padding: 24px; color: #cbd0d8; background: #292b2f; line-height: 1.6; overflow-wrap: anywhere; }
 .boundary-error p { margin: 12px 0; }
+
+/* DDL and session settings */
+.session-template-select { max-width: 170px; min-width: 80px; font-size: 11px; }
+.connection-tabs { overflow-x: auto; flex-shrink: 0; }
+.ddl-dialog { width: min(1120px, 94vw); max-height: 92vh; }
+.ddl-dialog > .dialog-body { overflow-y: auto; max-height: calc(92vh - 100px); }
+.ddl-controls { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.ddl-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ddl-preview details { border-bottom: 1px solid var(--border); padding: 8px 0; }
+.ddl-preview summary { display: flex; align-items: center; justify-content: space-between; gap: 15px; cursor: pointer; }
+.ddl-preview summary label { margin: 0; overflow-wrap: anywhere; }
+.ddl-diff { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; }
+.ddl-diff pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 350px; overflow: auto; padding: 12px; background: #1e1f22; border: 1px solid var(--border); font-size: 12px; }
+.ddl-file-editor { display: flex; flex-direction: column; gap: 12px; }
+.ddl-file-editor textarea { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+.ddl-local-tree { overflow: auto; padding: 12px; flex: 1; }
+.ddl-local-tree details { margin-bottom: 10px; }
+.ddl-local-tree details > div { padding: 4px 0 4px 12px; overflow-wrap: anywhere; }
+.ddl-local-tree small { color: var(--muted); }
+
+.query-toolbar { flex-wrap: wrap; min-height: 36px; height: auto; padding-top: 6px; padding-bottom: 6px; row-gap: 6px; }

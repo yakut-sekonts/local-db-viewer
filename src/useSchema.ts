@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Profile, SchemaIndex } from './shared';
 import { requestedSchemas, tableKey } from './completion';
 
-export function useSchema(profile: Profile | undefined, catalog: string, schema: string, revision: number) {
+export function useSchema(profile: Profile | undefined, catalog: string, schema: string, revision: number, ddlMappingId?: string) {
   const [automaticRevision, setAutomaticRevision] = useState(0);
   const manualRevision = useRef(revision);
   const [index, setIndex] = useState<SchemaIndex>();
@@ -10,7 +10,7 @@ export function useSchema(profile: Profile | undefined, catalog: string, schema:
   const [busy, setBusy] = useState(false);
   const cache = useRef(new Map<string, { time: number; promise: Promise<SchemaIndex> }>());
   const generation = useRef(0);
-  useEffect(() => { cache.current.clear(); }, [profile, revision, automaticRevision]);
+  useEffect(() => { cache.current.clear(); }, [profile, revision, automaticRevision, ddlMappingId]);
   function load(catalog: string, schema: string): Promise<SchemaIndex> {
     if (!profile) return Promise.reject(new Error('Выберите подключение.'));
     const key = JSON.stringify([profile.id, catalog, schema]);
@@ -33,7 +33,7 @@ export function useSchema(profile: Profile | undefined, catalog: string, schema:
     const current = ++generation.current;
     const manual = manualRevision.current !== revision; manualRevision.current = revision;
     setIndex(undefined); setStatus(''); setBusy(Boolean(profile));
-    if (!profile || profile.jdbc?.options?.autoSync === false && !manual) { setBusy(false); return; }
+    if (!profile || !ddlMappingId && profile.jdbc?.options?.autoSync === false && !manual) { setBusy(false); return; }
     const timer = setTimeout(() => {
       void loadScope().then(value => {
         if (generation.current !== current) return;
@@ -41,9 +41,19 @@ export function useSchema(profile: Profile | undefined, catalog: string, schema:
       }).catch(error => { if (generation.current === current) setStatus(error.message); }).finally(() => { if (generation.current === current) setBusy(false); });
     }, 300);
     return () => { clearTimeout(timer); generation.current++; };
-  }, [profile, catalog, schema, revision, automaticRevision]);
+  }, [profile, catalog, schema, revision, automaticRevision, ddlMappingId]);
 
   async function loadScope(): Promise<SchemaIndex> {
+    if (ddlMappingId) {
+      const key = `ddl:${ddlMappingId}`, cached = cache.current.get(key);
+      if (cached && Date.now() - cached.time < 5000) return cached.promise;
+      const promise = window.studio.ddl.index(ddlMappingId).then(index => {
+        if (index.profileId !== profile?.id || index.catalog !== catalog || index.schema !== schema) throw new Error('DDL mapping изменился. Откройте новую консоль из mapping.');
+        return index;
+      });
+      cache.current.set(key, { time: Date.now(), promise });
+      return promise;
+    }
     const selected = profile?.jdbc?.schemas;
     if (selected?.mode !== 'selected') return load(catalog, schema);
     if (!selected.selected.length) return { profileId: profile!.id, catalog, schema, tables: [], relationships: [], warnings: [] };
@@ -61,6 +71,7 @@ export function useSchema(profile: Profile | undefined, catalog: string, schema:
     const current = generation.current;
     try {
       const base = await loadScope();
+      if (ddlMappingId) { if (current !== generation.current) return; setStatus(base.warnings.join('\n')); setIndex(base); return base; }
       const needed = requestedSchemas(sql, offset, base, profile.engine);
       const extra = await Promise.allSettled(needed.map(context => load(context.catalog, context.schema)));
       if (current !== generation.current) return;

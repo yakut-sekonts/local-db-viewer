@@ -6,7 +6,7 @@ import { connectionError, httpAgent, validateSSL } from './tls';
 import { validateJdbc } from './jdbc-config';
 import { profileDriver, driverDefinition } from '../src/drivers';
 
-export type Connection = Omit<Profile, 'hasSecret'> & { secret?: string; driverClasspath?: string[] };
+export type Connection = Omit<Profile, 'hasSecret'> & { secret?: string; driverClasspath?: string[]; sessionTemplateId?: string };
 export const quoteIdentifier = (value: string): string => `"${value.replaceAll('"', '""')}"`;
 
 export function validateConnection(input: Connection): Connection {

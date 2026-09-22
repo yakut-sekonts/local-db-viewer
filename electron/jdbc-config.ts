@@ -10,6 +10,19 @@ export function validateJdbc(input: JdbcSettings | undefined): void {
   if (input === undefined) return;
   if (!input || typeof input !== 'object' || Array.isArray(input) || JSON.stringify(input).length > 256000) throw new Error('Некорректные настройки JDBC.');
   validateConnectionOptions(input);
+  const templates = input.sessionTemplates === undefined ? [] : input.sessionTemplates;
+  if (!Array.isArray(templates) || templates.length > 32) throw new Error('Допустимо до 32 шаблонов сессий.');
+  const templateIds = new Set<string>(), templateNames = new Set<string>();
+  for (const template of templates) {
+    if (!template || typeof template !== 'object' || Array.isArray(template) || typeof template.id !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(template.id) || templateIds.has(template.id) || typeof template.name !== 'string' || !template.name.trim() || template.name.length > 100 || /[\r\n\0]/.test(template.name) || templateNames.has(template.name.trim().toLowerCase())) throw new Error('Укажите уникальные имя и ID шаблона сессии.');
+    templateIds.add(template.id); templateNames.add(template.name.trim().toLowerCase());
+    for (const value of [template.driverVersion, template.driverClass]) if (value !== undefined && typeof value !== 'string') throw new Error('Некорректный драйвер шаблона.');
+    const auth = template.authentication;
+    if (auth !== undefined && (!auth || typeof auth !== 'object' || !['none','basic','bearer'].includes(auth.auth) || typeof auth.user !== 'string' || auth.user.length > 512 || /[\r\n\0]/.test(auth.user) || auth.secret !== undefined && (typeof auth.secret !== 'string' || auth.secret.length > 16384 || /[\r\n\0]/.test(auth.secret)))) throw new Error('Некорректная аутентификация шаблона.');
+    if (template.options && Object.keys(template.options).some(key => !['readOnly','autoCommit','isolation','startupStatements','queryTimeoutSeconds'].includes(key))) throw new Error('Неизвестная настройка шаблона сессии.');
+    validateJdbc({ driverVersion: template.driverVersion, driverClass: template.driverClass, classpath: template.classpath, options: template.options });
+  }
+  for (const id of [input.defaultSessionTemplate, input.introspectionSessionTemplate]) if (id !== undefined && (typeof id !== 'string' || id !== '' && !templateIds.has(id))) throw new Error('Выбранный шаблон сессии не существует.');
   if (input.driverId) driverDefinition(input.driverId);
   if (input.productId && !DATABASE_PRODUCTS.some(product => product.id === input.productId)) throw new Error('Неизвестный тип СУБД.');
   if (input.driverVersion && !/^(bundled|[a-f0-9]{64})$/.test(input.driverVersion)) throw new Error('Некорректная версия драйвера.');

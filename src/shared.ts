@@ -57,6 +57,8 @@ export interface QuerySnapshot {
   inTransaction: boolean;
 }
 export interface QueryInput {
+  ddlMappingId?: string;
+  templateId?: string;
   requestId: string;
   sessionId: string;
   profileId: string;
@@ -87,6 +89,7 @@ export interface SchemaInput { profileId: string; catalog: string; schema: strin
 export interface JdbcDialect { quote: string; catalogs: boolean; schemas: boolean; catalogAtStart: boolean; catalogSeparator: string; unquotedCase: 'lower' | 'upper' | 'preserve'; fullOuterJoins: boolean }
 export interface SchemaIndex extends SchemaInput { dialect?: JdbcDialect; tables: TableMeta[]; relationships: Relationship[]; warnings: string[] }
 export interface DesktopAPI {
+  ddl: import('./ddl').DdlAPI;
   jdbc: { properties(profile: ProfileDraft): Promise<import('./jdbc').JdbcProperty[]>; preview(input: MetadataInput): Promise<string>; browse(profile: ProfileDraft, input: Omit<MetadataInput, 'profileId'>): Promise<MetadataResult> };
   ssh: { fingerprint(host: string, port: number): Promise<string> };
   drivers: import('./drivers').DriversAPI;
@@ -100,7 +103,7 @@ export interface DesktopAPI {
   query: {
     run(input: QueryInput): Promise<void>;
     cancel(requestId: string): Promise<void>;
-    release(sessionId: string): Promise<void>;
+    release(sessionId: string, requireNoTransaction?: boolean): Promise<void>;
     onUpdate(listener: (value: QuerySnapshot) => void): () => void;
   };
   metadata(input: MetadataInput): Promise<MetadataResult>;
