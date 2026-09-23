@@ -36,7 +36,7 @@ async function mssql(database: string) {
   await new Promise<void>((resolve,reject)=>{client.once('connect',error=>error?reject(error):resolve());client.once('error',reject);client.connect();});
   const query: Query = sql => new Promise((resolve,reject)=>{
     const rows: Cell[][] = [];
-    const request = new Request(sql,error=>error?reject(new Error(`${error.message}\nFixture SQL:\n${sql}`,{cause:error})):resolve({columns:[],rows,truncated:false}));
+    const request = new Request(sql,error=>error?reject(new Error(`${error instanceof AggregateError ? error.errors.map(item=>String(item)).join('\n') : error.message}\nFixture SQL:\n${sql}`,{cause:error})):resolve({columns:[],rows,truncated:false}));
     request.on('row',columns=>rows.push(columns.map((column: {value: Cell})=>column.value)));
     client.execSqlBatch(request);
   });
