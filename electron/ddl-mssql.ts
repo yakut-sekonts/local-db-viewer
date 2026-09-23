@@ -129,7 +129,12 @@ export async function readMssqlDdl(mapping: DdlMapping, query: CatalogQuery) {
         if (flag(column,'persisted')) sql += ` PERSISTED${flag(column,'nullable') ? '' : ' NOT NULL'}`;
       } else {
         sql += ` ${dataType(column)}`;
-        const collation = optionalText(column,'collation'); if (collation) sql += ` COLLATE ${q(collation)}`;
+        const collation = optionalText(column,'collation');
+        if (collation) {
+          // COLLATE accepts a collation token, not a bracket-delimited identifier.
+          if (!/^[A-Za-z][A-Za-z0-9_]{0,127}$/.test(collation)) unsupported(`${name}.${columnName}`,'collation name');
+          sql += ` COLLATE ${collation}`;
+        }
         if (flag(column,'sparse')) sql += ' SPARSE';
         if (flag(column,'identity')) sql += ` IDENTITY(${integer(column,'seed')},${integer(column,'increment')})${flag(column,'identity_replication') ? ' NOT FOR REPLICATION' : ''}`;
         if (flag(column,'rowguid')) sql += ' ROWGUIDCOL';
