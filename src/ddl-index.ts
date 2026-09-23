@@ -13,13 +13,14 @@ function path(tokens: Token[], start: number, mapping: DdlMapping, engine: Datab
   return { ref: { name: last, catalog: parts.length === 3 ? parts[0]! : parts.length === 2 && catalogOnly ? parts[0]! : mapping.catalog,
     schema: parts.length === 3 ? parts[1]! : parts.length === 2 && !catalogOnly ? parts[0]! : mapping.schema }, next: i };
 }
-function names(tokens: Token[], start: number, engine: DatabaseEngine): string[] {
+function names(tokens: Token[], start: number, engine: DatabaseEngine, sorted = false): string[] {
   if (tokens[start]?.value !== '(') return [];
   const result: string[] = []; let expectName = true;
   for (let i = start + 1; i < tokens.length; i++) {
     const token = tokens[i]!;
     if (token.value === ')') return expectName ? [] : result;
     if (expectName && token.kind === 'name') { result.push(name(token, engine)); expectName = false; }
+    else if (sorted && !expectName && (word(token,'ASC') || word(token,'DESC'))) { /* Key ordering does not change FK column names. */ }
     else if (!expectName && token.value === ',') expectName = true;
     else return [];
   }
@@ -40,6 +41,7 @@ export function ddlIndex(mapping: DdlMapping, files: { file: string; sql: string
     try { all = tokenize(file.sql, engine, 100000).tokens; } catch (error) { warn(file.file,(error as Error).message); continue; }
     if (all.some(token => token.closed === false && !(token.kind === 'comment' && (token.text.startsWith('--') || token.text.startsWith('#'))))) { warn(file.file, 'незакрытый SQL token; файл не индексирован'); continue; }
     const tokens = all.filter(token => token.kind !== 'comment'); let created = 0, addedConstraints = 0;
+    const handledAlters = new Set<number>();
     for (let i = 0; i < tokens.length; i++) {
       if (tokens[i]?.container !== 0 || !word(tokens[i],'ALTER') || !word(tokens[i+1],'TABLE')) continue;
       let start = i+2;
@@ -56,9 +58,9 @@ export function ddlIndex(mapping: DdlMapping, files: { file: string; sql: string
       if ((!foreign && !primaryKey) || !word(tokens[start+1],'KEY')) continue;
       start+=2;
       if (word(tokens[start],'CLUSTERED') || word(tokens[start],'NONCLUSTERED')) start++;
-      const sourceNames = names(tokens,start,engine);
+      const sourceNames = names(tokens,start,engine,primaryKey);
       if (!sourceNames.length) continue;
-      if (primaryKey) {addedKeys.push({ref:table.ref,columns:sourceNames});addedConstraints++;continue;}
+      if (primaryKey) {addedKeys.push({ref:table.ref,columns:sourceNames});addedConstraints++;handledAlters.add(i);continue;}
       const end = tokens.findIndex((token,pos)=>pos>start && token.container===0 && token.value===';');
       const clause = tokens.slice(start,end<0?undefined:end), refAt=clause.findIndex(token=>word(token,'REFERENCES'));
       if (refAt<0) continue;
@@ -68,6 +70,7 @@ export function ddlIndex(mapping: DdlMapping, files: { file: string; sql: string
       if (targetNames.length && targetNames.length!==sourceNames.length) {warn(file.file,'неполный составной foreign key');continue;}
       relations.push({id:`ddl:${file.file}:${tokens[i]!.start}`,name:constraintName??`${table.ref.name} → ${target.ref.name}`,source:table.ref,target:target.ref,columns:sourceNames.map((source,n)=>({source,target:targetNames[n]??''})),kind:'foreign-key'});
       addedConstraints++;
+      handledAlters.add(i);
     }
     for (let i = 0; i < tokens.length; i++) {
       if (!word(tokens[i], 'CREATE') || tokens[i]!.container !== 0) continue;
@@ -94,16 +97,16 @@ export function ddlIndex(mapping: DdlMapping, files: { file: string; sql: string
         if (!clause.length) continue;
         if (word(clause[0], 'CONSTRAINT')) clause = clause.slice(2);
         const first = clause[0]; if (!first) continue;
-        const constraint = !first.quoted && ['PRIMARY','FOREIGN','UNIQUE','CHECK','KEY','INDEX','EXCLUDE'].includes(first.value.toUpperCase());
+        const constraint = !first.quoted && (['PRIMARY','FOREIGN','UNIQUE','CHECK','KEY','INDEX','EXCLUDE'].includes(first.value.toUpperCase()) || word(first,'NOT') && word(clause[1],'NULL'));
         const column = !constraint && first.kind === 'name' ? name(first, engine) : undefined;
         if (column) {
           const boundary = clause.findIndex((token,pos) => pos > 0 && token.container === first.container && !token.quoted && ['CONSTRAINT','PRIMARY','REFERENCES','NOT','NULL','DEFAULT','UNIQUE','CHECK','COLLATE','GENERATED','IDENTITY','COMMENT','AUTO_INCREMENT'].includes(token.value.toUpperCase()));
           const typeTokens = clause.slice(1, boundary < 0 ? undefined : boundary);
           if (!typeTokens.length) { warn(file.file, `тип ${column} не указан`); }
-          columns.push({ name: column, type: typeTokens.length ? file.sql.slice(typeTokens[0]!.start,typeTokens.at(-1)!.end) : '' });
+          columns.push({ name: column, type: word(typeTokens[0],'AS') ? 'computed' : typeTokens.length ? file.sql.slice(typeTokens[0]!.start,typeTokens.at(-1)!.end) : '' });
           if (++columnCount > 20000) { warn(file.file,'локальный индекс ограничен 20 000 колонок; неполная таблица исключена'); break filesLoop; }
           if (clause.some((token,pos) => word(token,'PRIMARY') && word(clause[pos + 1],'KEY'))) pk.push(column);
-        } else if (word(first,'PRIMARY') && word(clause[1],'KEY')) pk.push(...names(clause,2,engine));
+        } else if (word(first,'PRIMARY') && word(clause[1],'KEY')) pk.push(...names(clause,word(clause[2],'CLUSTERED') || word(clause[2],'NONCLUSTERED') ? 3 : 2,engine,true));
         const refAt = clause.findIndex(token => word(token,'REFERENCES'));
         if (refAt >= 0) {
           const sourceNames = column ? [column] : word(first,'FOREIGN') && word(clause[1],'KEY') ? names(clause,2,engine) : [];
@@ -119,7 +122,7 @@ export function ddlIndex(mapping: DdlMapping, files: { file: string; sql: string
       index.tables.push({ ...table.ref, columns }); primary.set(key,pk); i = close;
     }
     if (!created && !addedConstraints && file.sql.trim()) warn(file.file,'для подсказок поддерживаются CREATE TABLE и ALTER TABLE ADD PRIMARY/FOREIGN KEY; остальные команды сохранены как SQL');
-    if (tokens.some(token => token.container === 0 && word(token,'ALTER')) && !addedConstraints) warn(file.file,'ALTER колонок не изменяет локальный индекс; обновите CREATE TABLE до итоговой структуры');
+    if (tokens.some((token,i) => token.container === 0 && word(token,'ALTER') && !handledAlters.has(i))) warn(file.file,'ALTER кроме ADD PRIMARY/FOREIGN KEY не изменяет локальный индекс; для колонок используйте итоговый CREATE TABLE');
   }
   index.tables = index.tables.filter(table => !ambiguous.has(tableKey(table)));
   for (const key of addedKeys) {

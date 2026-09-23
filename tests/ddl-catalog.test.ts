@@ -66,3 +66,11 @@ test('offline JOINs resolve composite ALTER foreign keys across files, including
   const bad=ddlIndex(mapping,[{file:'x.sql',sql:'CREATE TABLE s.a(id int); ALTER TABLE s.a ADD FOREIGN KEY(missing) REFERENCES s.a(id);'}],'postgres');
   assert.equal(bad.relationships.length,0);
 });
+
+test('named NOT NULL and clustered primary keys do not create phantom columns', () => {
+  const pg=ddlIndex(mapping,[{file:'pg.sql',sql:'CREATE TABLE s.t(id integer, CONSTRAINT id_required NOT NULL id);'}],'postgres');
+  assert.deepEqual(pg.tables[0]?.columns.map(column=>column.name),['id']);
+  const ms=ddlIndex(mapping,[{file:'ms.sql',sql:'CREATE TABLE s.t(id int, value AS (id*2) PERSISTED, CONSTRAINT pk PRIMARY KEY CLUSTERED(id DESC)); CREATE TABLE s.child(id int REFERENCES s.t);'}],'mssql');
+  assert.equal(ms.tables[0]?.columns[1]?.type,'computed');
+  assert.deepEqual(ms.relationships[0]?.columns,[{source:'id',target:'id'}]);
+});

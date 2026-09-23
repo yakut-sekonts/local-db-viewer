@@ -44,7 +44,7 @@ export async function readMssqlDdl(mapping: DdlMapping, query: CatalogQuery) {
   const tableQuery = `FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE s.name=${scope} AND t.is_ms_shipped=0 ORDER BY t.name`;
   const tables = await read(`t.object_id AS id, t.name, CONVERT(nvarchar(30),t.modify_date,126) AS modified,
     t.is_memory_optimized AS memory, t.temporal_type AS temporal, t.is_filetable AS filetable,
-    t.is_node AS node, t.is_edge AS edge, t.filestream_data_space_id AS filestream,
+    t.is_node AS node, t.is_edge AS edge, COALESCE(t.filestream_data_space_id,0) AS filestream,
     t.large_value_types_out_of_row AS out_of_row, t.text_in_row_limit AS text_in_row,
     t.lock_escalation_desc AS lock_escalation, t.lob_data_space_id AS lob_space,
     CONVERT(bit,CASE WHEN EXISTS (SELECT 1 FROM sys.fulltext_indexes f WHERE f.object_id=t.object_id) THEN 1 ELSE 0 END) AS fulltext,

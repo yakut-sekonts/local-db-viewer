@@ -12,6 +12,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  ddl:
+    uses: ./.github/workflows/ddl-catalog.yml
   build:
     strategy:
       fail-fast: false
@@ -101,7 +103,7 @@ jobs:
 
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: [build, ddl]
     runs-on: ubuntu-latest
     permissions:
       contents: write
