@@ -1,0 +1,56 @@
+name: Database DDL integration
+on:
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  ddl:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - postgres: '14'
+            mssql: '2019-latest'
+          - postgres: '18'
+            mssql: '2022-latest'
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_PASSWORD: fixture-postgres
+        ports: ['5432/tcp']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      mssql:
+        image: mcr.microsoft.com/mssql/server:${{ matrix.mssql }}
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_PID: Developer
+          MSSQL_SA_PASSWORD: Fixture-Only_4821Test
+        ports: ['1433/tcp']
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npx tsx tests/ddl-servers.ts
+        env:
+          LDV_DDL_SERVER_TEST: '1'
+          LDV_PG_PORT: ${{ job.services.postgres.ports[5432] }}
+          LDV_MSSQL_PORT: ${{ job.services.mssql.ports[1433] }}
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ddl-servers-pg${{ matrix.postgres }}-mssql${{ matrix.mssql }}
+          path: test-artifacts/ddl-*.json
+          retention-days: 7

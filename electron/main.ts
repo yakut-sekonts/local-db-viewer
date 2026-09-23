@@ -8,7 +8,7 @@ import { DatabaseSession, type QueryTask } from './database';
 import { SessionPool, type SessionLease } from './session-pool';
 import { sessionTemplate } from './session-template';
 import { DdlStore } from './ddl-store';
-import { readDdl } from './ddl-reader';
+import { ddlConnection, readDdl } from './ddl-reader';
 import { ddlIndex } from '../src/ddl-index';
 import type { DdlMapping } from '../src/ddl';
 import { sshFingerprint } from './ssh';
@@ -197,11 +197,12 @@ void app.whenReady().then(() => {
   });
   handle('ddl:preview', async (id: string) => {
     string(id, 'mappingId'); const mapping = await ddl.get(id);
-    const connection = sessionTemplate(await profiles.get(mapping.profileId), 'introspection');
+    const connection = ddlConnection(sessionTemplate(await profiles.get(mapping.profileId), 'introspection'));
     const lease = await sessionPool.acquire(connection);
     try {
       const result = await readDdl(connection, mapping, async sql => {
-        const query = lease.session.createQuery(randomUUID(), 10000, undefined, mapping.catalog, mapping.schema);
+        // PostgreSQL exporter controls search_path inside its isolated read-only transaction.
+        const query = lease.session.createQuery(randomUUID(), 10000, undefined, mapping.catalog, sqlEngine(connection) === 'postgres' ? '' : mapping.schema);
         const timer = setTimeout(() => { void query.cancel().catch(() => {}); }, 60000);
         try {
           const result = await query.run(sql);

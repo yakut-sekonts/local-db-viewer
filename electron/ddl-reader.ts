@@ -4,11 +4,22 @@ import type { MetadataResult } from '../src/shared';
 import { sqlEngine } from '../src/drivers';
 import { identifier, sqlLiteral } from './sql';
 import { ddlFileName } from './ddl-store';
+import { readPostgresDdl } from './ddl-postgres';
+import { readMssqlDdl } from './ddl-mssql';
 
-/** Use server-owned definitions, never reconstruct incomplete CREATE from column metadata. */
+export function ddlConnection(connection: Connection): Connection {
+  if (!['postgres','mssql'].includes(sqlEngine(connection))) return connection;
+  return { ...connection, jdbc: { ...connection.jdbc, options: { ...connection.jdbc?.options, singleSession: false, autoCommit: true, keepAliveSeconds: 0, autoDisconnectSeconds: 0 } } };
+}
+
+/** Prefer native definitions; catalog exporters reject unsupported structures explicitly. */
 export async function readDdl(connection: Connection, mapping: DdlMapping, query: (sql: string) => Promise<MetadataResult>) {
   const engine = sqlEngine(connection), q = (name: string) => identifier(name, engine), literal = (name: string) => sqlLiteral(name, engine);
   const read = async (sql: string) => { const result = await query(sql); if (result.truncated) throw new Error('Серверный DDL превышает лимит. Выгрузка остановлена без записи файлов.'); return result.rows; };
+  if (engine === 'postgres' || engine === 'mssql') {
+    if (!mapping.catalog || !mapping.schema) throw new Error('Для выгрузки укажите catalog/database и schema.');
+    return engine === 'postgres' ? readPostgresDdl(mapping,read) : readMssqlDdl(mapping,read);
+  }
   const files: { file: string; sql: string }[] = [];
   const add = (kind: string, name: unknown, sql: unknown) => {
     if (typeof name !== 'string' || typeof sql !== 'string' || !sql.trim()) throw new Error('Сервер не вернул полный SQL объекта.');
