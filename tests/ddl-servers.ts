@@ -42,7 +42,7 @@ async function mssql(database: string) {
   });
   return {query,close:()=>new Promise<void>(resolve=>{client.once('end',resolve);client.close();})};
 }
-const reports: object[] = [];
+const reports: {engine: string; passed: boolean; [key: string]: unknown}[] = [];
 for (const engine of ['postgres','mssql'] as const) {
   const open = engine === 'postgres' ? postgres : mssql, q = (name:string)=>identifier(name,engine), s=q(schema);
   let admin: Awaited<ReturnType<typeof open>> | undefined;
@@ -103,7 +103,7 @@ next line'; COMMENT ON COLUMN ${s}.parent.label IS 'Unicode: 名';
     await writeFile(`test-artifacts/ddl-${engine}-after.json`,JSON.stringify(sorted(second.files),null,2));
     assert.deepEqual(sorted(second.files),sorted(first.files),`${engine}: export → restore → export must preserve definitions`);
     const jdbc: Connection = {...profile(engine,source),schema:'',user:engine==='postgres'?'postgres':'sa',auth:'basic',secret:engine==='postgres'?'fixture-postgres':'Fixture-Only_4821Test',
-      endpoint:`${engine==='postgres'?'postgresql':'sqlserver'}://127.0.0.1:${engine==='postgres'?process.env.LDV_PG_PORT:process.env.LDV_MSSQL_PORT}`,jdbc:{options:{singleSession:true}}};
+      endpoint:`${engine==='postgres'?'postgresql':'sqlserver'}://127.0.0.1:${engine==='postgres'?process.env.LDV_PG_PORT:process.env.LDV_MSSQL_PORT}/${source}`,jdbc:{options:{singleSession:true}}};
     const pool=new SessionPool(async profile=>profile),consoleLease=await pool.acquire(jdbc),ddlLease=await pool.acquire(ddlConnection(jdbc));
     try {
       assert.notEqual(consoleLease.session,ddlLease.session);
@@ -137,6 +137,10 @@ next line'; COMMENT ON COLUMN ${s}.parent.label IS 'Unicode: 名';
     }
     reports.push({engine,passed:true,roundTrip:true,files:first.files.length,jdbc:true,consoleTransactionPreserved:true,offlineForeignKeys:true,unsupportedRejected:true});
     console.log(`PASS: ${engine} definitions → clean database → identical definitions, offline JOINs and guards`);
+  } catch(error) {
+    reports.push({engine,passed:false,error:(error as Error).stack});console.error(error);
   } finally {await a.close();await b.close();}
 }
-await writeFile('test-artifacts/ddl-servers-results.json',JSON.stringify({passed:true,reports},null,2));
+const passed=reports.every(report=>report.passed);
+await writeFile('test-artifacts/ddl-servers-results.json',JSON.stringify({passed,reports},null,2));
+assert.ok(passed,'DDL server integration failed; see per-engine errors and artifacts.');
