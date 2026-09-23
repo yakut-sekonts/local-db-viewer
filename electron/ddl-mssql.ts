@@ -198,7 +198,9 @@ export async function readMssqlDdl(mapping: DdlMapping, query: CatalogQuery) {
     if (!['V','TR'].includes(type)) unsupported(name,'CLR trigger');
     if (flag(module,'indexed_view')) unsupported(name,'indexed view');
     const definition = createModule(text(module,'definition'),type === 'V' ? 'VIEW' : 'TRIGGER');
-    let sql = `SET ANSI_NULLS ${flag(module,'ansi_nulls') ? 'ON' : 'OFF'};\nSET QUOTED_IDENTIFIER ${flag(module,'quoted_identifier') ? 'ON' : 'OFF'};\nGO\n${definition.trimEnd().replace(/;?$/,';')}`;
+    // SQL Server stores leading whitespace submitted after GO in sys.sql_modules.
+    // Canonicalize only the outer whitespace so round trips do not accumulate blank lines.
+    let sql = `SET ANSI_NULLS ${flag(module,'ansi_nulls') ? 'ON' : 'OFF'};\nSET QUOTED_IDENTIFIER ${flag(module,'quoted_identifier') ? 'ON' : 'OFF'};\nGO\n${definition.trim().replace(/;?$/,';')}`;
     if (type === 'TR' && flag(module,'disabled')) sql += `\nGO\nDISABLE TRIGGER ${path(mapping.schema,name)} ON ${path(mapping.schema,text(module,'table_name'))};`;
     output.add(type === 'V' ? 'view' : 'trigger',name,sql);
   }
@@ -208,6 +210,6 @@ export async function readMssqlDdl(mapping: DdlMapping, query: CatalogQuery) {
   return {files:output.files,warnings:[
     'SQL Server 2019–2022: обычные rowstore tables, defaults, computed/identity columns, PK/UNIQUE/CHECK/FK, indexes, views и table triggers. Требуется VIEW DEFINITION на базу.',
     'Выгрузка не является backup: данные, owners/grants, extended properties, sequences, routines, пользовательские типы и статистика не копируются. Внешние зависимости должны существовать. Temporal, partitioned, memory-optimized, graph, encrypted/masked и специальные индексы останавливают выгрузку.',
-    'Применение вручную: tables, затем indexes/check/foreign-key, после — зависимые views/triggers. GO разделяет SQL Server batches; в консоли выделяйте один batch без GO.',
+    'Применение вручную: tables, затем indexes/check/foreign-key, после — зависимые views/triggers. GO разделяет SQL Server batches; сложные triggers с несколькими командами в теле применяйте через нативный клиент.',
   ]};
 }
