@@ -1,5 +1,15 @@
 # История версий
 
+## 0.6.0
+
+- Добавлена серверная выгрузка DDL для PostgreSQL 14–18 и SQL Server 2019–2022: определения обычных таблиц, колонок, constraints, indexes, views и triggers. PostgreSQL дополнительно выгружает sequences и comments. Сохраняются identity/generated/computed columns, составные ключи и свойства поддерживаемых индексов.
+- Экспортёры проверяют поддерживаемые свойства и прекращают выгрузку при неполных метаданных. SQL Server требует VIEW DEFINITION на базу. Данные и существующие SQL-файлы при ошибке не меняются.
+- PostgreSQL использует read-only snapshot; оба экспортёра работают в отдельных JDBC-сессиях, сохраняя открытые транзакции SQL-консолей даже при Single session mode.
+- Локальные JOIN-подсказки читают ALTER TABLE ADD PRIMARY/FOREIGN KEY из отдельных файлов. Учтены именованные NOT NULL PostgreSQL 18, clustered keys SQL Server и computed columns.
+- В release pipeline добавлен экспорт → восстановление в пустую базу → повторный экспорт на PostgreSQL 14/18 и SQL Server 2019/2022, включая реальные JDBC-драйверы и проверку сохранности SQL-транзакций.
+
+DDL mapping не заменяет backup или генератор миграций: owners/grants, routines, пользовательские типы и внешние зависимости не копируются. Partitioned/temporal/RLS и другие специальные свойства пока останавливают выгрузку. SQL Server sequences, extended properties и пользовательская статистика не экспортируются. Применение SQL остаётся ручным; GO — разделитель batches, а сложные SQL Server triggers применяются через нативный клиент. Подробные границы поддержки указаны в README.
+
 ## 0.5.0
 
 - Session templates: сохранённые шаблоны внутри подключения, отдельный выбор для SQL-консолей и интроспекции. Переопределяются authentication, read-only, Auto commit, startup script и JDBC driver version/class/JAR. Секреты шифруются, разные шаблоны используют отдельные физические соединения даже при Single session mode.
