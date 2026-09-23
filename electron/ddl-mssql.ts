@@ -111,7 +111,11 @@ export async function readMssqlDdl(mapping: DdlMapping, query: CatalogQuery) {
     if (included.length) sql += ` INCLUDE (${included.map(item=>q(text(item,'name'))).join(', ')})`;
     if (flag(index,'has_filter')) sql += ` WHERE ${text(index,'filter')}`;
     const on = (key: string) => flag(index,key) ? 'ON' : 'OFF';
-    sql += ` WITH (PAD_INDEX = ${on('padded')}, FILLFACTOR = ${number(index,'fill_factor')}, IGNORE_DUP_KEY = ${on('ignore_dup_key')}, STATISTICS_NORECOMPUTE = ${on('no_recompute')}, ALLOW_ROW_LOCKS = ${on('allow_row_locks')}, ALLOW_PAGE_LOCKS = ${on('allow_page_locks')}, OPTIMIZE_FOR_SEQUENTIAL_KEY = ${on('sequential')}, DATA_COMPRESSION = ${compression(tableId,id)}) ON ${space(number(index,'space'))}`;
+    const fillFactor = number(index,'fill_factor');
+    if (fillFactor < 0 || fillFactor > 100) unsupported(text(index,'name'),'fill factor');
+    // Catalog zero means the server default; CREATE TABLE constraints accept 1–100 only.
+    const fillOption = fillFactor === 0 ? '' : `FILLFACTOR = ${fillFactor}, `;
+    sql += ` WITH (PAD_INDEX = ${on('padded')}, ${fillOption}IGNORE_DUP_KEY = ${on('ignore_dup_key')}, STATISTICS_NORECOMPUTE = ${on('no_recompute')}, ALLOW_ROW_LOCKS = ${on('allow_row_locks')}, ALLOW_PAGE_LOCKS = ${on('allow_page_locks')}, OPTIMIZE_FOR_SEQUENTIAL_KEY = ${on('sequential')}, DATA_COMPRESSION = ${compression(tableId,id)}) ON ${space(number(index,'space'))}`;
     return sql;
   }
   for (const table of tables) {
