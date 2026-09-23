@@ -61,19 +61,23 @@ def extract_java(artifact, destination):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--platform', choices=['mac-arm64', 'windows-x64'], required=True)
+    parser.add_argument('--platform', choices=['mac-arm64', 'windows-x64'])
+    parser.add_argument('--jars-only', action='store_true', help='Prepare only JDBC artifacts for server integration tests with JAVA_HOME')
     parser.add_argument('--compiler', action='store_true', help='Download the pinned macOS ARM64 JDK for local builds')
     args = parser.parse_args()
+    if bool(args.platform) == args.jars_only:
+        parser.error('Select --platform or --jars-only.')
     manifest = json.loads((ROOT / 'build/runtime-lock.json').read_text())
     common = ROOT / 'runtime/common'
     common.mkdir(parents=True, exist_ok=True)
     for artifact in manifest['jars']:
         shutil.copy2(download(artifact), common / artifact['name'])
-    extract_java(manifest['java'][args.platform], ROOT / 'runtime' / args.platform)
+    if args.platform:
+        extract_java(manifest['java'][args.platform], ROOT / 'runtime' / args.platform)
     if args.compiler:
         extract_java(manifest['java']['compiler-mac-arm64'], ROOT / 'runtime/compiler')
     shutil.copy2(ROOT / 'build/runtime-lock.json', common / 'runtime-lock.json')
-    print('Runtime ready:', args.platform, flush=True)
+    print('Runtime ready:', args.platform or 'JDBC jars', flush=True)
 
 
 if __name__ == '__main__':

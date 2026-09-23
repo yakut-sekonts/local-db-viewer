@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
-import { writeFile, mkdir } from 'node:fs/promises';
+import { writeFile, mkdir, symlink } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
 import { Client } from 'pg';
 import { Connection as TdsConnection, Request } from 'tedious';
-import { readDdl } from '../electron/ddl-reader';
+import { ddlConnection, readDdl } from '../electron/ddl-reader';
+import { SessionPool } from '../electron/session-pool';
 import { ddlIndex } from '../src/ddl-index';
 import type { MetadataResult, DatabaseEngine, Cell } from '../src/shared';
 import type { Connection } from '../electron/trino';
@@ -10,6 +12,11 @@ import { identifier } from '../electron/sql';
 
 // Disposable CI databases only. No developer credentials or production hosts are used.
 if (process.env.CI !== 'true' || !process.env.LDV_DDL_SERVER_TEST) throw new Error('Run against disposable PostgreSQL / SQL Server CI services.');
+const resources=resolve('test-artifacts/ddl-jdbc-runtime');
+await mkdir(resources,{recursive:true});
+await symlink(resolve('runtime/common'),join(resources,'jdbc'),'dir');
+await symlink(process.env.JAVA_HOME!,join(resources,'jre'),'dir');
+Object.defineProperty(process,'resourcesPath',{value:resources});
 const schema = `DDL ' quoted 名`, source = 'ldv_ddl_source', destination = 'ldv_ddl_restored';
 type Query = (sql: string) => Promise<MetadataResult>;
 function mapping(database: string) { return {id:'fixture',name:'fixture',profileId:'fixture',directory:'/unused',catalog:database,schema}; }
@@ -29,7 +36,7 @@ async function mssql(database: string) {
   await new Promise<void>((resolve,reject)=>{client.once('connect',error=>error?reject(error):resolve());client.once('error',reject);client.connect();});
   const query: Query = sql => new Promise((resolve,reject)=>{
     const rows: Cell[][] = [];
-    const request = new Request(sql,error=>error?reject(error):resolve({columns:[],rows,truncated:false}));
+    const request = new Request(sql,error=>error?reject(new Error(`${error.message}\nFixture SQL:\n${sql}`,{cause:error})):resolve({columns:[],rows,truncated:false}));
     request.on('row',columns=>rows.push(columns.map((column: {value: Cell})=>column.value)));
     client.execSqlBatch(request);
   });
@@ -95,6 +102,23 @@ next line'; COMMENT ON COLUMN ${s}.parent.label IS 'Unicode: 名';
     await writeFile(`test-artifacts/ddl-${engine}-before.json`,JSON.stringify(sorted(first.files),null,2));
     await writeFile(`test-artifacts/ddl-${engine}-after.json`,JSON.stringify(sorted(second.files),null,2));
     assert.deepEqual(sorted(second.files),sorted(first.files),`${engine}: export → restore → export must preserve definitions`);
+    const jdbc: Connection = {...profile(engine,source),schema:'',user:engine==='postgres'?'postgres':'sa',auth:'basic',secret:engine==='postgres'?'fixture-postgres':'Fixture-Only_4821Test',
+      endpoint:`${engine==='postgres'?'postgresql':'sqlserver'}://127.0.0.1:${engine==='postgres'?process.env.LDV_PG_PORT:process.env.LDV_MSSQL_PORT}`,jdbc:{options:{singleSession:true}}};
+    const pool=new SessionPool(async profile=>profile),consoleLease=await pool.acquire(jdbc),ddlLease=await pool.acquire(ddlConnection(jdbc));
+    try {
+      assert.notEqual(consoleLease.session,ddlLease.session);
+      const begin=await consoleLease.session.createQuery('begin').run(engine==='postgres'?'BEGIN':'BEGIN TRANSACTION');
+      assert.equal(begin.state,'FINISHED',begin.error);
+      const jdbcQuery: Query=async sql=>{
+        const result=await ddlLease.session.createQuery(crypto.randomUUID(),10000,undefined,source,'').run(sql);
+        if(result.state!=='FINISHED')throw new Error(result.error||result.state);
+        return {columns:result.columns,rows:result.rows,truncated:result.truncated};
+      };
+      const throughJdbc=await readDdl(jdbc,mapping(source),jdbcQuery);
+      assert.deepEqual(sorted(throughJdbc.files),sorted(first.files),'JDBC and native catalog readers must return identical definitions');
+      assert.equal(consoleLease.session.inTransaction,true,'DDL must leave the SQL console transaction open');
+      const rollback=await consoleLease.session.createQuery('rollback').run('ROLLBACK');assert.equal(rollback.state,'FINISHED',rollback.error);
+    } finally {await ddlLease.release();await consoleLease.release();}
     const index=ddlIndex(mapping(source),first.files,engine);
     assert.ok(index.tables.some(table=>table.name==='child'));
     assert.ok(index.relationships.some(relation=>relation.source.name==='child'&&relation.target.name==='parent'),'exported ALTER FK must supply offline JOINs');
@@ -111,7 +135,7 @@ next line'; COMMENT ON COLUMN ${s}.parent.label IS 'Unicode: 名';
       await a.query(`ALTER TABLE ${s}.child ALTER COLUMN label ADD MASKED WITH (FUNCTION='default()')`);
       await assert.rejects(readDdl(profile(engine,source),mapping(source),a.query),/masked/);
     }
-    reports.push({engine,passed:true,roundTrip:true,files:first.files.length,offlineForeignKeys:true,unsupportedRejected:true});
+    reports.push({engine,passed:true,roundTrip:true,files:first.files.length,jdbc:true,consoleTransactionPreserved:true,offlineForeignKeys:true,unsupportedRejected:true});
     console.log(`PASS: ${engine} definitions → clean database → identical definitions, offline JOINs and guards`);
   } finally {await a.close();await b.close();}
 }

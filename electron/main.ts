@@ -201,8 +201,8 @@ void app.whenReady().then(() => {
     const lease = await sessionPool.acquire(connection);
     try {
       const result = await readDdl(connection, mapping, async sql => {
-        // PostgreSQL exporter controls search_path inside its isolated read-only transaction.
-        const query = lease.session.createQuery(randomUUID(), 10000, undefined, mapping.catalog, sqlEngine(connection) === 'postgres' ? '' : mapping.schema);
+        // Catalog exporters qualify their objects and do not mutate JDBC schema/search_path.
+        const query = lease.session.createQuery(randomUUID(), 10000, undefined, mapping.catalog, ['postgres','mssql'].includes(sqlEngine(connection)) ? '' : mapping.schema);
         const timer = setTimeout(() => { void query.cancel().catch(() => {}); }, 60000);
         try {
           const result = await query.run(sql);

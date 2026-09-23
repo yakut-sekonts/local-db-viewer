@@ -56,7 +56,7 @@ export async function readMssqlDdl(mapping: DdlMapping, query: CatalogQuery) {
   }
   const columns = await read(`c.object_id AS table_id, c.name, c.column_id AS ordinal, ty.name AS type, ts.name AS type_schema,
     ty.is_user_defined AS custom_type, ty.is_assembly_type AS assembly_type, c.max_length AS length, c.precision, c.scale,
-    c.is_nullable AS nullable, c.collation_name AS collation, c.is_identity AS identity, c.is_computed AS computed,
+    c.is_nullable AS nullable, c.collation_name AS collation, c.is_identity AS [identity], c.is_computed AS computed,
     CONVERT(nvarchar(80),ic.seed_value) AS seed, CONVERT(nvarchar(80),ic.increment_value) AS increment, ic.is_not_for_replication AS identity_replication,
     cc.definition AS expression, cc.is_persisted AS persisted, dc.name AS default_name, dc.definition AS default_definition,
     c.default_object_id AS default_id, c.rule_object_id AS rule_id, c.is_sparse AS sparse, c.is_column_set AS column_set,

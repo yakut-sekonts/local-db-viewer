@@ -43,6 +43,12 @@ jobs:
       - run: npm ci
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+      - run: python scripts/prepare-runtime.py --jars-only
+      - run: npm run build:jdbc
       - run: npx tsx tests/ddl-servers.ts
         env:
           LDV_DDL_SERVER_TEST: '1'
