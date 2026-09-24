@@ -71,7 +71,7 @@ try {
   const modifier=process.platform==='darwin'?'Meta':'Control';
   await page.keyboard.press(`${modifier}+a`); await page.keyboard.insertText(original); await page.keyboard.press('Escape');
   await page.getByRole('button', { name:'Форматировать SQL', exact:true }).click();
-  const currentSQL=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('studio.tabs')).find(tab=>tab.name==='visible_view.sql')?.sql);
+  const currentSQL=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('studio.tabs')).find(tab=>tab.name==='visible_view.sql')?.sql?.replace(/\r\n/g,'\n'));
   await expect.poll(currentSQL).toContain('select\n  id,');
   expect(await currentSQL()).toContain("'UPPER;select'"); expect(await currentSQL()).toContain('[Value]');
   await page.keyboard.press(`${modifier}+z`); await expect.poll(currentSQL).toBe(original);
