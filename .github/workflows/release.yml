@@ -67,6 +67,7 @@ jobs:
             node tests/hardening-desktop.mjs
             node tests/settings-desktop.mjs
             node tests/ddl-desktop.mjs
+            node tests/completion-desktop.mjs
             node tests/update-install-mac.mjs
           else
             export LOCAL_DB_VIEWER_RESOURCES="$GITHUB_WORKSPACE/release/win-unpacked/resources"
@@ -79,6 +80,7 @@ jobs:
             node tests/hardening-desktop.mjs
             node tests/settings-desktop.mjs
             node tests/ddl-desktop.mjs
+            node tests/completion-desktop.mjs
           fi
       - uses: actions/upload-artifact@v7
         with:
