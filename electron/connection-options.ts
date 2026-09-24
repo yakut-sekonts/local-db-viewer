@@ -4,6 +4,14 @@ import type { JdbcSettings } from '../src/jdbc';
 const text = (value: unknown, maximum = 512): value is string => typeof value === 'string' && value.length <= maximum && !/[\0\r\n]/.test(value);
 const number = (value: unknown, minimum: number, maximum: number) => Number.isInteger(value) && Number(value) >= minimum && Number(value) <= maximum;
 export function validateConnectionOptions(settings: JdbcSettings): void {
+  const options = settings.options;
+  if (options?.switchSchema !== undefined && !['automatic','manual','disabled'].includes(options.switchSchema)) throw new Error('Неизвестный режим Switch schema.');
+  if (options?.loadSources !== undefined && !['all','user','none'].includes(options.loadSources)) throw new Error('Неизвестный режим Load sources for.');
+  if (options?.preIntrospectedObjects !== undefined && typeof options.preIntrospectedObjects !== 'boolean') throw new Error('Некорректная настройка pre-introspected objects.');
+  if (options?.codeStyle !== undefined) {
+    const style = options.codeStyle;
+    if (!style || typeof style !== 'object' || Array.isArray(style) || !['upper','lower','preserve'].includes(style.keywordCase) || !number(style.indentSize, 1, 8) || typeof style.useTabs !== 'boolean') throw new Error('Некорректный Code style.');
+  }
   for (const key of ['ssh','certificates','schemas','options'] as const) if (settings[key] !== undefined && (!settings[key] || typeof settings[key] !== 'object' || Array.isArray(settings[key]))) throw new Error(`Некорректные настройки ${key}.`);
   const ssh = settings.ssh;
   if (ssh) {
@@ -37,7 +45,6 @@ export function validateConnectionOptions(settings: JdbcSettings): void {
     if (!['all','selected'].includes(schemas.mode) || !Array.isArray(schemas.selected) || schemas.selected.length > 5000 || schemas.selected.some(item => !item || !text(item.catalog) || !text(item.schema))) throw new Error('Некорректный выбор schemas.');
     for (const pattern of [schemas.includePattern, schemas.excludePattern, schemas.objectInclude, schemas.objectExclude]) if (pattern !== undefined && (typeof pattern !== 'string' || pattern.length > 16000 || pattern.includes('\0') || pattern.split('\n').length > 32 || pattern.split('\n').some(line => line.length > 512))) throw new Error('Фильтр: до 32 patterns по 512 символов.');
   }
-  const options = settings.options;
   if (options) {
     for (const field of ['singleSession','autoSync','trackSchemaChanges','loadSystemSchemas'] as const) if (options[field] !== undefined && typeof options[field] !== 'boolean') throw new Error(`Некорректная настройка ${field}.`);
     for (const field of ['keepAliveSeconds','autoDisconnectSeconds'] as const) if (options[field] !== undefined && (!number(options[field], 0, 86400) || Number(options[field]) > 0 && Number(options[field]) < 5)) throw new Error(`${field}: 0 (отключено) либо от 5 до 86400 секунд.`);

@@ -1,6 +1,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import * as monaco from 'monaco-editor';
 import EditorWorker from 'monaco-editor/editor/editor.worker.js?worker';
+import FormatWorker from './format-worker?worker';
+import { defaultCodeStyle, generatedStyle, type CodeStyle } from './codeStyle';
 import { completeSQL } from './completion';
 import type { DatabaseEngine, SchemaIndex } from './shared';
 
@@ -17,20 +19,45 @@ monaco.editor.defineTheme('studio', {
   colors: { 'editor.background': '#1E1F22', 'editor.foreground': '#BCBEC4', 'editorLineNumber.foreground': '#606366', 'editorLineNumber.activeForeground': '#A4A7AD', 'editor.lineHighlightBackground': '#26282E', 'editor.selectionBackground': '#214283', 'editorCursor.foreground': '#BBBBBB', 'editorIndentGuide.background1': '#313438', 'editorWidget.background': '#2B2D30' },
 });
 
-export interface EditorHandle { selection(): string; focus(): void }
-interface Props { value: string; onChange(value: string): void; onRun(sql: string): void; engine: DatabaseEngine; getSchema(sql: string, offset: number): Promise<SchemaIndex | undefined> }
-export const SqlEditor = forwardRef<EditorHandle, Props>(function SqlEditor({ value, onChange, onRun, engine, getSchema }, ref) {
+export interface EditorHandle { selection(): string; focus(): void; format(): Promise<void> }
+interface Props { value: string; onChange(value: string): void; onRun(sql: string): void; onError(message: string): void; engine: DatabaseEngine; driverId?: string; codeStyle?: CodeStyle; getSchema(sql: string, offset: number): Promise<SchemaIndex | undefined> }
+export const SqlEditor = forwardRef<EditorHandle, Props>(function SqlEditor({ value, onChange, onRun, onError, engine, driverId, codeStyle = defaultCodeStyle, getSchema }, ref) {
   const container = useRef<HTMLDivElement>(null);
   const editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
-  const callbacks = useRef({ onChange, onRun, engine, getSchema });
-  callbacks.current = { onChange, onRun, engine, getSchema };
+  const callbacks = useRef({ onChange, onRun, onError, engine, driverId, codeStyle, getSchema });
+  callbacks.current = { onChange, onRun, onError, engine, driverId, codeStyle, getSchema };
+  const formatting = useRef<(() => void) | undefined>(undefined);
+  async function formatEditor() {
+    const instance = editor.current, model = instance?.getModel();
+    if (!instance || !model || formatting.current) return;
+    const version = model.getVersionId(), selection = instance.getSelection();
+    const range = selection && !selection.isEmpty() ? selection : model.getFullModelRange();
+    const worker = new FormatWorker();
+    const finish = () => { clearTimeout(timeout); worker.terminate(); formatting.current = undefined; };
+    const timeout = setTimeout(() => { finish(); callbacks.current.onError('Форматирование превысило 3 секунды. SQL не изменён.'); }, 3000);
+    formatting.current = finish;
+    worker.onerror = () => { finish(); callbacks.current.onError('Ошибка форматирования. SQL не изменён.'); };
+    worker.onmessage = ({ data }) => {
+      finish();
+      if (model.isDisposed() || editor.current !== instance) return;
+      if (data.error) { callbacks.current.onError(data.error); return; }
+      if (version !== model.getVersionId()) { callbacks.current.onError('SQL изменился во время форматирования. Повторите действие.'); return; }
+      instance.pushUndoStop(); instance.executeEdits('format-sql', [{ range, text: data.value }]); instance.pushUndoStop(); instance.focus();
+    };
+    const { engine, driverId, codeStyle } = callbacks.current;
+    worker.postMessage({ sql: model.getValueInRange(range), engine, driverId, style: codeStyle });
+  }
   useImperativeHandle(ref, () => ({
     selection: () => {
       const selected = editor.current?.getSelection();
       return (selected && editor.current?.getModel()?.getValueInRange(selected)) || editor.current?.getValue() || '';
     },
     focus: () => editor.current?.focus(),
+    format: formatEditor,
   }));
+  useEffect(() => {
+    editor.current?.getModel()?.updateOptions({ tabSize: codeStyle.indentSize, indentSize: codeStyle.indentSize, insertSpaces: !codeStyle.useTabs });
+  }, [codeStyle]);
   useEffect(() => {
     const instance = monaco.editor.create(container.current!, {
       value, language: 'sql', theme: 'studio', fontSize: 13, lineHeight: 22,
@@ -51,6 +78,8 @@ export const SqlEditor = forwardRef<EditorHandle, Props>(function SqlEditor({ va
         callbacks.current.onRun((selection && instance.getModel()?.getValueInRange(selection)) || instance.getValue());
       },
     });
+    const formatAction = instance.addAction({ id: 'studio.format', label: 'Форматировать SQL', keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyL], run: formatEditor });
+    instance.getModel()?.updateOptions({ tabSize: codeStyle.indentSize, indentSize: codeStyle.indentSize, insertSpaces: !codeStyle.useTabs });
     const completion = monaco.languages.registerCompletionItemProvider('sql', {
       triggerCharacters: ['.', ' '],
       async provideCompletionItems(model, position, _context, token) {
@@ -64,12 +93,13 @@ export const SqlEditor = forwardRef<EditorHandle, Props>(function SqlEditor({ va
         const kinds = { column: monaco.languages.CompletionItemKind.Field, table: monaco.languages.CompletionItemKind.Class, join: monaco.languages.CompletionItemKind.Reference, keyword: monaco.languages.CompletionItemKind.Keyword };
         return { suggestions: completeSQL(sql, offset, index, engine).map(item => {
           const start = model.getPositionAt(item.start); const end = model.getPositionAt(item.end);
-          return { label: item.label, insertText: item.insertText, detail: item.detail, documentation: item.insertText, kind: kinds[item.kind], filterText: item.filterText,
+          const insertText = item.kind === 'keyword' || item.kind === 'join' ? generatedStyle(item.insertText, engine, callbacks.current.codeStyle) : item.insertText;
+          return { label: item.label, insertText, detail: item.detail, documentation: insertText, kind: kinds[item.kind], filterText: item.filterText,
             sortText: `${item.rank}:${item.label}`, range: new monaco.Range(start.lineNumber, start.column, end.lineNumber, end.column) };
         }) };
       },
     });
-    return () => { completion.dispose(); change.dispose(); action.dispose(); instance.getModel()?.dispose(); instance.dispose(); editor.current = null; };
+    return () => { formatting.current?.(); formatAction.dispose(); completion.dispose(); change.dispose(); action.dispose(); instance.getModel()?.dispose(); instance.dispose(); editor.current = null; };
   }, []);
   return <div className="sql-editor" ref={container} />;
 });

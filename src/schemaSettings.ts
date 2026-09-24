@@ -31,5 +31,5 @@ export function filterSchema(index: SchemaIndex, settings?: SchemaSettings): Sch
   return { ...index, tables, relationships: index.relationships.filter(relation => objectAllowed(settings, relation.source) && objectAllowed(settings, relation.target)) };
 }
 export function isSystemSchema(catalog: string, schema: string): boolean {
-  return /^(information_schema|pg_catalog|pg_toast(?:_temp_\d+)?|sys|INFORMATION_SCHEMA|SYS|SYSTEM)$/.test(schema) || catalog === 'system';
+  return /^(information_schema|performance_schema|mysql|pg_catalog|pg_toast(?:_temp_\d+)?|pg_temp_\d+|sys|system)$/i.test(schema) || /^(information_schema|performance_schema|mysql|system)$/i.test(catalog);
 }

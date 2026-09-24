@@ -7,6 +7,7 @@ import { existsSync } from 'node:fs';
 import { DatabaseSession, type QueryTask } from './database';
 import { SessionPool, type SessionLease } from './session-pool';
 import { sessionTemplate } from './session-template';
+import { SourceCache, readObjectSources, shouldLoadSources, supportsObjectSources } from './object-sources';
 import { DdlStore } from './ddl-store';
 import { ddlConnection, readDdl } from './ddl-reader';
 import { ddlIndex } from '../src/ddl-index';
@@ -43,6 +44,7 @@ const useLegacyStorage = !explicitDataDirectory && !existsSync(newDirectory) && 
 app.setName(useLegacyStorage ? legacyName : productName);
 app.setPath('userData', explicitDataDirectory || (useLegacyStorage ? legacyDirectory : newDirectory));
 const sessions = new Map<string, SessionLease>();
+const sourceCache = new SourceCache();
 const sessionPool = new SessionPool(prepareDriver);
 const active = new Map<string, { query: QueryTask; sessionId: string; done: Promise<unknown> }>();
 let window: BrowserWindow;
@@ -108,7 +110,7 @@ function handle(name: string, fn: (...args: any[]) => unknown): void {
     if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || event.senderFrame.url !== pathToFileURL(entry).href) {
       throw new Error('Недоверенный IPC sender.');
     }
-    const databaseOperation = ['ddl:preview', 'ddl:write-preview', 'ddl:write-file', 'query:run', 'profiles:test', 'metadata', 'schema:load', 'jdbc:properties', 'jdbc:preview', 'jdbc:browse', 'ssh:fingerprint', 'drivers:install', 'drivers:import', 'drivers:select'].includes(name);
+    const databaseOperation = ['sources:load', 'ddl:preview', 'ddl:write-preview', 'ddl:write-file', 'query:run', 'profiles:test', 'metadata', 'schema:load', 'jdbc:properties', 'jdbc:preview', 'jdbc:browse', 'ssh:fingerprint', 'drivers:install', 'drivers:import', 'drivers:select'].includes(name);
     if (!databaseOperation) return fn(...args);
     if (installingUpdate) throw new Error('Приложение обновляется.');
     pendingDatabaseOperations++;
@@ -222,12 +224,13 @@ void app.whenReady().then(() => {
   handle('profiles:save', async (draft: ProfileDraft) => {
     validateDraft(draft);
     if (draft.id && sessionPool.hasProfile(draft.id)) throw new Error('Отключите консоли и дождитесь загрузки метаданных перед изменением подключения.');
-    return profiles.save(draft);
+    const saved = await profiles.save(draft); sourceCache.clear(saved.id); return saved;
   });
   handle('profiles:remove', async (id: string) => {
     string(id, 'id');
     for (const [sessionId, entry] of sessions) if (entry.profileId === id) await release(sessionId);
     await profiles.remove(id);
+    sourceCache.clear(id);
   });
   handle('profiles:test', async (draft: ProfileDraft) => {
     if (installingUpdate) throw new Error('Приложение обновляется.');
@@ -257,6 +260,8 @@ void app.whenReady().then(() => {
     }
     if ([...active.values()].some(job => job.sessionId === input.sessionId)) throw new Error('В этой консоли уже выполняется запрос.');
     if (input.templateId !== undefined) string(input.templateId, 'templateId', 100);
+    if (input.applyContext !== undefined && typeof input.applyContext !== 'boolean') throw new Error('Некорректный выбор schema.');
+    if (input.searchPath !== undefined) string(input.searchPath, 'searchPath', 8192);
     const connection = sessionTemplate(await profiles.get(input.profileId), 'console', input.templateId);
     if (installingUpdate) throw new Error('Приложение обновляется.');
     if ([...active.values()].some(job => job.sessionId === input.sessionId)) throw new Error('В этой консоли уже выполняется запрос.');
@@ -271,7 +276,7 @@ void app.whenReady().then(() => {
     sessions.set(input.sessionId, lease);
     const query = session.createQuery(input.requestId, input.maxRows, result => {
       if (!window.isDestroyed()) window.webContents.send('query:update', result);
-    }, input.catalog, input.schema);
+    }, input.catalog, input.schema, { apply: connection.jdbc?.options?.switchSchema !== 'disabled' && (connection.jdbc?.options?.switchSchema !== 'manual' || input.applyContext === true), searchPath: input.searchPath });
     const done = query.run(input.sql).finally(() => active.delete(input.requestId));
     active.set(input.requestId, { query, sessionId: input.sessionId, done });
     void done.catch(() => {});
@@ -305,6 +310,27 @@ void app.whenReady().then(() => {
         } finally { clearTimeout(timeout); active.delete(id); }
       }, await relations.list(input.profileId)), connection.jdbc?.schemas);
     } finally { await lease.release(); }
+  });
+  handle('sources:load', async (input: SchemaInput & { refresh?: boolean; automatic?: boolean }) => {
+    if (!input || typeof input !== 'object') throw new Error('Некорректный запрос исходников.');
+    for (const key of ['profileId','catalog','schema'] as const) string(input[key], key);
+    for (const value of [input.refresh,input.automatic]) if (value !== undefined && typeof value !== 'boolean') throw new Error('Некорректный режим загрузки исходников.');
+    const connection = sessionTemplate(await profiles.get(input.profileId), 'introspection');
+    if (!shouldLoadSources(connection, input, input.automatic === true)) return { ...input, objects: [], warnings: [], loadedAt: Date.now(), skipped: true };
+    if (!supportsObjectSources(connection)) return { ...input, objects: [], warnings: ['Загрузка исходников пока недоступна для этого JDBC-драйвера.'], loadedAt: Date.now(), skipped: true };
+    return sourceCache.load(input, input.refresh === true, async () => {
+      const isolated = { ...connection, jdbc: connection.jdbc ? { ...connection.jdbc, options: { ...connection.jdbc.options, singleSession: false, autoCommit: true, keepAliveSeconds: 0, autoDisconnectSeconds: 0 } } : undefined };
+      const lease = await sessionPool.acquire(isolated);
+      try { return await readObjectSources(connection, input, async sql => {
+        const query = lease.session.createQuery(randomUUID(), 1000);
+        const timer = setTimeout(() => { void query.cancel().catch(() => {}); }, 30000);
+        try {
+          const result = await query.run(sql);
+          if (result.state !== 'FINISHED') throw new Error(result.error || 'Загрузка исходников отменена.');
+          return { columns: result.columns, rows: result.rows, truncated: result.truncated };
+        } finally { clearTimeout(timer); }
+      }); } finally { await lease.release(); }
+    });
   });
   handle('schema:save-relation', async (profileId: string, relation: Relationship) => {
     string(profileId, 'profileId');

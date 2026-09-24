@@ -55,8 +55,12 @@ export interface QuerySnapshot {
   catalog?: string;
   schema?: string;
   inTransaction: boolean;
+  searchPath?: string;
+  contextApplied?: boolean;
 }
 export interface QueryInput {
+  applyContext?: boolean;
+  searchPath?: string;
   ddlMappingId?: string;
   templateId?: string;
   requestId: string;
@@ -76,7 +80,7 @@ export interface MetadataInput {
 }
 export interface MetadataResult { columns: Column[]; rows: Cell[][]; truncated: boolean }
 export interface TableRef { catalog: string; schema: string; name: string }
-export interface TableMeta extends TableRef { columns: Column[] }
+export interface TableMeta extends TableRef { columns: Column[]; metadataSource?: 'bundled' }
 export interface Relationship {
   id: string;
   name: string;
@@ -89,6 +93,7 @@ export interface SchemaInput { profileId: string; catalog: string; schema: strin
 export interface JdbcDialect { quote: string; catalogs: boolean; schemas: boolean; catalogAtStart: boolean; catalogSeparator: string; unquotedCase: 'lower' | 'upper' | 'preserve'; fullOuterJoins: boolean }
 export interface SchemaIndex extends SchemaInput { dialect?: JdbcDialect; tables: TableMeta[]; relationships: Relationship[]; warnings: string[] }
 export interface DesktopAPI {
+  sources: import('./sources').SourcesAPI;
   ddl: import('./ddl').DdlAPI;
   jdbc: { properties(profile: ProfileDraft): Promise<import('./jdbc').JdbcProperty[]>; preview(input: MetadataInput): Promise<string>; browse(profile: ProfileDraft, input: Omit<MetadataInput, 'profileId'>): Promise<MetadataResult> };
   ssh: { fingerprint(host: string, port: number): Promise<string> };

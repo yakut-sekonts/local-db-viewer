@@ -173,10 +173,23 @@ public final class LocalDBViewerBridge {
             Connection active = connect();
             if (CANCELED.get()) throw new CancellationException("Query canceled");
             String catalog = string(request, "catalog", ""), schema = string(request, "schema", "");
-            if (!catalog.isEmpty() && !Objects.equals(JdbcMetadata.catalog(active), catalog)) active.setCatalog(catalog);
-            if (!schema.isEmpty() && !Objects.equals(JdbcMetadata.schema(active), schema)) active.setSchema(schema);
             String sql = request.get("sql").getAsString();
             String command = string(request, "transactionAction", "");
+            boolean postgres = string(config, "driverId", "").equals("postgres") || string(config, "engine", "").equals("postgres");
+            // ROLLBACK must remain usable even if the current transaction is aborted
+            // or another shared console remembers a different schema.
+            if (bool(request, "applyContext", true) && !command.startsWith("commit") && !command.startsWith("rollback")) {
+                String path = string(request, "searchPath", "");
+                boolean usePath = postgres && request.has("searchPath") && !request.get("searchPath").isJsonNull();
+                boolean changeCatalog = !catalog.isEmpty() && !Objects.equals(JdbcMetadata.catalog(active), catalog);
+                boolean changePath = usePath && !path.equals(searchPath(active));
+                boolean changeSchema = !usePath && !schema.isEmpty() && !Objects.equals(JdbcMetadata.schema(active), schema);
+                if (explicitTransaction && (changeCatalog || changePath || changeSchema)) throw new SQLException("Завершите транзакцию перед переключением catalog/schema.");
+                if (changeCatalog) active.setCatalog(catalog);
+                if (changePath) try (PreparedStatement statement = active.prepareStatement("SELECT pg_catalog.set_config('search_path', ?, false)")) { statement.setString(1, path); postgresContextQuery(statement); }
+                else if (changeSchema) active.setSchema(schema);
+                snapshot.addProperty("contextApplied", true);
+            }
             boolean mysqlStreaming = string(config, "driverClass", "").startsWith("com.mysql.");
             try (Statement statement = mysqlStreaming ? active.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY) : active.createStatement()) {
                 runningStatement = statement;
@@ -223,7 +236,8 @@ public final class LocalDBViewerBridge {
             try {
                 String catalogValue = JdbcMetadata.catalog(active), schemaValue = JdbcMetadata.schema(active);
                 if (!catalogValue.isEmpty()) snapshot.addProperty("catalog", catalogValue);
-                if (!schemaValue.isEmpty()) snapshot.addProperty("schema", schemaValue);
+                if (postgres || !schemaValue.isEmpty()) snapshot.addProperty("schema", schemaValue);
+                if (postgres) snapshot.addProperty("searchPath", searchPath(active));
             } catch (SQLException unsupported) { warnings.add("Не удалось получить текущие catalog/schema: " + error(unsupported)); }
         } catch (Throwable failure) {
             snapshot.addProperty("state", CANCELED.get() || failure instanceof CancellationException ? "CANCELED" : "FAILED");
@@ -233,6 +247,30 @@ public final class LocalDBViewerBridge {
             snapshot.getAsJsonObject("stats").addProperty("elapsedTimeMillis", (System.nanoTime() - started) / 1_000_000);
             JsonObject result = message("done"); result.add("snapshot", snapshot); send(result);
         }
+    }
+    private static String searchPath(Connection active) throws SQLException {
+        try (PreparedStatement statement = active.prepareStatement("SELECT pg_catalog.current_setting('search_path')")) {
+            postgresContextQuery(statement);
+            try (ResultSet result = statement.getResultSet()) { return result.next() ? result.getString(1) : ""; }
+        }
+    }
+    private static void postgresContextQuery(PreparedStatement statement) throws SQLException {
+        // Like pgjdbc's getSchema(), context bookkeeping must not start a transaction
+        // when autoCommit=false, particularly just after COMMIT/ROLLBACK. Load the
+        // driver's public interface through its isolated, version-specific loader.
+        runningStatement = statement;
+        try {
+            if (CANCELED.get()) throw new CancellationException("Query canceled");
+            statement.setQueryTimeout(30);
+            ClassLoader loader = statement.getClass().getClassLoader();
+            int flags = Class.forName("org.postgresql.core.QueryExecutor", true, loader).getField("QUERY_SUPPRESS_BEGIN").getInt(null);
+            Class.forName("org.postgresql.core.BaseStatement", true, loader).getMethod("executeWithFlags", int.class).invoke(statement, flags);
+        } catch (java.lang.reflect.InvocationTargetException failure) {
+            if (failure.getCause() instanceof SQLException sql) throw sql;
+            throw new SQLException("PostgreSQL context query failed", failure.getCause());
+        } catch (ReflectiveOperationException failure) {
+            throw new SQLFeatureNotSupportedException("Этот PostgreSQL JDBC-драйвер не поддерживает безопасное чтение search_path.", failure);
+        } finally { runningStatement = null; }
     }
     private static void describe() {
         JsonObject result = message("properties");

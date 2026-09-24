@@ -69,7 +69,7 @@ export class DatabaseSession {
     }
     this.cancelResolve?.reject(error); this.cancelResolve = undefined;
   }
-  createQuery(requestId: string, maxRows = 1000, notify: (result: QuerySnapshot) => void = () => {}, catalog = '', schema = ''): QueryTask {
+  createQuery(requestId: string, maxRows = 1000, notify: (result: QuerySnapshot) => void = () => {}, catalog = '', schema = '', context?: { apply: boolean; searchPath?: string }): QueryTask {
     let task: QueryTask | undefined, canceled = false;
     return {
       run: sql => this.enqueue(async () => {
@@ -78,7 +78,7 @@ export class DatabaseSession {
           notify(result); return result;
         }
         try {
-          task = this.directQuery(requestId, maxRows, result => { this.inTransaction = result.inTransaction; notify(result); }, catalog, schema);
+          task = this.directQuery(requestId, maxRows, result => { this.inTransaction = result.inTransaction; notify(result); }, catalog, schema, context);
           return await task.run(sql);
         } catch (error) {
           const result: QuerySnapshot = { requestId, queryId: '', state: 'FAILED', error: (error as Error).message, columns: [], rows: [], totalRows: 0, truncated: false, stats: {}, warnings: [], inTransaction: this.inTransaction };
@@ -107,10 +107,10 @@ export class DatabaseSession {
       try { worker.postMessage({ ...request, requestId }); } catch (error) { failure(error as Error); }
     });
   }
-  private directQuery(requestId: string, maxRows = 1000, notify: (result: QuerySnapshot) => void = () => {}, catalog = '', schema = ''): QueryTask {
+  private directQuery(requestId: string, maxRows = 1000, notify: (result: QuerySnapshot) => void = () => {}, catalog = '', schema = '', context?: { apply: boolean; searchPath?: string }): QueryTask {
     if (!Number.isInteger(maxRows) || maxRows < 1 || maxRows > 10000) throw new Error('Лимит строк должен быть от 1 до 10000.');
     if (this.connection.engine === 'trino' && !this.connection.jdbc) {
-      this.trino.catalog = catalog; this.trino.schema = schema;
+      if (context?.apply !== false) { this.trino.catalog = catalog; this.trino.schema = schema; }
       const task = new TrinoQuery(this.connection, this.trino, requestId, maxRows, notify);
       return { run: sql => task.run(singleStatement(sql, sqlEngine(this.connection))), cancel: () => task.cancel() };
     }
@@ -121,7 +121,7 @@ export class DatabaseSession {
         const worker = this.ensureWorker();
         return new Promise(resolve => {
           this.current = { requestId, resolve, notify, latest: { requestId, queryId: '', state: 'RUNNING', columns: [], rows: [], totalRows: 0, truncated: false, stats: {}, warnings: [], inTransaction: false, catalog, schema } };
-          try { worker.postMessage({ kind: 'run', requestId, sql: statement, transactionAction: transactionAction(statement), maxRows, catalog, schema }); }
+          try { worker.postMessage({ kind: 'run', requestId, sql: statement, transactionAction: transactionAction(statement), maxRows, catalog: context?.apply === false && !this.connection.jdbc ? '' : catalog, schema: context?.apply === false && !this.connection.jdbc ? '' : schema, applyContext: context?.apply ?? true, searchPath: context?.searchPath }); }
           catch (error) { this.fail(error instanceof Error ? error : new Error(String(error))); }
         });
       },

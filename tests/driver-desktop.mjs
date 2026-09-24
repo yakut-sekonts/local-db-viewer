@@ -34,15 +34,15 @@ try {
       return request;
     };
   }, { fixtures, root: resolve('.runtime-cache/maven/repository') });
-  async function query(profileId, sessionId, sql) {
-    return page.evaluate(async ({ profileId, sessionId, sql }) => {
+  async function query(profileId, sessionId, sql, context = {}) {
+    return page.evaluate(async ({ profileId, sessionId, sql, context }) => {
       const requestId = crypto.randomUUID();
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => { off(); reject(new Error('Query timed out')); }, 30000);
         const off = window.studio.query.onUpdate(value => { if (value.requestId === requestId && value.state !== 'RUNNING') { clearTimeout(timer); off(); value.state === 'FINISHED' ? resolve(value) : reject(new Error(value.error)); } });
-        window.studio.query.run({ requestId, sessionId, profileId, sql, catalog: '', schema: '', maxRows: 100 }).catch(error => { clearTimeout(timer); off(); reject(error); });
+        window.studio.query.run({ requestId, sessionId, profileId, sql, catalog: '', schema: '', maxRows: 100, ...context }).catch(error => { clearTimeout(timer); off(); reject(error); });
       });
-    }, { profileId, sessionId, sql });
+    }, { profileId, sessionId, sql, context });
   }
   const draft = { name: 'H2 versions', engine: 'jdbc', endpoint: 'jdbc:h2:mem:version_fixture', user: 'sa', auth: 'none', tls: false, catalog: '', schema: '', jdbc: { driverId: 'h2', productId: 'h2' } };
   const profile = await page.evaluate(draft => window.studio.profiles.save(draft), draft);
@@ -101,6 +101,25 @@ try {
   expect(index.relationships.find(relation => relation.name === 'FK_PARENT').columns).toEqual([{source:'TENANT',target:'TENANT'},{source:'ID',target:'ID'}]);
   const columns = await page.evaluate(input => window.studio.metadata(input), { profileId: h2.id, kind: 'columns', catalog: index.catalog, schema: index.schema, table: 'under_score' });
   expect(columns.rows.map(row => row[0])).toEqual(['EXPECTED']);
+  for (const sql of ['CREATE SCHEMA ALTERNATE', 'CREATE VIEW PUBLIC.V_SOURCE AS SELECT 42 AS ANSWER']) await query(h2.id,'context-setup',sql);
+  await page.evaluate(()=>window.studio.query.release('context-setup'));
+  for (const mode of ['automatic','manual','disabled']) {
+    const contextProfile=await page.evaluate(draft=>window.studio.profiles.save(draft),{...h2,id:undefined,name:`Context ${mode}`,jdbc:{...h2.jdbc,options:{switchSchema:mode,singleSession:true,autoSync:false,loadSources:'none'}}});
+    const id=`context-${mode}`;
+    const change=await query(contextProfile.id,id,'SET SCHEMA ALTERNATE'); expect(change.schema).toBe('ALTERNATE');
+    const remembered=await query(contextProfile.id,id,'SELECT CURRENT_SCHEMA()',{schema:'PUBLIC'});
+    expect(remembered.schema).toBe(mode==='automatic'?'PUBLIC':'ALTERNATE');
+    const explicit=await query(contextProfile.id,id,'SELECT CURRENT_SCHEMA()',{schema:'PUBLIC',applyContext:true});
+    expect(explicit.schema).toBe(mode==='disabled'?'ALTERNATE':'PUBLIC');
+    await query(contextProfile.id,id,'BEGIN');
+    const sources=await page.evaluate(profileId=>window.studio.sources.load({profileId,catalog:'METADATA',schema:'PUBLIC',refresh:true}),contextProfile.id);
+    expect(sources.objects.find(object=>object.name==='V_SOURCE').sql).toContain('42');
+    expect((await query(contextProfile.id,id,'SELECT 1')).inTransaction).toBe(true);
+    if(mode!=='disabled') await expect(query(contextProfile.id,id,'SELECT 1',{schema:'ALTERNATE',applyContext:true})).rejects.toThrow('транзакцию');
+    await query(contextProfile.id,id,'ROLLBACK');
+    await page.evaluate(id=>window.studio.query.release(id),id);
+  }
+  console.log('PASS: Automatic/Manual/Disable through real JDBC and IPC; isolated source reads preserve active transactions');
   const preview = await page.evaluate(input => window.studio.jdbc.preview(input), { profileId: h2.id, kind: 'columns', catalog: index.catalog, schema: index.schema, table: 'CHILDREN' });
   expect((await query(h2.id, 'preview', preview)).rows).toEqual([['1','2','Готово 🌍']]);
   await page.evaluate(() => window.studio.query.release('preview'));
@@ -158,6 +177,6 @@ try {
   await page.screenshot({ path: 'test-artifacts/iceberg-recovery.png' });
   expect(errors).toEqual([]);
   console.log('PASS: Hive/Iceberg metadata error, explicit catalog selection, corrected columns and preview; no silent substitution');
-  await writeFile('test-artifacts/driver-desktop-results.json', JSON.stringify({ passed: true, platform: process.platform, arch: await app.evaluate(() => process.arch), versions: [old.version, fixtures.h2.version], checks: ['updates','session-isolation','rollback','H2-metadata','composite-FK','DuckDB','Iceberg-routing'] }, null, 2));
+  await writeFile('test-artifacts/driver-desktop-results.json', JSON.stringify({ passed: true, platform: process.platform, arch: await app.evaluate(() => process.arch), versions: [old.version, fixtures.h2.version], checks: ['updates','session-isolation','rollback','H2-metadata','composite-FK','DuckDB','Iceberg-routing','schema-switch-modes','source-session-isolation'] }, null, 2));
 } catch (error) { await page.screenshot({ path: 'test-artifacts/driver-failure.png' }).catch(() => {}); throw error; }
 finally { server?.close(); try { await app.close(); } finally { h2Server?.kill(); } }

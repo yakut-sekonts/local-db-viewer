@@ -106,7 +106,7 @@ export function completeSQL(sql: string, offset: number, index: SchemaIndex, eng
   const joinContext = isKeyword(last, 'JOIN');
   if (ctx.qualifier.length && !tableContext) {
     const matches = refs.filter(ref => ctx.qualifier.length === 1 ? nameMatches(ctx.qualifier[0], ref.alias, engine) : !ref.explicitAlias && !!ref.physical && resolveTable(ctx.qualifier, index, engine, []) === ref.physical);
-    for (const ref of matches.length === 1 ? matches : []) for (const column of columns(ref)) add(column.name, q(column.name), `${ref.alias} · ${column.type}`, 'column', 0);
+    for (const ref of matches.length === 1 ? matches : []) for (const column of columns(ref)) add(column.name, q(column.name), `${ref.alias} · ${column.type}${ref.table.metadataSource === 'bundled' ? ' · встроенный справочник' : ''}`, 'column', 0);
     return suggestions;
   }
   if (tableContext) {
@@ -115,7 +115,7 @@ export function completeSQL(sql: string, offset: number, index: SchemaIndex, eng
       const matches = !parts.length ? ctes.includes(table) || table.catalog === index.catalog && table.schema === index.schema && !ctes.some(cte => nameKey(cte.name) === nameKey(table.name))
         : !ctes.includes(table) && ( parts.length === 1 ? nameMatches(parts[0], catalogOnly(engine, index.dialect) ? table.catalog : table.schema, engine)
         : nameMatches(parts[0], table.catalog, engine) && nameMatches(parts[1], table.schema, engine));
-      if (matches) add(table.name, ctes.includes(table) || parts.length ? q(table.name) : tablePath(table, engine, index.dialect), ctes.includes(table) ? 'CTE' : `${table.catalog}.${table.schema} · ${table.columns.length} columns`, 'table', 1);
+      if (matches) add(table.name, ctes.includes(table) || parts.length ? q(table.name) : tablePath(table, engine, index.dialect), ctes.includes(table) ? 'CTE' : `${table.catalog}.${table.schema} · ${table.columns.length} columns${table.metadataSource === 'bundled' ? ' · встроенный справочник' : ''}`, 'table', 1);
     }
   } else {
     const counts = new Map<string, number>();
@@ -123,7 +123,7 @@ export function completeSQL(sql: string, offset: number, index: SchemaIndex, eng
     for (const ref of refs) for (const column of columns(ref)) {
       const ambiguous = (counts.get(nameKey(column.name)) ?? 0) > 1;
       const label = ambiguous ? `${ref.alias}.${column.name}` : column.name;
-      add(label, ambiguous ? `${q(ref.alias)}.${q(column.name)}` : q(column.name), `${ref.alias} · ${column.type}`, 'column', 1, `${column.name} ${label}`);
+      add(label, ambiguous ? `${q(ref.alias)}.${q(column.name)}` : q(column.name), `${ref.alias} · ${column.type}${ref.table.metadataSource === 'bundled' ? ' · встроенный справочник' : ''}`, 'column', 1, `${column.name} ${label}`);
     }
     for (const ref of refs) add(`${ref.alias}.*`, `${q(ref.alias)}.*`, `Все колонки ${ref.table.name}`, 'column', 3);
     const clause=[...ctx.before].reverse().find(token=>['SELECT','FROM','WHERE','GROUP','HAVING','ORDER','LIMIT','OFFSET','FETCH','QUALIFY','WINDOW'].some(word=>isKeyword(token,word)));

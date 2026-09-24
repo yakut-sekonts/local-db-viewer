@@ -3,6 +3,7 @@ import { writeFile, mkdir, symlink } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { Client } from 'pg';
 import { Connection as TdsConnection, Request } from 'tedious';
+import { readObjectSources } from '../electron/object-sources';
 import { ddlConnection, readDdl } from '../electron/ddl-reader';
 import { SessionPool } from '../electron/session-pool';
 import { ddlIndex } from '../src/ddl-index';
@@ -114,11 +115,52 @@ next line'; COMMENT ON COLUMN ${s}.parent.label IS 'Unicode: 名';
         if(result.state!=='FINISHED')throw new Error(result.error||result.state);
         return {columns:result.columns,rows:result.rows,truncated:result.truncated};
       };
+      const objectSources=await readObjectSources(jdbc,{profileId:jdbc.id,catalog:source,schema},jdbcQuery);
+      assert.ok(objectSources.objects.some(object=>object.name==='v'&&object.sql?.includes('SELECT')),'server view source');
+      assert.ok(objectSources.objects.some(object=>object.name==='child_trigger'&&object.sql?.includes('TRIGGER')),'server trigger source');
+      if(engine==='postgres') assert.ok(objectSources.objects.some(object=>object.name==='fixture_trigger()'&&object.sql?.includes('RETURNS trigger')),'server function source');
       const throughJdbc=await readDdl(jdbc,mapping(source),jdbcQuery);
       assert.deepEqual(sorted(throughJdbc.files),sorted(first.files),'JDBC and native catalog readers must return identical definitions');
       assert.equal(consoleLease.session.inTransaction,true,'DDL must leave the SQL console transaction open');
       const rollback=await consoleLease.session.createQuery('rollback').run('ROLLBACK');assert.equal(rollback.state,'FINISHED',rollback.error);
     } finally {await ddlLease.release();await consoleLease.release();}
+    if(engine==='postgres') {
+      const contextConnection={...jdbc,jdbc:{...jdbc.jdbc,options:{singleSession:false,autoCommit:false}}};
+      let contextLease=await pool.acquire(contextConnection);
+      const runContext=async(sql:string,apply=true,searchPath?:string)=>{
+        const result=await contextLease.session.createQuery(crypto.randomUUID(),100,undefined,source,'public',{apply,searchPath}).run(sql);
+        assert.equal(result.state,'FINISHED',result.error);return result;
+      };
+      try {
+        const path=`${s}, public, "$user"`;
+        const state=await runContext('SELECT pg_backend_pid()',true,path),pid=state.rows[0]?.[0];
+        assert.equal(state.searchPath,path); assert.equal(state.schema,schema); assert.equal(state.inTransaction,true);
+        const rejected=await contextLease.session.createQuery('context-guard',10,undefined,source,'public',{apply:true,searchPath:'public'}).run('SELECT 1');
+        assert.equal(rejected.state,'FAILED'); assert.match(rejected.error??'',/транзакцию/);
+        await runContext('COMMIT',false);
+        const checkIdle=async()=>{
+          const status=await a.query(`SELECT state,xact_start IS NULL FROM pg_catalog.pg_stat_activity WHERE pid=${Number(pid)}`);
+          assert.deepEqual(status.rows[0],['idle',true],'reading search_path must not open a transaction after COMMIT');
+        };
+        await checkIdle();
+        const failed=await contextLease.session.createQuery('aborted-query',10,undefined,source,schema,{apply:true,searchPath:path}).run('SELECT 1/0');
+        assert.equal(failed.state,'FAILED');assert.equal(failed.inTransaction,true);
+        await runContext('ROLLBACK',true,'public');
+        await checkIdle();
+        await contextLease.release();contextLease=await pool.acquire(contextConnection);
+        const restored=await runContext('SELECT current_schema()',true,state.searchPath);
+        assert.equal(restored.schema,schema);assert.equal(restored.searchPath,path);
+        await runContext('ROLLBACK',false);
+        const empty=await runContext('SELECT current_schema()',true,'');
+        assert.equal(empty.searchPath,'');assert.equal(empty.schema,'');assert.equal(empty.rows[0]?.[0],null);
+        await runContext('COMMIT',false);
+        // In Manual / Disable the remembered toolbar context must not override SET.
+        await runContext(`SET search_path TO ${s}, public`,false);
+        const manual=await runContext('SELECT current_schema()',false,'public');
+        assert.equal(manual.schema,schema);assert.equal(manual.searchPath,`${s}, public`);
+        await runContext('ROLLBACK',false);
+      } finally {await contextLease.release();}
+    }
     const index=ddlIndex(mapping(source),first.files,engine);
     assert.ok(index.tables.some(table=>table.name==='child'));
     assert.ok(index.relationships.some(relation=>relation.source.name==='child'&&relation.target.name==='parent'),'exported ALTER FK must supply offline JOINs');
@@ -135,7 +177,7 @@ next line'; COMMENT ON COLUMN ${s}.parent.label IS 'Unicode: 名';
       await a.query(`ALTER TABLE ${s}.child ALTER COLUMN label ADD MASKED WITH (FUNCTION='default()')`);
       await assert.rejects(readDdl(profile(engine,source),mapping(source),a.query),/masked/);
     }
-    reports.push({engine,passed:true,roundTrip:true,files:first.files.length,jdbc:true,consoleTransactionPreserved:true,offlineForeignKeys:true,unsupportedRejected:true});
+    reports.push({engine,passed:true,roundTrip:true,files:first.files.length,jdbc:true,objectSources:true,searchPath:engine==='postgres',consoleTransactionPreserved:true,offlineForeignKeys:true,unsupportedRejected:true});
     console.log(`PASS: ${engine} definitions → clean database → identical definitions, offline JOINs and guards`);
   } catch(error) {
     reports.push({engine,passed:false,error:(error as Error).stack});console.error(error);

@@ -31,6 +31,10 @@ export interface JdbcSettings {
     introspectionMinutes?: number;
     trackSchemaChanges?: boolean;
     loadSystemSchemas?: boolean;
+    switchSchema?: 'automatic' | 'manual' | 'disabled';
+    loadSources?: 'all' | 'user' | 'none';
+    preIntrospectedObjects?: boolean;
+    codeStyle?: { keywordCase: 'upper' | 'lower' | 'preserve'; indentSize: number; useTabs: boolean };
     beforeConnect?: BeforeConnectTask[];
   };
 }
