@@ -181,13 +181,18 @@ public final class LocalDBViewerBridge {
             if (bool(request, "applyContext", true) && !command.startsWith("commit") && !command.startsWith("rollback")) {
                 String path = string(request, "searchPath", "");
                 boolean usePath = postgres && request.has("searchPath") && !request.get("searchPath").isJsonNull();
-                boolean changeCatalog = !catalog.isEmpty() && !Objects.equals(JdbcMetadata.catalog(active), catalog);
-                boolean changePath = usePath && !path.equals(searchPath(active));
-                boolean changeSchema = !usePath && !schema.isEmpty() && !Objects.equals(JdbcMetadata.schema(active), schema);
+                PostgresContext current = postgres ? postgresContext(active) : null;
+                boolean changeCatalog = !catalog.isEmpty() && !Objects.equals(postgres ? current.catalog() : JdbcMetadata.catalog(active), catalog);
+                boolean changePath = usePath && !path.equals(current.searchPath());
+                boolean changeSchema = !usePath && !schema.isEmpty() && !Objects.equals(postgres ? current.schema() : JdbcMetadata.schema(active), schema);
                 if (explicitTransaction && (changeCatalog || changePath || changeSchema)) throw new SQLException("Завершите транзакцию перед переключением catalog/schema.");
+                if (postgres && changeCatalog) throw new SQLException("PostgreSQL: для другой database нужно отдельное подключение.");
                 if (changeCatalog) active.setCatalog(catalog);
                 if (changePath) try (PreparedStatement statement = active.prepareStatement("SELECT pg_catalog.set_config('search_path', ?, false)")) { statement.setString(1, path); postgresContextQuery(statement); }
-                else if (changeSchema) active.setSchema(schema);
+                else if (changeSchema) {
+                    if (postgres) try (PreparedStatement statement = active.prepareStatement("SELECT pg_catalog.set_config('search_path', pg_catalog.quote_ident(?), false)")) { statement.setString(1, schema); postgresContextQuery(statement); }
+                    else active.setSchema(schema);
+                }
                 snapshot.addProperty("contextApplied", true);
             }
             boolean mysqlStreaming = string(config, "driverClass", "").startsWith("com.mysql.");
@@ -234,10 +239,11 @@ public final class LocalDBViewerBridge {
             } finally { runningStatement = null; }
             snapshot.addProperty("state", CANCELED.get() ? "CANCELED" : "FINISHED");
             try {
-                String catalogValue = JdbcMetadata.catalog(active), schemaValue = JdbcMetadata.schema(active);
+                PostgresContext current = postgres ? postgresContext(active) : null;
+                String catalogValue = postgres ? current.catalog() : JdbcMetadata.catalog(active), schemaValue = postgres ? current.schema() : JdbcMetadata.schema(active);
                 if (!catalogValue.isEmpty()) snapshot.addProperty("catalog", catalogValue);
                 if (postgres || !schemaValue.isEmpty()) snapshot.addProperty("schema", schemaValue);
-                if (postgres) snapshot.addProperty("searchPath", searchPath(active));
+                if (postgres) snapshot.addProperty("searchPath", current.searchPath());
             } catch (SQLException unsupported) { warnings.add("Не удалось получить текущие catalog/schema: " + error(unsupported)); }
         } catch (Throwable failure) {
             snapshot.addProperty("state", CANCELED.get() || failure instanceof CancellationException ? "CANCELED" : "FAILED");
@@ -248,14 +254,18 @@ public final class LocalDBViewerBridge {
             JsonObject result = message("done"); result.add("snapshot", snapshot); send(result);
         }
     }
-    private static String searchPath(Connection active) throws SQLException {
-        try (PreparedStatement statement = active.prepareStatement("SELECT pg_catalog.current_setting('search_path')")) {
+    private record PostgresContext(String catalog, String schema, String searchPath) {}
+    private static PostgresContext postgresContext(Connection active) throws SQLException {
+        try (PreparedStatement statement = active.prepareStatement("SELECT pg_catalog.current_database(), pg_catalog.current_schema(), pg_catalog.current_setting('search_path')")) {
             postgresContextQuery(statement);
-            try (ResultSet result = statement.getResultSet()) { return result.next() ? result.getString(1) : ""; }
+            try (ResultSet result = statement.getResultSet()) {
+                if (!result.next()) throw new SQLException("PostgreSQL did not return the session context");
+                return new PostgresContext(result.getString(1), Objects.toString(result.getString(2), ""), result.getString(3));
+            }
         }
     }
     private static void postgresContextQuery(PreparedStatement statement) throws SQLException {
-        // Like pgjdbc's getSchema(), context bookkeeping must not start a transaction
+        // Unlike pgjdbc's getSchema(), context bookkeeping must not start a transaction
         // when autoCommit=false, particularly just after COMMIT/ROLLBACK. Load the
         // driver's public interface through its isolated, version-specific loader.
         runningStatement = statement;
