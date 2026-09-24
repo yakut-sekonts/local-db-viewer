@@ -58,7 +58,7 @@ export function relationColumn(binding: Binding, table: TableRef, column: string
 export function analyzeSQL(sql: string, context: Context, index: SchemaIndex, engine: DatabaseEngine): Query {
   const byContainer = new Map<number, Token[]>(), children = new Map<number, number[]>(), opening = new Map<number,number>();
   const physicalTables = new Map<TableMeta,QueryTable>();
-  let columnBudget=50000, bindingBudget=512;
+  let columnBudget=50000, bindingBudget=512, branchBudget=512, scanBudget=100000;
   function reserveColumns(count: number) { columnBudget-=count; if(columnBudget<0)throw new AnalysisLimit(); }
   for (const token of context.tokens) {
     const tokens = byContainer.get(token.container) ?? [];
@@ -203,6 +203,7 @@ export function analyzeSQL(sql: string, context: Context, index: SchemaIndex, en
     const body=tokens.slice(main), splits=body.flatMap((token,i)=>setOperator(token)?[i]:[]), branches: Query[]=[];
     let begin=0;
     for(const boundary of [...splits,body.length]) {
+      if(--branchBudget<0)throw new AnalysisLimit();
       const section=body.slice(begin,boundary), lower=begin===0?start:body[begin-1]!.end, upper=boundary===body.length?end:body[boundary]!.start;
       const local: Binding[]=[];
       let from=false;
@@ -254,7 +255,8 @@ export function analyzeSQL(sql: string, context: Context, index: SchemaIndex, en
       // Scalar/EXISTS subqueries correlate with this branch. FROM and CTE bodies were handled above.
       function nestedExpressions(parent: number) {
         const pending=[...(children.get(parent) ?? [])];
-        for(let scanned=0;pending.length && scanned<100000;scanned++) {
+        while(pending.length) {
+          if(--scanBudget<0)throw new AnalysisLimit();
           const child=pending.pop()!;
           if(handled.has(child))continue;
           const bounds=context.containers[child]!;

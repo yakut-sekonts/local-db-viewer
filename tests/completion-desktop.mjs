@@ -57,7 +57,7 @@ try {
     await expect(page.locator('tbody tr')).toHaveCount(rows);
   }
 
-  await suggest('SELECT * FROM (SELECT customer_id AS cid, amount+1 AS total FROM orders) d WHERE d.|');
+  await suggest('SELECT * FROM (SELECT [customer_id] AS [cid], amount+1 AS total FROM [orders]) d WHERE d.|');
   await expect(popup).toContainText('cid');
   await expect(popup).toContainText('total');
   await popup.locator('.monaco-list-row').filter({ hasText: 'total' }).first().click();

@@ -1,11 +1,11 @@
-# Local DB Viewer 0.7.0
+# Local DB Viewer 0.7.1
 
 Desktop SQL IDE с 71 вариантом JDBC-подключения. Семь драйверов входят в дистрибутив; расширенный каталог содержит SQL, аналитические системы и NoSQL через JDBC. Интерфейс выполнен по предоставленному референсу DataGrip: тёмная тема, Database Explorer, SQL-консоли, Files и нижняя панель Services с результатами. Это самостоятельное приложение, не продукт JetBrains.
 
 ## Установка в профиль пользователя
 
-- **macOS 13 и новее, Apple Silicon (ARM64, M1 и новее):** откройте `Local-DB-Viewer-0.7.0-mac-arm64.dmg` и скопируйте `Local DB Viewer.app` в `~/Applications`. Папку можно создать в своей домашней директории. Intel Mac не поддерживается.
-- **Windows 11 x64:** запустите `Local-DB-Viewer-0.7.0-windows-x64-setup.exe`. NSIS устанавливает приложение для текущего пользователя в `%LOCALAPPDATA%\Programs\Local DB Viewer`, создаёт ярлыки и не запрашивает elevation. Используются `perMachine: false`, `allowElevation: false`, `asInvoker`.
+- **macOS 13 и новее, Apple Silicon (ARM64, M1 и новее):** откройте `Local-DB-Viewer-0.7.1-mac-arm64.dmg` и скопируйте `Local DB Viewer.app` в `~/Applications`. Папку можно создать в своей домашней директории. Intel Mac не поддерживается.
+- **Windows 11 x64:** запустите `Local-DB-Viewer-0.7.1-windows-x64-setup.exe`. NSIS устанавливает приложение для текущего пользователя в `%LOCALAPPDATA%\Programs\Local DB Viewer`, создаёт ярлыки и не запрашивает elevation. Используются `perMachine: false`, `allowElevation: false`, `asInvoker`.
 
 Node.js, Java и Python отдельно не требуются. Семь базовых JDBC-драйверов встроены; дополнительные устанавливаются из окна «JDBC-драйверы». Сборка macOS имеет локальную ad-hoc подпись, но не Developer ID/notarization; Windows не имеет Authenticode-подписи. После обновления ad-hoc сборки macOS может повторно запросить разрешение Keychain; постоянный Developer ID нужен для стабильного доступа без таких запросов. Корпоративные политики запуска, Gatekeeper и SmartScreen действуют независимо от возможности установки без прав администратора.
 

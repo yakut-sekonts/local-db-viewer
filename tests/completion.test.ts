@@ -175,10 +175,13 @@ test('ORDER BY exposes output aliases, while WHERE and window expressions keep t
 });
 
 test('array expressions and quoted aliases preserve projection boundaries; excessive input is bounded', () => {
+  assert.deepEqual(suggest('SELECT [o].| FROM [orders] [o]','sqlite').map(item=>item.label),orders.columns.map(column=>column.name));
+  assert.deepEqual(suggest('SELECT d.| FROM (SELECT [customer_id] AS [Customer ID], [tenant_id] AS [Tenant] FROM [orders]) d','sqlite').map(item=>item.label),['Customer ID','Tenant']);
   assert.deepEqual(suggest('SELECT d.| FROM (SELECT ARRAY[1,2] AS values_array, id FROM orders) d').map(item=>item.label),['values_array','id']);
   assert.deepEqual(suggest('SELECT d.| FROM (SELECT customer_id AS "Customer ID", tenant_id AS "Tenant" FROM orders) d').map(item=>item.label),['Customer ID','Tenant']);
   assert.deepEqual(suggest('SELECT '+ '('.repeat(129) + 'o.|' + ')'.repeat(129) + ' FROM orders o'),[]);
   assert.deepEqual(completeSQL(' '.repeat(1_000_001),0,index,'postgres'),[]);
+  assert.deepEqual(suggest('SELECT 1 UNION ALL '.repeat(512)+'SELECT o.| FROM orders o'),[]);
   const huge={...index,tables:[{...orders,columns:Array.from({length:50001},(_,i)=>({name:`c${i}`,type:'bigint'}))}]};
   assert.deepEqual(suggest('SELECT o.| FROM orders o','postgres',huge),[]);
 });

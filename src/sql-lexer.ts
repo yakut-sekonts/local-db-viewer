@@ -30,7 +30,7 @@ export function tokenize(sql: string, engine?: DatabaseEngine, maximumTokens = N
       const end = sql.indexOf(dollar, i + dollar.length); i = end < 0 ? sql.length : end + dollar.length;
       tokens.push({ text: sql.slice(start, i), value: '', start, end: i, container, kind: 'string', closed: end >= 0 }); continue;
     }
-    if (['"', "'", '`'].includes(sql.charAt(i)) || sql.charAt(i) === '[' && (!engine || engine === 'mssql' || engine === 'jdbc')) {
+    if (['"', "'", '`'].includes(sql.charAt(i)) || sql.charAt(i) === '[' && (!engine || engine === 'mssql' || engine === 'sqlite' || engine === 'jdbc')) {
       const opening = sql.charAt(i++); const closing = opening === '[' ? ']' : opening;
       const escaped = opening === "'" && (!engine || mysql || engine === 'clickhouse' || engine === 'postgres' && /e/i.test(sql.charAt(start - 1)) && !/[\p{L}\p{N}_$]/u.test(sql.charAt(start - 2))) || opening === '"' && mysql || opening === '`' && engine === 'clickhouse';
       let value = ''; let closed = false;
