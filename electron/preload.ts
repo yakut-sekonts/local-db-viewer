@@ -15,6 +15,7 @@ const api: DesktopAPI = {
   ssh: { fingerprint: (host, port) => invoke('ssh:fingerprint', host, port) },
   drivers: {
     state: () => invoke('drivers:state'), check: () => invoke('drivers:check'), automatic: enabled => invoke('drivers:automatic', enabled),
+    configureSource: (id, source) => invoke('drivers:configure-source', id, source),
     install: id => invoke('drivers:install', id), select: (id, key) => invoke('drivers:select', id, key), import: (id, version) => invoke('drivers:import', id, version),
     onChange: listener => {
       const handler = (_: Electron.IpcRendererEvent, state: DriversState) => listener(state);

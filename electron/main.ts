@@ -78,7 +78,7 @@ async function prepareDriver(connection: Connection): Promise<Connection> {
   const extra = connection.jdbc.classpath ?? [];
   // Explicit external classpaths are self-contained; they must not be shadowed by bundled classes.
   if (extra.length) return { ...connection, driverClasspath: extra };
-  return { ...connection, driverClasspath: await drivers.paths(profileDriver(connection), connection.jdbc.driverVersion) };
+  return { ...connection, driverClasspath: await drivers.paths(profileDriver(connection), connection.jdbc.driverVersion, connection.jdbc.driverClass || driverDefinition(profileDriver(connection)).className) };
 }
 
 async function readMetadata(connection: Connection, input: Omit<MetadataInput, 'profileId'>): Promise<MetadataResult> {
@@ -110,7 +110,7 @@ function handle(name: string, fn: (...args: any[]) => unknown): void {
     if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || event.senderFrame.url !== pathToFileURL(entry).href) {
       throw new Error('Недоверенный IPC sender.');
     }
-    const databaseOperation = ['sources:load', 'ddl:preview', 'ddl:write-preview', 'ddl:write-file', 'query:run', 'profiles:test', 'metadata', 'schema:load', 'jdbc:properties', 'jdbc:preview', 'jdbc:browse', 'ssh:fingerprint', 'drivers:install', 'drivers:import', 'drivers:select'].includes(name);
+    const databaseOperation = ['sources:load', 'ddl:preview', 'ddl:write-preview', 'ddl:write-file', 'query:run', 'profiles:test', 'metadata', 'schema:load', 'jdbc:properties', 'jdbc:preview', 'jdbc:browse', 'ssh:fingerprint', 'drivers:install', 'drivers:import', 'drivers:select', 'drivers:configure-source'].includes(name);
     if (!databaseOperation) return fn(...args);
     if (installingUpdate) throw new Error('Приложение обновляется.');
     pendingDatabaseOperations++;
@@ -159,15 +159,16 @@ void app.whenReady().then(() => {
   handle('updates:download', () => updater.download());
   handle('updates:install', () => updater.install());
   drivers = new DriverManager(join(app.getPath('userData'), 'drivers'), bundledDrivers(), driverCatalogLock, fetchUpdate,
-    () => updater.readDriverCatalog(), async (id, paths) => {
+    () => updater.readDriverCatalog(), async (id, paths, driverClass) => {
       const driver = driverDefinition(id);
-      await inspectJdbc({ id: 'driver-probe', name: driver.name, engine: 'jdbc', endpoint: driver.url, user: '', auth: 'none', tls: false, catalog: '', schema: '', jdbc: { driverId: id }, driverClasspath: paths }, { kind: 'probe' });
+      await inspectJdbc({ id: 'driver-probe', name: driver.name, engine: 'jdbc', endpoint: driver.url, user: '', auth: 'none', tls: false, catalog: '', schema: '', jdbc: { driverId: id, driverClass }, driverClasspath: paths }, { kind: 'probe', classOnly: !!driverClass });
     }, value => { if (!window.isDestroyed()) window.webContents.send('drivers:change', value); });
   driversReady = readFile(join(process.resourcesPath, 'update-config.json'), 'utf8').then(value => JSON.parse(value).repository ?? '').catch(() => '')
     .then(repository => updater.initialize(repository)).then(() => drivers.initialize());
   handle('drivers:state', async () => { await driversReady; return drivers.state(); });
   handle('drivers:check', async () => { await driversReady; return drivers.check(); });
   handle('drivers:automatic', async enabled => { await driversReady; return drivers.automatic(enabled); });
+  handle('drivers:configure-source', async (id, source) => { await driversReady; return drivers.configureSource(id, source); });
   handle('drivers:install', async id => { await driversReady; return drivers.install(id); });
   handle('drivers:select', async (id, key) => { await driversReady; return drivers.select(id, key); });
   handle('drivers:import', async (id, version) => {

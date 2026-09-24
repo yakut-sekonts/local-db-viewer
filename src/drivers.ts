@@ -21,20 +21,26 @@ export function productName(profile: Pick<ProfileDraft, 'engine' | 'jdbc'>): str
 export interface DriverFile { path: string; size: number; sha256: string }
 export interface DriverRelease { key: string; version: string; files: DriverFile[] }
 export interface DriverCatalog { format: 1; drivers: Record<string, DriverRelease> }
-export interface DriverInstallation extends DriverRelease { source: 'bundled' | 'download' | 'local'; paths: string[] }
+export interface DriverInstallation extends DriverRelease { source: 'bundled' | 'download' | 'local' | 'feed'; paths: string[]; driverClass?: string }
+export interface DriverUpdateSource { url: string; driverClass: string }
 export interface DriverStatus {
   id: string; selected?: string; installed: { key: string; version: string; source: DriverInstallation['source'] }[];
-  latest?: string; available: boolean; phase?: 'downloading' | 'verifying'; progress?: number; error?: string;
+  latest?: string; latestKey?: string; available: boolean; phase?: 'downloading' | 'verifying'; progress?: number; error?: string;
+  updateSource?: DriverUpdateSource; sourceError?: string; checkedAt?: number;
 }
-export interface DriversState { drivers: DriverStatus[]; checking: boolean; automatic: boolean; checkedAt?: number; error?: string }
+export interface DriversState { drivers: DriverStatus[]; checking: boolean; configuring?: string; automatic: boolean; checkedAt?: number; error?: string }
 export interface DriversAPI {
   state(): Promise<DriversState>;
   check(): Promise<DriversState>;
   automatic(enabled: boolean): Promise<void>;
+  configureSource(id: string, source: DriverUpdateSource | null): Promise<void>;
   install(id: string): Promise<void>;
   select(id: string, key: string): Promise<void>;
   import(id: string, version: string): Promise<boolean>;
   onChange(listener: (state: DriversState) => void): () => void;
+}
+export function driverSourceLabel(source: DriverInstallation['source']): string {
+  return { bundled: 'встроенный', download: 'Maven Central', local: 'импорт', feed: 'источник обновлений' }[source];
 }
 
 export function compareDriverVersions(a: string, b: string): number {

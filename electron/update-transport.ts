@@ -15,7 +15,7 @@ function responseHeaders(values: Record<string, string | string[]>): Headers {
 // Chromium provides system proxy/PAC and TLS verification; cookies are not sent.
 export const fetchUpdate: UpdateFetch = (url, options) => new Promise((resolve, reject) => {
   if (options.signal?.aborted) { reject(options.signal.reason); return; }
-  const request = net.request({ url, method: 'GET', redirect: options.redirect ?? 'error', cache: 'no-store', useSessionCookies: false });
+  const request = net.request({ url, method: 'GET', redirect: options.redirect ?? 'error', cache: 'no-store', credentials: options.credentials ?? 'omit', useSessionCookies: false });
   let body: Readable | undefined;
   let settled = false;
   const fail = (error: Error) => {

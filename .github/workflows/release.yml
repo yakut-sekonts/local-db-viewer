@@ -64,6 +64,7 @@ jobs:
             node tests/jdbc-streaming.mjs
             npm run test:ui
             node tests/driver-desktop.mjs
+            node tests/driver-feed-desktop.mjs
             node tests/hardening-desktop.mjs
             node tests/settings-desktop.mjs
             node tests/ddl-desktop.mjs
@@ -77,6 +78,7 @@ jobs:
             node tests/update-install-windows.mjs
             export LOCAL_DB_VIEWER_EXECUTABLE="$GITHUB_WORKSPACE/release/win-unpacked/Local DB Viewer.exe"
             node tests/driver-desktop.mjs
+            node tests/driver-feed-desktop.mjs
             node tests/hardening-desktop.mjs
             node tests/settings-desktop.mjs
             node tests/ddl-desktop.mjs

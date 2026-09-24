@@ -1,0 +1,82 @@
+import { _electron as electron, expect } from '@playwright/test';
+import { copyFile, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+const fixtures = JSON.parse(await readFile('tests/driver-fixtures.json', 'utf8')).drivers;
+const old = fixtures['h2-old'], next = fixtures.h2;
+const directory = await mkdtemp(join(tmpdir(), 'local-db-viewer-driver-feed-'));
+await mkdir(join(directory, 'drivers/objects'), { recursive: true });
+await mkdir(join(directory, 'updates'));
+await mkdir('test-artifacts', { recursive: true });
+await writeFile(join(directory, 'updates/settings.json'), JSON.stringify({ repository: 'fixture/public', automatic: false }));
+for (const file of old.files) await copyFile(resolve('.runtime-cache/maven/repository', file.path), join(directory, 'drivers/objects', file.sha256 + '.jar'));
+await writeFile(join(directory, 'drivers/settings.json'), JSON.stringify({ automatic: false, installed: { custom: [{ ...old, source: 'local', paths: [] }] }, selected: { custom: old.key } }));
+const app = await electron.launch({ executablePath: process.env.LOCAL_DB_VIEWER_EXECUTABLE, args: process.env.LOCAL_DB_VIEWER_EXECUTABLE ? [] : [resolve('.')], env: { ...process.env, LOCAL_DB_VIEWER_DATA_DIR: directory } });
+const page = await app.firstWindow(), errors = [];
+page.on('pageerror', error => errors.push(error.message));
+try {
+  await expect(page.locator('.monaco-editor')).toBeVisible();
+  await app.evaluate(({ net }, { next, root }) => {
+    const { EventEmitter } = process.getBuiltinModule('node:events'), { Readable } = process.getBuiltinModule('node:stream'), { createReadStream } = process.getBuiltinModule('node:fs'), { join } = process.getBuiltinModule('node:path');
+    globalThis.feedRequests = [];
+    globalThis.feedManifest = { format: 1, driverId: 'custom', driverClass: 'org.h2.Driver', revision: 1, version: next.version, files: next.files.map(file => ({ url: `https://vendor.test/${file.path}`, size: file.size, sha256: file.sha256 })) };
+    net.request = options => {
+      if (options.credentials !== 'omit' || options.useSessionCookies !== false) throw new Error('Credentials were not omitted');
+      const url = String(options.url); globalThis.feedRequests.push(url); let source;
+      if (url === 'https://vendor.test/driver.json') source = () => Readable.from([Buffer.from(JSON.stringify(globalThis.feedManifest))]);
+      else if (url.startsWith('https://vendor.test/')) source = () => createReadStream(join(root, url.slice('https://vendor.test/'.length)));
+      else if (url.startsWith('https://api.github.com/')) source = () => Readable.from([Buffer.from(JSON.stringify({ format: 1, drivers: {} }))]);
+      else throw new Error('Unexpected fixture URL');
+      const request = new EventEmitter(); let response;
+      request.setHeader = () => {}; request.abort = () => { response?.destroy(); request.emit('close'); };
+      request.end = () => queueMicrotask(() => { response = source(); response.statusCode = 200; response.headers = {}; response.once('close', () => request.emit('close')); request.emit('response', response); });
+      return request;
+    };
+  }, { next, root: resolve('.runtime-cache/maven/repository') });
+  const profile = await page.evaluate(() => window.studio.profiles.save({ name: 'Universal JDBC feed', engine: 'jdbc', endpoint: 'jdbc:h2:mem:feed_test', user: 'sa', auth: 'none', tls: false, catalog: '', schema: '', jdbc: { driverId: 'custom', driverClass: 'org.h2.Driver' } }));
+  const query = async (sessionId, profileId = profile.id) => page.evaluate(async ({ profileId, sessionId }) => {
+    const requestId = crypto.randomUUID();
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { off(); reject(new Error('Query timeout')); }, 30000);
+      const off = window.studio.query.onUpdate(result => { if (result.requestId === requestId && result.state !== 'RUNNING') { clearTimeout(timer); off(); result.state === 'FINISHED' ? resolve(result.rows) : reject(new Error(result.error)); } });
+      window.studio.query.run({ requestId, sessionId, profileId, sql: 'SELECT H2VERSION()', catalog: '', schema: '', maxRows: 1 }).catch(error => { clearTimeout(timer); off(); reject(error); });
+    });
+  }, { profileId, sessionId });
+  expect(await query('old')).toEqual([[old.version]]);
+  await page.getByRole('button', { name: 'JDBC-драйверы', exact: true }).click();
+  await page.getByLabel('Поиск драйвера').fill('Другой');
+  await page.locator('.driver-list button').filter({ hasText: 'Другой JDBC-драйвер' }).click();
+  await page.getByLabel('HTTPS URL манифеста драйвера').fill('https://vendor.test/driver.json');
+  await page.getByLabel('Driver class источника').fill('org.h2.Driver');
+  await page.getByRole('button', { name: 'Сохранить и проверить источник', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Удалить источник', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Закрыть драйверы', exact: true }).click();
+  await expect(page.locator('.driver-toast')).toContainText('Доступны обновления JDBC-драйверов: 1');
+  await page.getByRole('button', { name: 'Посмотреть', exact: true }).click();
+  await page.getByRole('button', { name: `Установить ${next.version}`, exact: true }).click();
+  await expect(page.getByLabel('Активная версия драйвера').locator('option:checked')).toHaveText(`${next.version} · источник обновлений`, { timeout: 45000 });
+  const installedKey = await page.getByLabel('Активная версия драйвера').inputValue();
+  expect(await query('new')).toEqual([[next.version]]); expect(await query('old')).toEqual([[old.version]]);
+  const pinned = await page.evaluate(draft => window.studio.profiles.save(draft), { ...profile, id: undefined, name: 'Pinned imported version', jdbc: { ...profile.jdbc, driverVersion: old.key } });
+  expect(await query('pinned', pinned.id)).toEqual([[old.version]]);
+  await page.getByLabel('Активная версия драйвера').selectOption(old.key);
+  expect(await query('rollback')).toEqual([[old.version]]);
+  await page.getByLabel('Активная версия драйвера').selectOption(installedKey);
+  await app.evaluate(() => { globalThis.feedManifest.driverClass = 'other.InvalidDriver'; });
+  await page.getByRole('button', { name: 'Проверить версии драйверов', exact: true }).click();
+  await expect(page.locator('.driver-source-settings [role=alert]')).toContainText('Некорректный манифест');
+  await expect(page.getByLabel('Активная версия драйвера')).toHaveValue(installedKey);
+  expect(await query('after-invalid')).toEqual([[next.version]]);
+  const requests = await app.evaluate(() => globalThis.feedRequests);
+  expect(requests.some(url => url.endsWith('.jar'))).toBe(true);
+  await page.locator('.driver-center-body section').evaluate(element => { element.scrollTop = element.scrollHeight; });
+  await page.screenshot({ path: 'test-artifacts/driver-feed-center.png' });
+  await page.getByRole('button', { name: 'Удалить источник', exact: true }).click();
+  await expect(page.getByLabel('HTTPS URL манифеста драйвера')).toHaveValue('');
+  await expect(page.getByLabel('Активная версия драйвера')).toHaveValue(installedKey);
+  expect(await query('after-remove')).toEqual([[next.version]]);
+  expect(errors).toEqual([]);
+  await writeFile('test-artifacts/driver-feed-desktop-results.json', JSON.stringify({ passed: true, platform: process.platform, versions: [old.version, next.version], checks: ['source-UI', 'imported-update-notification', 'download', 'real-class-probe', 'Universal-JDBC', 'session-isolation', 'pinned-import', 'rollback', 'invalid-feed-preserves-version', 'remove-source-preserves-driver'] }, null, 2));
+  console.log('PASS: external feed UI, imported update, Universal JDBC/H2, old session, pin, rollback, invalid source and removal');
+} finally { await app.close(); }

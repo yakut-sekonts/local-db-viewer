@@ -31,7 +31,12 @@ export async function testUpdateNetwork(app, page, directory, artifacts) {
   const calls = [], tunnels = [], sockets = new Set();
   let rejectTunnel = false;
   const tls = createTLS({ pfx: untrustedCertificate.pfx, passphrase: password }, (request, response) => {
-    calls.push({ host: request.headers.host, auth: request.headers.authorization ?? null });
+    calls.push({ host: request.headers.host, auth: request.headers.authorization ?? null, cookie: request.headers.cookie ?? null });
+    if (request.url === '/auth-fixture') {
+      if (request.headers.authorization === 'Basic ' + Buffer.from('fixture-user:fixture-password').toString('base64')) { response.end('ok'); }
+      else { response.writeHead(401, { 'WWW-Authenticate': 'Basic realm="disposable-fixture"' }); response.end(); }
+      return;
+    }
     if (request.headers.authorization === 'Bearer expired-fixture') { response.writeHead(401); response.end(); return; }
     if (request.url.endsWith('/latest')) {
       response.setHeader('Content-Type', 'application/json');
@@ -76,6 +81,22 @@ export async function testUpdateNetwork(app, page, directory, artifacts) {
         ['api.github.com', 'release-assets.githubusercontent.com'].includes(request.hostname) && new X509Certificate(request.certificate.data).fingerprint256 === fingerprint ? 0 : -2));
       await session.defaultSession.closeAllConnections();
     }, trustedCertificate.fingerprint);
+    // Populate Chromium's session auth cache deliberately. The updater must
+    // omit it even on the same origin while retaining explicitly set PATs.
+    await app.evaluate(async ({ net, session }) => {
+      for (const domain of ['api.github.com', 'release-assets.githubusercontent.com']) await session.defaultSession.cookies.set({ url: `https://${domain}`, name: 'fixture-cookie', value: 'must-not-leak', secure: true });
+      await new Promise((resolve, reject) => {
+        const request = net.request({ url: 'https://api.github.com/auth-fixture', credentials: 'include', redirect: 'error' });
+        const timer = setTimeout(() => { request.abort(); reject(new Error('Auth cache fixture timeout')); }, 10000);
+        request.on('login', (_auth, callback) => callback('fixture-user', 'fixture-password'));
+        request.on('error', error => { clearTimeout(timer); reject(error); });
+        request.on('response', response => {
+          response.on('data', () => {});
+          response.on('end', () => { clearTimeout(timer); response.statusCode === 200 ? resolve() : reject(new Error('Auth fixture HTTP ' + response.statusCode)); });
+        });
+        request.end();
+      });
+    });
     for (const token of ['', 'valid-fixture', 'expired-fixture']) {
       calls.length = 0;
       await page.evaluate(token => window.studio.updates.configure({ repository: 'fixture/public', automatic: false, token }), token);
@@ -86,6 +107,8 @@ export async function testUpdateNetwork(app, page, directory, artifacts) {
       assert.equal(downloaded.progress, 100);
       const cdn = calls.filter(call => call.host === 'release-assets.githubusercontent.com');
       assert.equal(cdn.length, 1); assert.equal(cdn[0].auth, null);
+      assert.ok(calls.every(call => call.cookie === null), 'session cookies must not be sent');
+      assert.ok(calls.every(call => !call.auth?.startsWith('Basic ')), 'cached HTTP credentials must not be sent');
       if (!token) assert.ok(calls.every(call => call.auth === null));
       else assert.ok(calls.some(call => call.auth === `Bearer ${token}`));
       if (token === 'expired-fixture') assert.equal(calls.filter(call => call.host === 'api.github.com' && !call.auth).length, 2);
@@ -108,6 +131,7 @@ export async function testUpdateNetwork(app, page, directory, artifacts) {
   } finally {
     await app.evaluate(async ({ session }) => {
       session.defaultSession.setCertificateVerifyProc(null);
+      await session.defaultSession.clearAuthCache();
       await session.defaultSession.setProxy({ mode: 'system' });
       await session.defaultSession.closeAllConnections();
     });

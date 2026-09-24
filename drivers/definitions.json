@@ -398,7 +398,7 @@
     "className": "com.amazon.athena.jdbc.AthenaDriver",
     "url": "jdbc:athena://AwsRegion=us-east-1",
     "documentation": "https://docs.aws.amazon.com/athena/latest/ug/connect-with-jdbc.html",
-    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+    "note": "Импортируйте JAR и зависимости производителя. Для автопроверки подключите HTTPS-источник версий в окне драйверов."
   },
   {
     "id": "bigquery",
@@ -406,7 +406,7 @@
     "className": "com.simba.googlebigquery.jdbc.Driver",
     "url": "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443",
     "documentation": "https://cloud.google.com/bigquery/docs/reference/odbc-jdbc-drivers",
-    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+    "note": "Импортируйте JAR и зависимости производителя. Для автопроверки подключите HTTPS-источник версий в окне драйверов."
   },
   {
     "id": "impala",
@@ -414,7 +414,7 @@
     "className": "com.cloudera.impala.jdbc.Driver",
     "url": "jdbc:impala://localhost:21050/default",
     "documentation": "https://impala.apache.org/docs/build/html/topics/impala_jdbc.html",
-    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+    "note": "Импортируйте JAR и зависимости производителя. Для автопроверки подключите HTTPS-источник версий в окне драйверов."
   },
   {
     "id": "elasticsearch",
@@ -422,7 +422,7 @@
     "className": "org.elasticsearch.xpack.sql.jdbc.EsDriver",
     "url": "jdbc:es://https://localhost:9200",
     "documentation": "https://www.elastic.co/docs/reference/query-languages/sql/sql-jdbc",
-    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+    "note": "Импортируйте JAR и зависимости производителя. Для автопроверки подключите HTTPS-источник версий в окне драйверов."
   },
   {
     "id": "redis",
@@ -430,7 +430,7 @@
     "className": "",
     "url": "jdbc:redis:",
     "documentation": "https://www.cdata.com/drivers/redis/jdbc/",
-    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+    "note": "Импортируйте JAR и зависимости производителя. Для автопроверки подключите HTTPS-источник версий в окне драйверов."
   },
   {
     "id": "cassandra",
@@ -438,7 +438,7 @@
     "className": "",
     "url": "jdbc:cassandra:",
     "documentation": "https://www.datastax.com/drivers",
-    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+    "note": "Импортируйте JAR и зависимости производителя. Для автопроверки подключите HTTPS-источник версий в окне драйверов."
   },
   {
     "id": "couchbase",
@@ -446,7 +446,7 @@
     "className": "",
     "url": "jdbc:couchbase:",
     "documentation": "https://www.cdata.com/drivers/couchbase/jdbc/",
-    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+    "note": "Импортируйте JAR и зависимости производителя. Для автопроверки подключите HTTPS-источник версий в окне драйверов."
   },
   {
     "id": "dynamodb",
@@ -454,7 +454,7 @@
     "className": "",
     "url": "jdbc:dynamodb:",
     "documentation": "https://www.cdata.com/drivers/dynamodb/jdbc/",
-    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+    "note": "Импортируйте JAR и зависимости производителя. Для автопроверки подключите HTTPS-источник версий в окне драйверов."
   },
   {
     "id": "iris",
@@ -462,7 +462,7 @@
     "className": "com.intersystems.jdbc.IRISDriver",
     "url": "jdbc:IRIS://localhost:1972/USER",
     "documentation": "https://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=BGJD",
-    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+    "note": "Импортируйте JAR и зависимости производителя. Для автопроверки подключите HTTPS-источник версий в окне драйверов."
   },
   {
     "id": "denodo",
@@ -470,7 +470,7 @@
     "className": "com.denodo.vdp.jdbc.Driver",
     "url": "jdbc:vdb://localhost:9999/database",
     "documentation": "https://community.denodo.com/docs/html/browse/",
-    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+    "note": "Импортируйте JAR и зависимости производителя. Для автопроверки подключите HTTPS-источник версий в окне драйверов."
   },
   {
     "id": "openedge",
@@ -478,7 +478,7 @@
     "className": "com.ddtek.jdbc.openedge.OpenEdgeDriver",
     "url": "jdbc:datadirect:openedge://localhost:2000;databaseName=database",
     "documentation": "https://docs.progress.com/",
-    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+    "note": "Импортируйте JAR и зависимости производителя. Для автопроверки подключите HTTPS-источник версий в окне драйверов."
   },
   {
     "id": "tibero",
@@ -486,7 +486,7 @@
     "className": "com.tmax.tibero.jdbc.TbDriver",
     "url": "jdbc:tibero:thin:@localhost:8629:database",
     "documentation": "https://docs.tmaxtibero.com/",
-    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+    "note": "Импортируйте JAR и зависимости производителя. Для автопроверки подключите HTTPS-источник версий в окне драйверов."
   },
   {
     "id": "custom",
@@ -494,6 +494,6 @@
     "className": "",
     "url": "jdbc:",
     "documentation": "",
-    "note": "Импортируйте JAR и зависимости производителя. Автоматическая проверка версий недоступна без публичного источника обновлений."
+    "note": "Импортируйте JAR и зависимости производителя. Для автопроверки подключите HTTPS-источник версий в окне драйверов."
   }
 ]

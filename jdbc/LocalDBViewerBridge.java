@@ -302,7 +302,9 @@ public final class LocalDBViewerBridge {
             switch (kind) {
                 case "probe" -> {
                     Driver driver = driver();
-                    if (!driver.acceptsURL(string(config, "url", ""))) throw new SQLException("Driver does not accept this JDBC URL");
+                    // External feeds supply a class, not a user's connection URL.
+                    // The real connection still validates its URL in Driver.connect.
+                    if (!bool(request, "classOnly", false) && !driver.acceptsURL(string(config, "url", ""))) throw new SQLException("Driver does not accept this JDBC URL");
                     result.addProperty("value", "Driver loaded");
                 }
                 case "test" -> { DatabaseMetaData metadata = connect().getMetaData(); result.addProperty("value", "Соединение установлено · " + metadata.getDatabaseProductName() + " · " + metadata.getDriverVersion()); }

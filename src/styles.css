@@ -39,10 +39,15 @@
 .driver-list button.active { background: #30466e; }
 .driver-list small { color: #8ea8ca; white-space: nowrap; }
 .driver-center-body section { padding: 20px; overflow: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
+.driver-center-body section > * { flex-shrink: 0; max-width: 100%; }
 .driver-center-body h3, .driver-center-body p { margin: 0; line-height: 1.6; }
 .driver-center-body label { display: grid; gap: 7px; width: 100%; }
 .driver-center-body small, .driver-selection small { color: #959eac; line-height: 1.6; }
 .driver-class, .driver-documentation { overflow-wrap: anywhere; }
+.driver-source-settings { width: 100%; display: grid; gap: 12px; border-top: 1px solid #43454b; padding-top: 16px; }
+.driver-source-settings h4 { margin: 0; }
+.driver-source-settings pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.5 monospace; }
+.driver-source-settings summary { cursor: pointer; color: #8ea8ca; margin-bottom: 8px; }
 .driver-catalog-footer { padding: 16px 20px; display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
 .driver-catalog-footer .form-message { width: 100%; }
 .driver-selection { border-top: 1px solid #41444b; padding-top: 16px; display: grid; gap: 10px; }
