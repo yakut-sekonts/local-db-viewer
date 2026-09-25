@@ -6,6 +6,7 @@ import { singleStatement, transactionAction } from './sql';
 import { sqlEngine } from '../src/drivers';
 import { JdbcWorker } from './jdbc-worker';
 import { startupTimeout } from './before-connect';
+import { createScriptTask } from './script-runner';
 
 export interface QueryTask { run(sql: string): Promise<QuerySnapshot>; cancel(): Promise<void> }
 export class DatabaseSession {
@@ -87,6 +88,11 @@ export class DatabaseSession {
       }),
       cancel: async () => { canceled = true; await task?.cancel(); },
     };
+  }
+  createScript(requestId: string, maxRows: number, notify: (result: QuerySnapshot) => void, catalog: string, schema: string, context?: { apply: boolean; searchPath?: string }): QueryTask {
+    return createScriptTask({ requestId, engine: sqlEngine(this.connection), enqueue: work => this.enqueue(work), notify, inTransaction: () => this.inTransaction,
+      createQuery: (id, update, first) => this.directQuery(id, maxRows, result => { this.inTransaction = result.inTransaction; update(result); }, catalog, schema, first ? context : { apply: false }),
+    });
   }
   inspect<T>(request: { kind: string; [key: string]: unknown }, timeout = 60000): Promise<T> { return this.enqueue(() => this.inspectNow<T>(request, timeout)); }
   private async inspectNow<T>(request: { kind: string; [key: string]: unknown }, timeout: number): Promise<T> {

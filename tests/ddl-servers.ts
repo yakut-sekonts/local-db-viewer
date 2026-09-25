@@ -7,7 +7,7 @@ import { readObjectSources } from '../electron/object-sources';
 import { ddlConnection, readDdl } from '../electron/ddl-reader';
 import { SessionPool } from '../electron/session-pool';
 import { ddlIndex } from '../src/ddl-index';
-import type { MetadataResult, DatabaseEngine, Cell } from '../src/shared';
+import type { MetadataResult, DatabaseEngine, Cell, QuerySnapshot } from '../src/shared';
 import type { Connection } from '../electron/trino';
 import { identifier } from '../electron/sql';
 
@@ -123,6 +123,20 @@ next line'; COMMENT ON COLUMN ${s}.parent.label IS 'Unicode: 名';
       assert.deepEqual(sorted(throughJdbc.files),sorted(first.files),'JDBC and native catalog readers must return identical definitions');
       assert.equal(consoleLease.session.inTransaction,true,'DDL must leave the SQL console transaction open');
       const rollback=await consoleLease.session.createQuery('rollback').run('ROLLBACK');assert.equal(rollback.state,'FINISHED',rollback.error);
+      const events: QuerySnapshot[] = [];
+      const script = async (sql: string) => consoleLease.session.createScript(crypto.randomUUID(),100,result=>events.push(result),source,'').run(sql);
+      const table = `${s}.script_fixture`;
+      const setup = await script(`CREATE TABLE ${table} (id bigint, label varchar(40)); INSERT INTO ${table} VALUES (9223372036854775807, 'a;''b'); SELECT id, label FROM ${table}; SELECT count(*) FROM ${table};`);
+      assert.equal(setup.script?.state,'FINISHED',setup.error); assert.equal(setup.script.completed,4);
+      assert.deepEqual(events.find(result=>result.script?.index===2&&result.state==='FINISHED')?.rows,[['9223372036854775807',"a;'b"]]);
+      const failedScript=await script(`${engine==='postgres'?'BEGIN':'BEGIN TRANSACTION'}; INSERT INTO ${table} VALUES (2, 'rollback'); SELECT * FROM ${s}.script_missing; INSERT INTO ${table} VALUES (3, 'skipped'); COMMIT;`);
+      assert.equal(failedScript.script?.state,'FAILED');assert.equal(failedScript.script.completed,2);assert.equal(failedScript.inTransaction,true);
+      const recovered=await script(`ROLLBACK; SELECT count(*) FROM ${table};`);
+      assert.equal(recovered.script?.state,'FINISHED',recovered.error);assert.equal(recovered.inTransaction,false);assert.deepEqual(recovered.rows,[['1']]);
+      if(engine==='postgres') {
+        const context=await consoleLease.session.createScript('script-search-path',100,()=>{},source,'public').run(`SET search_path TO ${s}, public; SELECT current_schema();`);
+        assert.equal(context.script?.state,'FINISHED',context.error);assert.deepEqual(context.rows,[[schema]]);assert.equal(context.searchPath,`${s}, public`);
+      }
     } finally {await ddlLease.release();await consoleLease.release();}
     if(engine==='postgres') {
       const contextConnection={...jdbc,jdbc:{...jdbc.jdbc,options:{singleSession:false,autoCommit:false}}};
@@ -177,7 +191,7 @@ next line'; COMMENT ON COLUMN ${s}.parent.label IS 'Unicode: 名';
       await a.query(`ALTER TABLE ${s}.child ALTER COLUMN label ADD MASKED WITH (FUNCTION='default()')`);
       await assert.rejects(readDdl(profile(engine,source),mapping(source),a.query),/masked/);
     }
-    reports.push({engine,passed:true,roundTrip:true,files:first.files.length,jdbc:true,objectSources:true,searchPath:engine==='postgres',consoleTransactionPreserved:true,offlineForeignKeys:true,unsupportedRejected:true});
+    reports.push({engine,passed:true,roundTrip:true,files:first.files.length,jdbc:true,objectSources:true,searchPath:engine==='postgres',consoleTransactionPreserved:true,sequentialScripts:true,offlineForeignKeys:true,unsupportedRejected:true});
     console.log(`PASS: ${engine} definitions → clean database → identical definitions, offline JOINs and guards`);
   } catch(error) {
     reports.push({engine,passed:false,error:(error as Error).stack});console.error(error);

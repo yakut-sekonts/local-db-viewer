@@ -7,7 +7,7 @@ export function Results({ result, onError }: { result?: QuerySnapshot; onError(m
   const [page, setPage] = useState(0);
   const [filter, setFilter] = useState('');
   const [view, setView] = useState<'data' | 'messages'>('data');
-  useEffect(() => { setPage(0); setFilter(''); setView('data'); }, [result?.requestId]);
+  useEffect(() => { setPage(0); setFilter(''); setView('data'); }, [result?.requestId, result?.script?.index]);
   const rows = useMemo(() => (result?.rows ?? []).filter(row => !filter || row.some(value => cellText(value).toLowerCase().includes(filter.toLowerCase()))), [result?.rows, filter]);
   const pages = Math.max(1, Math.ceil(rows.length / 100));
   const currentPage = Math.min(page, pages - 1);

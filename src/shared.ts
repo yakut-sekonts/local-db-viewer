@@ -39,6 +39,7 @@ export interface QueryStats {
   queued?: boolean;
 }
 export interface QuerySnapshot {
+  script?: { index: number; total: number; completed: number; line: number; preview: string; state: QuerySnapshot['state']; elapsedTimeMillis: number; dataLimited?: boolean };
   requestId: string;
   queryId: string;
   state: 'RUNNING' | 'FINISHED' | 'FAILED' | 'CANCELED';
@@ -59,6 +60,7 @@ export interface QuerySnapshot {
   contextApplied?: boolean;
 }
 export interface QueryInput {
+  mode?: 'statement' | 'script';
   applyContext?: boolean;
   searchPath?: string;
   ddlMappingId?: string;
@@ -71,6 +73,7 @@ export interface QueryInput {
   schema: string;
   maxRows: number;
 }
+export function executionState(result?: QuerySnapshot): QuerySnapshot['state'] | undefined { return result?.script?.state ?? result?.state; }
 export interface MetadataInput {
   profileId: string;
   kind: 'catalogs' | 'schemas' | 'tables' | 'columns';

@@ -46,7 +46,7 @@ app.setPath('userData', explicitDataDirectory || (useLegacyStorage ? legacyDirec
 const sessions = new Map<string, SessionLease>();
 const sourceCache = new SourceCache();
 const sessionPool = new SessionPool(prepareDriver);
-const active = new Map<string, { query: QueryTask; sessionId: string; done: Promise<unknown> }>();
+const active = new Map<string, { query: Pick<QueryTask, 'cancel'>; sessionId: string; done: Promise<unknown> }>();
 let window: BrowserWindow;
 let profiles: ProfileStore;
 let relations: RelationStore;
@@ -254,33 +254,43 @@ void app.whenReady().then(() => {
     if (!input || typeof input !== 'object' || typeof input.sql !== 'string' || !input.sql.trim() || input.sql.length > 1_000_000) throw new Error('Некорректный SQL.');
     for (const key of ['requestId', 'sessionId', 'profileId', 'catalog', 'schema'] as const) string(input[key], key);
     if (!input.requestId || !input.sessionId || active.has(input.requestId)) throw new Error('Некорректный request ID.');
-    if (input.ddlMappingId !== undefined) {
-      string(input.ddlMappingId, 'ddlMappingId', 100);
-      const mapping = await ddl.get(input.ddlMappingId);
-      if (mapping.profileId !== input.profileId || mapping.catalog !== input.catalog || mapping.schema !== input.schema) throw new Error('DDL mapping изменился. Откройте новую консоль из mapping, чтобы проверить подключение и schema.');
-    }
     if ([...active.values()].some(job => job.sessionId === input.sessionId)) throw new Error('В этой консоли уже выполняется запрос.');
+    if (input.ddlMappingId !== undefined) string(input.ddlMappingId, 'ddlMappingId', 100);
     if (input.templateId !== undefined) string(input.templateId, 'templateId', 100);
     if (input.applyContext !== undefined && typeof input.applyContext !== 'boolean') throw new Error('Некорректный выбор schema.');
+    if (input.mode !== undefined && !['statement', 'script'].includes(input.mode)) throw new Error('Неизвестный режим выполнения SQL.');
     if (input.searchPath !== undefined) string(input.searchPath, 'searchPath', 8192);
-    const connection = sessionTemplate(await profiles.get(input.profileId), 'console', input.templateId);
-    if (installingUpdate) throw new Error('Приложение обновляется.');
-    if ([...active.values()].some(job => job.sessionId === input.sessionId)) throw new Error('В этой консоли уже выполняется запрос.');
-    const previous = sessions.get(input.sessionId);
-    if (previous && previous.profileId !== input.profileId) throw new Error('Консоль привязана к другому подключению.');
-    if (previous && previous.templateId !== (connection.sessionTemplateId ?? '')) throw new Error('Отключите консоль перед сменой шаблона сессии.');
-    if (openingSessions.has(input.sessionId)) throw new Error('Сессия уже открывается.');
-    openingSessions.add(input.sessionId);
-    let lease: SessionLease;
-    try { lease = previous ?? await sessionPool.acquire(connection, input.sessionId); } finally { openingSessions.delete(input.sessionId); }
-    const session = lease.session;
-    sessions.set(input.sessionId, lease);
-    const query = session.createQuery(input.requestId, input.maxRows, result => {
-      if (!window.isDestroyed()) window.webContents.send('query:update', result);
-    }, input.catalog, input.schema, { apply: connection.jdbc?.options?.switchSchema !== 'disabled' && (connection.jdbc?.options?.switchSchema !== 'manual' || input.applyContext === true), searchPath: input.searchPath });
-    const done = query.run(input.sql).finally(() => active.delete(input.requestId));
-    active.set(input.requestId, { query, sessionId: input.sessionId, done });
-    void done.catch(() => {});
+    if (!Number.isInteger(input.maxRows) || input.maxRows < 1 || input.maxRows > 10000) throw new Error('Лимит строк должен быть от 1 до 10000.');
+    let query: QueryTask | undefined, canceled = false;
+    let complete!: () => void;
+    const completion = new Promise<void>(resolve => { complete = resolve; });
+    const finish = () => { active.delete(input.requestId); complete(); };
+    // Reserve the request before any asynchronous setup so immediate cancellation
+    // and duplicate requests cannot race profile reads or driver preparation.
+    active.set(input.requestId, { sessionId: input.sessionId, done: completion, query: { cancel: async () => { canceled = true; await query?.cancel(); } } });
+    try {
+      if (input.ddlMappingId !== undefined) {
+        const mapping = await ddl.get(input.ddlMappingId);
+        if (mapping.profileId !== input.profileId || mapping.catalog !== input.catalog || mapping.schema !== input.schema) throw new Error('DDL mapping изменился. Откройте новую консоль из mapping, чтобы проверить подключение и schema.');
+      }
+      const connection = sessionTemplate(await profiles.get(input.profileId), 'console', input.templateId);
+      if (installingUpdate) throw new Error('Приложение обновляется.');
+      const previous = sessions.get(input.sessionId);
+      if (previous && previous.profileId !== input.profileId) throw new Error('Консоль привязана к другому подключению.');
+      if (previous && previous.templateId !== (connection.sessionTemplateId ?? '')) throw new Error('Отключите консоль перед сменой шаблона сессии.');
+      if (openingSessions.has(input.sessionId)) throw new Error('Сессия уже открывается.');
+      openingSessions.add(input.sessionId);
+      let lease: SessionLease;
+      try { lease = previous ?? await sessionPool.acquire(connection, input.sessionId); } finally { openingSessions.delete(input.sessionId); }
+      const session = lease.session;
+      sessions.set(input.sessionId, lease);
+      query = (input.mode === 'script' ? session.createScript : session.createQuery).call(session, input.requestId, input.maxRows, result => {
+        if (!window.isDestroyed()) window.webContents.send('query:update', result);
+      }, input.catalog, input.schema, { apply: connection.jdbc?.options?.switchSchema !== 'disabled' && (connection.jdbc?.options?.switchSchema !== 'manual' || input.applyContext === true), searchPath: input.searchPath });
+      if (canceled) await query.cancel();
+      const done = query.run(input.sql).finally(finish);
+      void done.catch(() => {});
+    } catch (error) { finish(); throw error; }
   });
   handle('query:cancel', async (id: string) => { string(id, 'requestId'); await active.get(id)?.query.cancel(); });
   handle('query:release', async (id: string, guard?: boolean) => { string(id, 'sessionId'); if (guard !== undefined && typeof guard !== 'boolean') throw new Error('Некорректный session guard.'); await release(id, guard); });
