@@ -1,3 +1,4 @@
+import { confirmExecution } from './ui-helpers.mjs';
 import { _electron as electron, expect } from '@playwright/test';
 import { mkdir, mkdtemp, readFile, writeFile, copyFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
@@ -136,6 +137,7 @@ try {
   await expect(popup).toContainText('PARENTS — ON', { timeout: 30000 });
   await popup.getByText(/^PARENTS — ON/).click(); await page.keyboard.press('Enter');
   await page.getByRole('button', { name: 'Выполнить' }).click();
+  await confirmExecution(page);
   await expect(page.locator('.result-state')).toHaveText('FINISHED', { timeout: 30000 });
   await expect(page.locator('tbody tr')).toHaveCount(1);
   console.log('PASS: H2 connection UI, generic catalogs/schemas/tables/columns, escaped metadata patterns, composite FK, quoted preview and Unicode data');

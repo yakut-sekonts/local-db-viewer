@@ -1,3 +1,4 @@
+import { confirmExecution } from './ui-helpers.mjs';
 import { _electron as electron, expect } from '@playwright/test';
 import { mkdir, mkdtemp, readFile, writeFile, copyFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
@@ -42,6 +43,7 @@ try {
   const script = "CREATE TABLE script_rows (id INTEGER, label TEXT);\nINSERT INTO script_rows VALUES (9223372036854775807, 'a;б 名');\nSELECT id, label FROM script_rows;\nSELECT count(*) AS amount FROM script_rows;";
   await sql(script);
   await page.getByRole('button', { name: 'Запустить SQL-скрипт', exact: true }).click();
+  await confirmExecution(page);
   await expect(page.locator('.script-state')).toHaveText('Скрипт · FINISHED', { timeout: 30000 });
   await expect(page.locator('.script-tabs [role=tab]')).toHaveCount(4);
   await expect(page.locator('.script-summary')).toContainText('Завершено 4 из 4');
@@ -59,16 +61,19 @@ try {
   await page.screenshot({ path: 'test-artifacts/script-results.png' });
   checks.push('JDBC SQLite script, per-command tabs, selected CSV, one history entry, SQL-only persistence');
 
-  // Ordinary execution still rejects a batch. Selection and the new shortcut run
+  // Ordinary execution resolves the command at the caret. Selection and the script shortcut run
   // only the highlighted script and never the trailing INSERT.
   await sql('SELECT 1; SELECT 2;');
   await page.getByRole('button', { name: 'Выполнить' }).click();
-  await expect(page.locator('.query-error')).toContainText('одну SQL-команду');
+  await confirmExecution(page);
+  await expect(page.locator('.result-state')).toHaveText('FINISHED');
+  await expect(page.locator('.grid-scroll tbody')).toContainText('2');
   await sql('SELECT 41; SELECT 42;\nINSERT INTO script_rows VALUES (2, \'must not run\');');
   await page.keyboard.press(`${modifier}+a`);
   await page.keyboard.press('ArrowLeft');
   await page.keyboard.press('Shift+ArrowDown');
   await page.keyboard.press(`${modifier}+Shift+Enter`);
+  await confirmExecution(page);
   await expect(page.locator('.script-state')).toHaveText('Скрипт · FINISHED');
   await expect(page.locator('.script-tabs [role=tab]')).toHaveCount(2);
   await expect(page.locator('.grid-scroll tbody')).toContainText('42');
@@ -87,6 +92,7 @@ try {
   // Cancellation uses the actual UI and must skip the statement after the long SELECT.
   await sql("WITH RECURSIVE x(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM x WHERE n<100000000) SELECT sum(n) FROM x; INSERT INTO script_rows VALUES (6, 'canceled');");
   await page.getByRole('button', { name: 'Запустить SQL-скрипт', exact: true }).click();
+  await confirmExecution(page);
   await expect(page.getByRole('button', { name: 'Отменить', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Отменить', exact: true }).click();
   await expect(page.locator('.script-state')).toHaveText('Скрипт · CANCELED', { timeout: 30000 });

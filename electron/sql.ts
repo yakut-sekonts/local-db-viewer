@@ -49,7 +49,7 @@ export function singleStatement(sql: string, engine: DatabaseEngine = 'jdbc', op
   return first.sql;
 }
 export interface SqlStatement { sql: string; start: number; end: number; line: number }
-function scanStatements(sql: string, engine: DatabaseEngine, options: SqlLexingOptions, multiple: boolean): SqlStatement[] {
+function scanStatements(sql: string, engine: DatabaseEngine, options: SqlLexingOptions, multiple: boolean, cursor?: number): SqlStatement[] {
   if (typeof sql !== 'string' || sql.length > 1_000_000) throw new Error('SQL пустой или превышает 1 MB.');
   const mysql = engine === 'mysql' || engine === 'mariadb';
   const postgres = engine === 'postgres';
@@ -67,7 +67,7 @@ function scanStatements(sql: string, engine: DatabaseEngine, options: SqlLexingO
     let low = 0, high = lineStarts.length;
     while (low < high) { const middle = Math.floor((low + high) / 2); if ((lineStarts[middle] ?? 0) <= offset) low = middle + 1; else high = middle; }
     statements.push({ sql: trimmed, start: offset, end: offset + trimmed.length, line: low });
-    if (multiple && statements.length > 100) throw new Error('В одном скрипте допускается до 100 SQL-команд.');
+    if (multiple && statements.length > (cursor === undefined ? 100 : 10000)) throw new Error(cursor === undefined ? 'В одном скрипте допускается до 100 SQL-команд.' : 'Слишком много команд для определения SQL под курсором. Разделите файл.');
   };
   while (i < sql.length) {
     const character = sql.charAt(i);
@@ -91,7 +91,13 @@ function scanStatements(sql: string, engine: DatabaseEngine, options: SqlLexingO
       const line = sql.slice(i, sql.indexOf('\n', i) < 0 ? sql.length : sql.indexOf('\n', i));
       if (/^(?:GO(?:\s+\d+)?\s*(?:--.*)?|DELIMITER\b.*|\\.*|\.[A-Za-z].*|\/\s*)\r?$/i.test(line)) throw new Error('GO, DELIMITER и команды клиентских программ не поддерживаются в последовательном скрипте. Ни одна команда не выполнена.');
     }
-    if (character === ';') { append(i); hasToken = false; ended = !multiple; start = ++i; continue; }
+    if (character === ';') {
+      append(i); hasToken = false;
+      // Stop at the chosen boundary: an unfinished draft later in the console
+      // must not prevent executing an earlier complete statement.
+      if (cursor !== undefined && i >= cursor && statements.length) return statements;
+      ended = !multiple; start = ++i; continue;
+    }
     hasToken = true;
     const dollar = postgres && !/[\p{L}\p{N}_$]/u.test(sql.charAt(i - 1)) ? /^\$(?:[A-Za-z_][A-Za-z_0-9]*)?\$/.exec(sql.slice(i))?.[0] : undefined;
     if (dollar) {
@@ -126,18 +132,40 @@ function scanStatements(sql: string, engine: DatabaseEngine, options: SqlLexingO
 // before executing any of it; never submit a cut-off routine or client directive.
 export function splitSqlScript(sql: string, engine: DatabaseEngine = 'jdbc'): SqlStatement[] {
   const statements = scanStatements(sql, engine, {}, true);
+  validateEscapeBoundaries(sql, engine, statements);
+  validateScriptStatements(statements, engine);
+  return statements;
+}
+
+/** Semicolons belong to the preceding statement; gaps belong to the next one.
+ * Trailing whitespace/comments resolve to the last statement. Never cut a
+ * procedural body into executable fragments or guess session escape modes.
+ */
+export function statementAtCursor(sql: string, cursor: number, engine: DatabaseEngine = 'jdbc'): SqlStatement {
+  if (!Number.isInteger(cursor) || cursor < 0 || cursor > sql.length) throw new Error('Некорректное положение курсора.');
+  const statements = scanStatements(sql, engine, {}, true, cursor);
+  validateEscapeBoundaries(sql, engine, statements, cursor);
+  validateScriptStatements(statements, engine, true);
+  const current = statements.at(-1);
+  if (!current) throw new Error('Под курсором нет SQL-команды.');
+  return current;
+}
+function validateEscapeBoundaries(sql: string, engine: DatabaseEngine, statements: SqlStatement[], cursor?: number): void {
   if (['mysql', 'mariadb', 'postgres'].includes(engine)) {
     let alternative: SqlStatement[];
-    try { alternative = scanStatements(sql, engine, { backslashEscapes: engine === 'postgres' }, true); }
+    try { alternative = scanStatements(sql, engine, { backslashEscapes: engine === 'postgres' }, true, cursor); }
     catch { throw new Error('Границы скрипта зависят от режима backslash escaping. Выполните неоднозначную команду отдельно.'); }
     if (alternative.length !== statements.length || alternative.some((part, i) => part.start !== statements[i]?.start || part.end !== statements[i]?.end)) throw new Error('Границы скрипта зависят от режима backslash escaping. Выполните неоднозначную команду отдельно.');
   }
+}
+function validateScriptStatements(statements: SqlStatement[], engine: DatabaseEngine, cursorMode = false): void {
   for (const part of statements) {
     // Comments and literals are removed only for conservative classification;
     // their original bytes are preserved in the statement sent to the driver.
     const prefix = leadingSqlWords(part.sql, engine);
     const command = prefix.join(' ');
-    if (/^(?:DELIMITER|GO|DECLARE|IF|WHILE|FOR|LOOP|CALL|EXEC|EXECUTE)\b/.test(command)
+    if (/^(?:DELIMITER|GO|DECLARE|IF|WHILE|FOR|LOOP)\b/.test(command)
+      || !cursorMode && /^(?:CALL|EXEC|EXECUTE)\b/.test(command)
       || /^BEGIN\b/.test(command) && !/^BEGIN(?: (?:WORK|TRANSACTION|TRAN)| (?:DEFERRED|IMMEDIATE|EXCLUSIVE)(?: TRANSACTION)?)?$/.test(command)
       || /^(?:CREATE|ALTER)\b/.test(command) && !/^(?:CREATE|ALTER)(?: OR (?:REPLACE|ALTER))?(?: TEMP(?:ORARY)?| UNIQUE| UNLOGGED)? (?:TABLE|VIEW|MATERIALIZED VIEW|INDEX|SCHEMA|DATABASE|SEQUENCE|ROLE|USER|TYPE)\b/.test(command)
       || /^COPY\b/.test(command) && /\b(?:FROM\s+STDIN|TO\s+STDOUT)\b/i.test(part.sql)
@@ -145,7 +173,6 @@ export function splitSqlScript(sql: string, engine: DatabaseEngine = 'jdbc'): Sq
       throw new Error(`Строка ${part.line}: procedural SQL, GO/DELIMITER и клиентские команды не поддерживаются в последовательном скрипте. Выполните их подходящим клиентом.`);
     }
   }
-  return statements;
 }
 function leadingSqlWords(sql: string, engine: DatabaseEngine): string[] {
   const words: string[] = []; let i = 0;

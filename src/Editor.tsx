@@ -5,6 +5,8 @@ import FormatWorker from './format-worker?worker';
 import { defaultCodeStyle, generatedStyle, type CodeStyle } from './codeStyle';
 import { completeSQL } from './completion';
 import type { DatabaseEngine, SchemaIndex } from './shared';
+import { executionTarget, type ExecutionTarget } from './execution';
+import { sqlEngine } from './drivers';
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
 monaco.editor.defineTheme('studio', {
@@ -19,13 +21,25 @@ monaco.editor.defineTheme('studio', {
   colors: { 'editor.background': '#1E1F22', 'editor.foreground': '#BCBEC4', 'editorLineNumber.foreground': '#606366', 'editorLineNumber.activeForeground': '#A4A7AD', 'editor.lineHighlightBackground': '#26282E', 'editor.selectionBackground': '#214283', 'editorCursor.foreground': '#BBBBBB', 'editorIndentGuide.background1': '#313438', 'editorWidget.background': '#2B2D30' },
 });
 
-export interface EditorHandle { selection(): string; focus(): void; format(): Promise<void> }
-interface Props { value: string; onChange(value: string): void; onRun(sql: string): void; onScript(sql: string): void; onError(message: string): void; engine: DatabaseEngine; driverId?: string; codeStyle?: CodeStyle; getSchema(sql: string, offset: number): Promise<SchemaIndex | undefined> }
-export const SqlEditor = forwardRef<EditorHandle, Props>(function SqlEditor({ value, onChange, onRun, onScript, onError, engine, driverId, codeStyle = defaultCodeStyle, getSchema }, ref) {
+export interface EditorHandle { execute(mode: 'statement' | 'script'): void; clearExecution(): void; focus(): void; format(): Promise<void> }
+interface Props { value: string; onChange(value: string): void; onExecute(target: ExecutionTarget): void; onError(message: string): void; engine: DatabaseEngine; driverId?: string; codeStyle?: CodeStyle; getSchema(sql: string, offset: number): Promise<SchemaIndex | undefined> }
+export const SqlEditor = forwardRef<EditorHandle, Props>(function SqlEditor({ value, onChange, onExecute, onError, engine, driverId, codeStyle = defaultCodeStyle, getSchema }, ref) {
   const container = useRef<HTMLDivElement>(null);
   const editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
-  const callbacks = useRef({ onChange, onRun, onScript, onError, engine, driverId, codeStyle, getSchema });
-  callbacks.current = { onChange, onRun, onScript, onError, engine, driverId, codeStyle, getSchema };
+  const callbacks = useRef({ onChange, onExecute, onError, engine, driverId, codeStyle, getSchema });
+  callbacks.current = { onChange, onExecute, onError, engine, driverId, codeStyle, getSchema };
+  const executionMark = useRef<monaco.editor.IEditorDecorationsCollection | undefined>(undefined);
+  function execute(mode: 'statement' | 'script') {
+    const instance = editor.current, model = instance?.getModel(), position = instance?.getPosition(), selection = instance?.getSelection();
+    if (!instance || !model || !position || !selection) return;
+    try {
+      const { engine, driverId } = callbacks.current;
+      const target = executionTarget(model.getValue(), model.getOffsetAt(position), { start: model.getOffsetAt(selection.getStartPosition()), end: model.getOffsetAt(selection.getEndPosition()) }, mode, sqlEngine({ engine, jdbc: { driverId } }));
+      const start = model.getPositionAt(target.start), end = model.getPositionAt(target.end);
+      executionMark.current?.set([{ range: new monaco.Range(start.lineNumber, start.column, end.lineNumber, end.column), options: { className: 'sql-execution-range', stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges } }]);
+      callbacks.current.onExecute(target);
+    } catch (error) { executionMark.current?.clear(); callbacks.current.onError((error as Error).message); }
+  }
   const formatting = useRef<(() => void) | undefined>(undefined);
   async function formatEditor() {
     const instance = editor.current, model = instance?.getModel();
@@ -48,10 +62,8 @@ export const SqlEditor = forwardRef<EditorHandle, Props>(function SqlEditor({ va
     worker.postMessage({ sql: model.getValueInRange(range), engine, driverId, style: codeStyle });
   }
   useImperativeHandle(ref, () => ({
-    selection: () => {
-      const selected = editor.current?.getSelection();
-      return (selected && editor.current?.getModel()?.getValueInRange(selected)) || editor.current?.getValue() || '';
-    },
+    execute,
+    clearExecution: () => executionMark.current?.clear(),
     focus: () => editor.current?.focus(),
     format: formatEditor,
   }));
@@ -70,19 +82,14 @@ export const SqlEditor = forwardRef<EditorHandle, Props>(function SqlEditor({ va
       suggestOnTriggerCharacters: true, wordBasedSuggestions: 'off', tabCompletion: 'on',
     });
     editor.current = instance;
+    executionMark.current = instance.createDecorationsCollection();
     const change = instance.onDidChangeModelContent(() => callbacks.current.onChange(instance.getValue()));
     const action = instance.addAction({
       id: 'studio.run', label: 'Выполнить SQL', keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
-      run: () => {
-        const selection = instance.getSelection();
-        callbacks.current.onRun((selection && instance.getModel()?.getValueInRange(selection)) || instance.getValue());
-      },
+      run: () => execute('statement'),
     });
     const formatAction = instance.addAction({ id: 'studio.format', label: 'Форматировать SQL', keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyL], run: formatEditor });
-    const scriptAction = instance.addAction({ id: 'studio.script', label: 'Запустить SQL-скрипт', keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter], run: () => {
-      const selection = instance.getSelection();
-      callbacks.current.onScript((selection && instance.getModel()?.getValueInRange(selection)) || instance.getValue());
-    } });
+    const scriptAction = instance.addAction({ id: 'studio.script', label: 'Запустить SQL-скрипт', keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter], run: () => execute('script') });
     instance.getModel()?.updateOptions({ tabSize: codeStyle.indentSize, indentSize: codeStyle.indentSize, insertSpaces: !codeStyle.useTabs });
     const completion = monaco.languages.registerCompletionItemProvider('sql', {
       triggerCharacters: ['.', ' '],

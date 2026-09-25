@@ -66,6 +66,7 @@ jobs:
             node tests/driver-desktop.mjs
             node tests/driver-feed-desktop.mjs
             node tests/script-desktop.mjs
+            node tests/execution-desktop.mjs
             node tests/hardening-desktop.mjs
             node tests/settings-desktop.mjs
             node tests/ddl-desktop.mjs
@@ -81,6 +82,7 @@ jobs:
             node tests/driver-desktop.mjs
             node tests/driver-feed-desktop.mjs
             node tests/script-desktop.mjs
+            node tests/execution-desktop.mjs
             node tests/hardening-desktop.mjs
             node tests/settings-desktop.mjs
             node tests/ddl-desktop.mjs

@@ -1,3 +1,4 @@
+import { confirmExecution } from './ui-helpers.mjs';
 import { _electron as electron, expect } from '@playwright/test';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
@@ -45,6 +46,7 @@ try {
   await expect(page.locator('dialog')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'main', exact: true })).toBeVisible({ timeout: 30000 });
   await page.getByRole('button', { name: 'Выполнить' }).click();
+  await confirmExecution(page);
   await expect(page.locator('.result-state')).toHaveText('FINISHED', { timeout: 30000 });
   await expect(page.locator('tbody tr')).toHaveCount(1);
   console.log('PASS: SQLite profile test, save, metadata and real SQL execution');
@@ -108,6 +110,7 @@ try {
   await page.getByRole('button', { name: 'metrics', exact: true }).hover();
   await page.getByRole('button', { name: 'Открыть SELECT metrics' }).click();
   await page.getByRole('button', { name: 'Выполнить' }).click();
+  await confirmExecution(page);
   await expect(page.locator('.result-state')).toHaveText('FINISHED', { timeout: 30000 });
   await expect(page.locator('tbody tr')).toHaveCount(3);
   await page.screenshot({ path: join(artifacts, 'local-db-viewer-desktop.png') });
@@ -152,6 +155,7 @@ try {
   await joinItem.click();
   await expect(page.locator('.view-lines')).toContainText('AND');
   await page.getByRole('button', { name: 'Выполнить' }).click();
+  await confirmExecution(page);
   await expect(page.locator('.result-state')).toHaveText('FINISHED', { timeout: 30000 });
   await expect(page.locator('tbody tr')).toHaveCount(2);
   console.log('PASS: accepted composite JOIN executes against SQLite');

@@ -1,3 +1,4 @@
+import { confirmExecution } from './ui-helpers.mjs';
 import { _electron as electron, expect } from '@playwright/test';
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -78,6 +79,7 @@ try {
   await page.keyboard.press(`${modifier}+Shift+l`);
   await expect.poll(currentSQL).toContain('select\n  id,');
   await page.getByRole('button', { name:'Выполнить' }).click();
+  await confirmExecution(page);
   await expect(page.locator('.result-state')).toHaveText('FINISHED',{timeout:30000});
   await expect(page.locator('tbody tr')).toHaveCount(1);
   await expect(page.locator('tbody tr')).toContainText('UPPER;select');
