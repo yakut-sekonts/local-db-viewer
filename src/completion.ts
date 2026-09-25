@@ -97,13 +97,21 @@ export function completeSQL(sql: string, offset: number, index: SchemaIndex, eng
     return [ref,ref.table.columns.filter(column=>counts.get(nameKey(column.name))===1)] as const;
   }));
   const columns = (ref: Binding) => uniqueColumns.get(ref) ?? [];
+  const columnNames=new Map(refs.map(ref=>[ref,new Map(columns(ref).map(column=>[nameKey(column.name),column]))]));
   const suggestions: SqlSuggestion[] = [];
   const q = (name: string) => quoteName(name, engine, index.dialect);
   const add = (label: string, insertText: string, detail: string, kind: SqlSuggestion['kind'], rank = 2, filterText?: string) => suggestions.push({ label, insertText, detail, kind, rank, filterText, start: ctx.replaceStart, end: ctx.replaceEnd });
+  if(analysis.using!==undefined) {
+    for(const column of analysis.using)add(column.name,q(column.name),`USING · общая колонка · ${column.type}`,'column',0);
+    return suggestions;
+  }
   const last = ctx.prior.at(-1);
   const fromClause = [...ctx.prior].reverse().find(token => ['FROM', 'JOIN', 'WHERE', 'ON', 'GROUP', 'ORDER', 'SELECT'].some(word => isKeyword(token, word)));
   const tableContext = ['FROM', 'JOIN', 'UPDATE', 'INTO'].some(word => isKeyword(last, word)) || last?.value === ',' && ['FROM', 'JOIN'].some(word => isKeyword(fromClause, word));
   const joinContext = isKeyword(last, 'JOIN');
+  const joinIndex=ctx.prior.length-1-[...ctx.prior].reverse().findIndex(token=>isKeyword(token,'JOIN'));
+  let naturalJoin=false;
+  for(let i=joinIndex-1;i>=0 && ['NATURAL','LEFT','RIGHT','FULL','INNER','OUTER','CROSS'].some(word=>isKeyword(ctx.prior[i],word));i--)if(isKeyword(ctx.prior[i],'NATURAL'))naturalJoin=true;
   if (ctx.qualifier.length && !tableContext) {
     const matches = refs.filter(ref => ctx.qualifier.length === 1 ? nameMatches(ctx.qualifier[0], ref.alias, engine) : !ref.explicitAlias && !!ref.physical && resolveTable(ctx.qualifier, index, engine, []) === ref.physical);
     for (const ref of matches.length === 1 ? matches : []) for (const column of columns(ref)) add(column.name, q(column.name), `${ref.alias} · ${column.type}${ref.table.metadataSource === 'bundled' ? ' · встроенный справочник' : ''}`, 'column', 0);
@@ -118,14 +126,27 @@ export function completeSQL(sql: string, offset: number, index: SchemaIndex, eng
       if (matches) add(table.name, ctes.includes(table) || parts.length ? q(table.name) : tablePath(table, engine, index.dialect), ctes.includes(table) ? 'CTE' : `${table.catalog}.${table.schema} · ${table.columns.length} columns${table.metadataSource === 'bundled' ? ' · встроенный справочник' : ''}`, 'table', 1);
     }
   } else {
-    const counts = new Map<string, number>();
-    for (const ref of refs) for (const column of columns(ref)) counts.set(nameKey(column.name), (counts.get(nameKey(column.name)) ?? 0) + 1);
-    for (const ref of refs) for (const column of columns(ref)) {
-      const ambiguous = (counts.get(nameKey(column.name)) ?? 0) > 1;
-      const label = ambiguous ? `${ref.alias}.${column.name}` : column.name;
-      add(label, ambiguous ? `${q(ref.alias)}.${q(column.name)}` : q(column.name), `${ref.alias} · ${column.type}${ref.table.metadataSource === 'bundled' ? ' · встроенный справочник' : ''}`, 'column', 1, `${column.name} ${label}`);
+    const nearest=new Map<string,{distance:number;count:number}>();
+    for(const item of analysis.columns) {
+      const key=nameKey(item.column.name), known=nearest.get(key);
+      if(!known || item.distance<known.distance)nearest.set(key,{distance:item.distance,count:1});
+      else if(item.distance===known.distance)known.count++;
     }
-    for (const ref of refs) add(`${ref.alias}.*`, `${q(ref.alias)}.*`, `Все колонки ${ref.table.name}`, 'column', 3);
+    for(const item of analysis.columns) {
+      const {column}=item, closest=nearest.get(nameKey(column.name))!;
+      const ambiguous=closest.count>1 || item.distance!==closest.distance || analysis.unknownDistances.some(distance=>distance<=item.distance);
+      if(!ambiguous) {
+        const detail=item.bindings.length>1 ? 'Общая колонка JOIN' : item.bindings[0]?.alias ?? '';
+        add(column.name,q(column.name),`${detail} · ${column.type}${item.bindings[0]?.table.metadataSource==='bundled' ? ' · встроенный справочник' : ''}`,'column',1);
+      } else for(const binding of item.bindings) {
+        const ref=refs.find(ref=>ref.alias===binding.alias && ref.distance===item.distance && ref.table===binding.table);
+        const original=ref && columnNames.get(ref)?.get(nameKey(column.name));
+        if(!ref || !original)continue;
+        const label=`${ref.alias}.${original.name}`;
+        add(label,`${q(ref.alias)}.${q(original.name)}`,`${ref.alias} · ${original.type}`,'column',1,`${original.name} ${label}`);
+      }
+    }
+    for (const ref of refs) if(ref.table.columns.length)add(`${ref.alias}.*`, `${q(ref.alias)}.*`, `Все колонки ${ref.table.name}`, 'column', 3);
     const clause=[...ctx.before].reverse().find(token=>['SELECT','FROM','WHERE','GROUP','HAVING','ORDER','LIMIT','OFFSET','FETCH','QUALIFY','WINDOW'].some(word=>isKeyword(token,word)));
     if(isKeyword(clause,'ORDER') && clause?.container===ctx.scope) {
       const counts=new Map<string,number>();
@@ -148,7 +169,7 @@ export function completeSQL(sql: string, offset: number, index: SchemaIndex, eng
   const currentWord = ctx.word?.value.toUpperCase() ?? '';
   const joins = ['LEFT JOIN', 'INNER JOIN', 'RIGHT JOIN', ...(engine === 'mysql' || engine === 'mariadb' || engine === 'sqlite' || (engine === 'jdbc' && !index.dialect?.fullOuterJoins) ? [] : ['FULL JOIN'])];
   const canJoin = joinContext || !ctx.qualifier.length && local.length > 0 && (currentWord === 'JOIN' || joins.some(join => currentWord && join.startsWith(currentWord)) || isKeyword(fromClause, 'FROM') || isKeyword(fromClause, 'ON'));
-  if (canJoin && !isKeyword(last, 'ON')) for (const base of local) for (const relation of index.relationships) {
+  if (canJoin && !isKeyword(last, 'ON') && !(joinContext && naturalJoin)) for (const base of local) for (const relation of index.relationships) {
     const forward = relation.columns.every(pair => projectedKey(base,relation.source,pair.source) !== undefined);
     const reverse = relation.columns.every(pair => projectedKey(base,relation.target,pair.target) !== undefined);
     if (!forward && !reverse) continue;

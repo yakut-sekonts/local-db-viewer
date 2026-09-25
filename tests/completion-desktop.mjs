@@ -85,12 +85,35 @@ try {
   await expect(popup).not.toContainText('other');
   await popup.locator('.monaco-list-row').filter({ hasText: 'total' }).first().click();
   await run(4);
+
+  await suggest('SELECT * FROM orders o JOIN customers c USING (|)');
+  await expect(popup).toContainText('tenant_id');
+  await expect(popup).not.toContainText('customer_id');
+  await expect(popup).not.toContainText('amount');
+  await expect(popup).not.toContainText('LEFT JOIN');
+  await popup.locator('.monaco-list-row').filter({ hasText: 'tenant_id' }).first().click();
+  await run(2);
+
+  await suggest('WITH joined AS (SELECT * FROM orders o JOIN customers c USING (tenant_id)) SELECT j.| FROM joined j');
+  await expect(popup).toContainText('tenant_id');
+  await popup.locator('.monaco-list-row').filter({ hasText: 'tenant_id' }).first().click();
+  await run(2);
+  await expect(page.locator('thead')).toContainText('tenant_id');
+
+  await suggest('WITH joined AS (SELECT * FROM (SELECT tenant_id, customer_id AS id, amount FROM orders) o NATURAL JOIN customers c) SELECT j.| FROM joined j');
+  await expect(popup).toContainText('id');
+  await expect(popup).toContainText('name');
+  await popup.locator('.monaco-list-row').filter({ hasText: 'name' }).first().click();
+  await run(2);
+  await expect(page.locator('tbody')).toContainText('First');
+  await expect(page.locator('tbody')).toContainText('Second');
+  await page.screenshot({ path: 'test-artifacts/completion-using-natural.png' });
   expect(errors).toEqual([]);
   await writeFile('test-artifacts/completion-desktop-results.json', JSON.stringify({
     passed: true, platform: process.platform, derivedColumns: true, projectedCompositeJoin: true,
-    correlatedScope: true, unionOutputOrder: true, executedAcceptedSQL: true,
+    correlatedScope: true, unionOutputOrder: true, usingCandidates: true, usingCTE: true, naturalJoinCTE: true, executedAcceptedSQL: true,
   }, null, 2));
-  console.log('PASS: actual Monaco completion and executed derived columns, projected composite JOIN, correlated query and UNION ORDER BY');
+  console.log('PASS: actual Monaco completion and executed derived columns, composite JOIN, USING/NATURAL CTE, correlated query and UNION ORDER BY');
 } catch (error) {
   await (await app.firstWindow()).screenshot({ path: 'test-artifacts/completion-failure.png' }).catch(() => {});
   throw error;

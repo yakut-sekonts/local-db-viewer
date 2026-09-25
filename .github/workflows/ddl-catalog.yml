@@ -54,6 +54,11 @@ jobs:
           LDV_DDL_SERVER_TEST: '1'
           LDV_PG_PORT: ${{ job.services.postgres.ports[5432] }}
           LDV_MSSQL_PORT: ${{ job.services.mssql.ports[1433] }}
+      - name: Verify JOIN completion against PostgreSQL
+        run: npx tsx tests/join-postgres.ts
+        env:
+          LDV_DDL_SERVER_TEST: '1'
+          LDV_PG_PORT: ${{ job.services.postgres.ports[5432] }}
       - uses: actions/upload-artifact@v7
         if: always()
         with:
