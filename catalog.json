@@ -183,13 +183,13 @@
     "h2": {
       "files": [
         {
-          "path": "com/h2database/h2/2.5.250/h2-2.5.250.jar",
-          "sha256": "82a80a2ac06901b03cdb233c663d21c4f49c884bf6d0cf85022729e8db9ab86f",
-          "size": 2689845
+          "path": "com/h2database/h2/2.5.252/h2-2.5.252.jar",
+          "sha256": "90b11dc413da82070ef15fc943282c1408e6ffd34fa68998335fea8603b5ff20",
+          "size": 2693360
         }
       ],
-      "key": "bd6051ee3e2f70e1a534439902be77f63165add9b672ea8e1afaae76b1a5bb73",
-      "version": "2.5.250"
+      "key": "cbf1bb6b1bb84e7bf34c1efaf1102d3a15e0700b0a3131c39430ef1b65bdb15b",
+      "version": "2.5.252"
     },
     "hana": {
       "files": [
