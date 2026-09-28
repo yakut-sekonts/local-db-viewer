@@ -38,20 +38,27 @@ export interface QueryStats {
   processedBytes?: number;
   queued?: boolean;
 }
-export interface QuerySnapshot {
-  script?: { index: number; total: number; completed: number; line: number; preview: string; state: QuerySnapshot['state']; elapsedTimeMillis: number; dataLimited?: boolean };
-  requestId: string;
-  queryId: string;
-  state: 'RUNNING' | 'FINISHED' | 'FAILED' | 'CANCELED';
+export interface QueryResultData {
   columns: Column[];
   rows: Cell[][];
   totalRows: number;
   truncated: boolean;
+  updateType?: string;
+  updateCount?: number | string;
+  resultState?: 'RUNNING' | 'FINISHED' | 'FAILED' | 'CANCELED';
+  error?: string;
+  dataLimited?: boolean;
+}
+export interface QuerySnapshot extends QueryResultData {
+  additionalResults?: QueryResultData[];
+  omittedResults?: number;
+  script?: { index: number; total: number; completed: number; line: number; preview: string; state: QuerySnapshot['state']; elapsedTimeMillis: number; dataLimited?: boolean };
+  requestId: string;
+  queryId: string;
+  state: 'RUNNING' | 'FINISHED' | 'FAILED' | 'CANCELED';
   stats: QueryStats;
   error?: string;
   errorLocation?: { lineNumber: number; columnNumber: number };
-  updateType?: string;
-  updateCount?: number | string;
   warnings: string[];
   catalog?: string;
   schema?: string;

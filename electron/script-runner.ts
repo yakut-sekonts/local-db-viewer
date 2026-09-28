@@ -1,4 +1,4 @@
-import type { DatabaseEngine, QuerySnapshot } from '../src/shared';
+import type { DatabaseEngine, QuerySnapshot, QueryResultData } from '../src/shared';
 import type { QueryTask } from './database';
 import { splitSqlScript, type SqlStatement } from './sql';
 
@@ -6,15 +6,22 @@ export const SCRIPT_RESULT_BYTES = 16 * 1024 ** 2;
 // Rows and columns from all statements share one retention budget. Drivers still
 // drain results according to their normal cancellation/row-limit semantics.
 export function retainScriptData(snapshot: QuerySnapshot, budget: number): { snapshot: QuerySnapshot; bytes: number; limited: boolean } {
-  let bytes = Buffer.byteLength(JSON.stringify(snapshot.columns));
-  if (bytes > budget) return { snapshot: { ...snapshot, columns: [], rows: [], truncated: snapshot.totalRows > 0 || snapshot.truncated }, bytes: 0, limited: true };
-  const rows: QuerySnapshot['rows'] = []; let limited = false;
-  for (const row of snapshot.rows) {
-    const size = Buffer.byteLength(JSON.stringify(row));
-    if (bytes + size > budget) { limited = true; break; }
-    rows.push(row); bytes += size;
+  let bytes = 0, limited = false;
+  function retain<T extends QueryResultData>(result: T): T {
+    const columns = Buffer.byteLength(JSON.stringify(result.columns));
+    if (bytes + columns > budget) { limited = true; return { ...result, columns: [], rows: [], truncated: result.totalRows > 0 || result.truncated, dataLimited: true }; }
+    bytes += columns;
+    const rows: QueryResultData['rows'] = []; let trimmed = false;
+    for (const row of result.rows) {
+      const size = Buffer.byteLength(JSON.stringify(row));
+      if (bytes + size > budget) { limited = true; trimmed = true; break; }
+      rows.push(row); bytes += size;
+    }
+    return { ...result, rows, truncated: result.truncated || trimmed, ...(trimmed ? { dataLimited: true } : {}) };
   }
-  return { snapshot: { ...snapshot, rows, truncated: snapshot.truncated || limited }, bytes, limited };
+  const result = retain(snapshot);
+  if (snapshot.additionalResults) result.additionalResults = snapshot.additionalResults.map(retain);
+  return { snapshot: result, bytes, limited };
 }
 interface ScriptOptions {
   requestId: string; engine: DatabaseEngine;

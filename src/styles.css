@@ -50,7 +50,7 @@
 .driver-source-settings summary { cursor: pointer; color: #8ea8ca; margin-bottom: 8px; }
 .script-results { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
 .script-summary { display: flex; flex-wrap: wrap; gap: 14px; padding: 7px 12px; font-size: 11px; border-bottom: 1px solid #393b40; }
-.script-state[data-state=FAILED], .script-state[data-state=CANCELED] { color: #e6a099; }
+.script-state[data-state=FAILED], .script-state[data-state=CANCELED], .query-state[data-state=FAILED], .query-state[data-state=CANCELED] { color: #e6a099; }
 .script-tabs { display: flex; overflow-x: auto; flex-shrink: 0; border-bottom: 1px solid #393b40; }
 .script-tabs button { display: flex; align-items: center; gap: 7px; white-space: nowrap; background: transparent; color: #a7b1bf; border: 0; border-right: 1px solid #393b40; padding: 7px 12px; cursor: pointer; font: inherit; font-size: 11px; }
 .script-tabs button.active { background: #30466e; color: #e0e6ef; }

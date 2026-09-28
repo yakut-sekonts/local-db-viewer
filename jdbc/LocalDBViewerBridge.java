@@ -210,32 +210,14 @@ public final class LocalDBViewerBridge {
                 else hasResult = statement.execute(sql);
                 if (command.equals("begin") || command.endsWith("-chain")) explicitTransaction = true;
                 if (command.equals("commit") || command.equals("rollback")) explicitTransaction = false;
-                if (hasResult) {
-                    try (ResultSet result = statement.getResultSet()) {
-                        ResultSetMetaData metadata = result.getMetaData();
-                        for (int column = 1; column <= metadata.getColumnCount(); column++) {
-                            JsonObject field = new JsonObject(); field.addProperty("name", metadata.getColumnLabel(column)); field.addProperty("type", metadata.getColumnTypeName(column)); columns.add(field);
-                        }
-                        int maximum = Math.min(10000, Math.max(1, request.get("maxRows").getAsInt()));
-                        long total = 0, retained = 0;
-                        while (result.next()) {
-                            if (CANCELED.get()) throw new CancellationException("Query canceled");
-                            total++;
-                            if (rows.size() < maximum && retained < 8 * 1024 * 1024) {
-                                JsonArray row = new JsonArray();
-                                for (int column = 1; column <= metadata.getColumnCount(); column++) row.add(JSON.toJsonTree(cell(result, metadata, column)));
-                                long length = JSON.toJson(row).getBytes(StandardCharsets.UTF_8).length;
-                                if (retained + length <= 8 * 1024 * 1024) { rows.add(row); retained += length; } else retained = 8 * 1024 * 1024;
-                            }
-                        }
-                        snapshot.addProperty("totalRows", total); snapshot.addProperty("truncated", total > rows.size());
-                    }
-                } else {
-                    long count = statement.getLargeUpdateCount();
-                    if (count >= 0) snapshot.addProperty("updateCount", Long.toString(count));
-                    snapshot.addProperty("updateType", "JDBC");
-                }
-                for (SQLWarning warning = statement.getWarnings(); warning != null && warnings.size() < 50; warning = warning.getNextWarning()) warnings.add(error(warning));
+                snapshot.addProperty("inTransaction", explicitTransaction);
+                if (!active.getAutoCommit() && (command.startsWith("commit") || command.startsWith("rollback"))) {
+                    snapshot.addProperty("updateType", "JDBC"); snapshot.addProperty("resultState", "FINISHED");
+                } else JdbcResults.read(statement, hasResult, snapshot, Math.min(10000, Math.max(1, request.get("maxRows").getAsInt())),
+                    CANCELED, LocalDBViewerBridge::cell, LocalDBViewerBridge::error, () -> {
+                        snapshot.getAsJsonObject("stats").addProperty("elapsedTimeMillis", (System.nanoTime() - started) / 1_000_000);
+                        JsonObject update = message("update"); update.add("snapshot", snapshot); send(update);
+                    });
             } finally { runningStatement = null; }
             snapshot.addProperty("state", CANCELED.get() ? "CANCELED" : "FINISHED");
             try {

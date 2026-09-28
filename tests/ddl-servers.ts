@@ -136,6 +136,30 @@ next line'; COMMENT ON COLUMN ${s}.parent.label IS 'Unicode: 名';
       if(engine==='postgres') {
         const context=await consoleLease.session.createScript('script-search-path',100,()=>{},source,'public').run(`SET search_path TO ${s}, public; SELECT current_schema();`);
         assert.equal(context.script?.state,'FINISHED',context.error);assert.deepEqual(context.rows,[[schema]]);assert.equal(context.searchPath,`${s}, public`);
+      } else {
+        // Real SQL Server procedure results use the same JVM connection as the console.
+        await a.query(`CREATE PROCEDURE ${s}.multiple_results AS BEGIN SET NOCOUNT OFF;
+          UPDATE ${table} SET label='updated' WHERE id=0;
+          SELECT id, label FROM ${table};
+          UPDATE ${table} SET label='updated';
+          SELECT id FROM ${table} WHERE id=0;
+          SELECT CAST(9007199254740993 AS bigint) AS big, CAST(12345678901234567890.123 AS decimal(23,3)) AS precise;
+        END`);
+        const multiple=await consoleLease.session.createQuery('procedure-results',100,undefined,source,'').run(`EXEC ${s}.multiple_results`);
+        assert.equal(multiple.state,'FINISHED',multiple.error);
+        const results=[multiple,...(multiple.additionalResults??[])];
+        assert.deepEqual(results.map(result=>result.columns.length ? result.rows : result.updateCount),[
+          '0',[['9223372036854775807',"a;'b"]],'1',[],[['9007199254740993','12345678901234567890.123']],
+        ]);
+        assert.ok(results.every(result=>result.resultState==='FINISHED'));
+        await a.query(`CREATE PROCEDURE ${s}.later_failure AS BEGIN SET NOCOUNT ON;
+          SELECT id FROM ${table}; THROW 50001, 'fixture procedure later failure', 1;
+        END`);
+        const failed=await consoleLease.session.createQuery('procedure-failure',100,undefined,source,'').run(`EXEC ${s}.later_failure`);
+        assert.equal(failed.state,'FAILED');assert.match(failed.error??'',/fixture procedure later failure/);
+        assert.deepEqual(failed.rows,[['9223372036854775807']]);assert.equal(failed.resultState,'FINISHED');
+        const next=await consoleLease.session.createQuery('procedure-recovery',100,undefined,source,'').run('SELECT 42');
+        assert.equal(next.state,'FINISHED',next.error);assert.deepEqual(next.rows,[['42']]);
       }
     } finally {await ddlLease.release();await consoleLease.release();}
     if(engine==='postgres') {
@@ -191,7 +215,7 @@ next line'; COMMENT ON COLUMN ${s}.parent.label IS 'Unicode: 名';
       await a.query(`ALTER TABLE ${s}.child ALTER COLUMN label ADD MASKED WITH (FUNCTION='default()')`);
       await assert.rejects(readDdl(profile(engine,source),mapping(source),a.query),/masked/);
     }
-    reports.push({engine,passed:true,roundTrip:true,files:first.files.length,jdbc:true,objectSources:true,searchPath:engine==='postgres',consoleTransactionPreserved:true,sequentialScripts:true,offlineForeignKeys:true,unsupportedRejected:true});
+    reports.push({engine,passed:true,roundTrip:true,files:first.files.length,jdbc:true,objectSources:true,searchPath:engine==='postgres',multipleResults:engine==='mssql',consoleTransactionPreserved:true,sequentialScripts:true,offlineForeignKeys:true,unsupportedRejected:true});
     console.log(`PASS: ${engine} definitions → clean database → identical definitions, offline JOINs and guards`);
   } catch(error) {
     reports.push({engine,passed:false,error:(error as Error).stack});console.error(error);
