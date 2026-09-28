@@ -145,13 +145,13 @@
     "duckdb": {
       "files": [
         {
-          "path": "org/duckdb/duckdb_jdbc/1.5.5.1/duckdb_jdbc-1.5.5.1.jar",
-          "sha256": "22343dd258db1b0b51d37afc776c8dff5b19282829fa5b47f7d5d6fe02b3377a",
-          "size": 85435455
+          "path": "org/duckdb/duckdb_jdbc/1.5.6.0/duckdb_jdbc-1.5.6.0.jar",
+          "sha256": "04ae3375d7c40dc88dc9bf0014b82ba5e66715564584af4e3abea39c7ba144d3",
+          "size": 85178546
         }
       ],
-      "key": "010eaeb82765c3cee35bba86c80fa9495afcca0df4b44806b6148ae12537413b",
-      "version": "1.5.5.1"
+      "key": "3a76ddb469b58c570436f9ca0e47fa64105beda71e0d125b5dfd36686b877e0f",
+      "version": "1.5.6.0"
     },
     "exasol": {
       "files": [
@@ -446,29 +446,29 @@
     "mongodb": {
       "files": [
         {
-          "path": "org/mongodb/mongodb-jdbc/3.0.8/mongodb-jdbc-3.0.8.jar",
-          "sha256": "f07daf4cdaf0efb1fa3cf233488256a8b23f1474c7898ecd538a85b1604c20b8",
-          "size": 41469746
+          "path": "org/mongodb/mongodb-jdbc/4.0.0/mongodb-jdbc-4.0.0.jar",
+          "sha256": "0501dcae50d7a56b81751e611cceb0ba72a2e34ec350b1fb871ef561953a5512",
+          "size": 42072254
         },
         {
-          "path": "org/mongodb/mongodb-driver-sync/5.9.1/mongodb-driver-sync-5.9.1.jar",
-          "sha256": "028c8b1043392ff197e1c83b37974ebdc8eb5a5a3eedb91b95f7215957bb523c",
-          "size": 174543
+          "path": "org/mongodb/mongodb-driver-sync/5.13.0/mongodb-driver-sync-5.13.0.jar",
+          "sha256": "b1042221132552cdf56f95bcd61d524b745923d7bc3ace1aaa882a7fd51fb94e",
+          "size": 179578
         },
         {
-          "path": "org/mongodb/bson/5.9.1/bson-5.9.1.jar",
-          "sha256": "c8950aedbe0003706af928c19288e9e1e28967ec77ac86d21634f79ec2f2e054",
-          "size": 531687
+          "path": "org/mongodb/bson/5.13.0/bson-5.13.0.jar",
+          "sha256": "51f583ee96fda9bc0897e73321c5ae1485102bfd8f95d0d34d7d57919cbc650a",
+          "size": 531686
         },
         {
-          "path": "org/mongodb/mongodb-driver-core/5.9.1/mongodb-driver-core-5.9.1.jar",
-          "sha256": "2069c4c7f5cf0389e64fa584642852085c7604c7c57678c0565d5daed886a189",
-          "size": 1977989
+          "path": "org/mongodb/mongodb-driver-core/5.13.0/mongodb-driver-core-5.13.0.jar",
+          "sha256": "44f0bc54cba2ef1cbfff8ad5f84e0f1bfccf4886661a93b0e4882ed9c4fdb81d",
+          "size": 2068639
         },
         {
-          "path": "org/mongodb/bson-record-codec/5.9.1/bson-record-codec-5.9.1.jar",
-          "sha256": "4647cafa6e3ae10b36ab108f275250fc185fd59426c59e1283a32e841b8a4d4e",
-          "size": 11796
+          "path": "org/mongodb/bson-record-codec/5.13.0/bson-record-codec-5.13.0.jar",
+          "sha256": "0f6aca2c3c4b3c63e0c1fea65147c51af02be5d8d940f298abb3dc0906ca1ba0",
+          "size": 11802
         },
         {
           "path": "org/aspectj/aspectjrt/1.9.7/aspectjrt-1.9.7.jar",
@@ -521,19 +521,19 @@
           "size": 264873
         },
         {
-          "path": "org/bouncycastle/bcprov-jdk18on/1.85/bcprov-jdk18on-1.85.jar",
-          "sha256": "20af26bf6060bb8005cc2389916812c1e0e998dc48d2ced7131b89461b54cff7",
-          "size": 10321819
+          "path": "org/bouncycastle/bcprov-jdk18on/1.86/bcprov-jdk18on-1.86.jar",
+          "sha256": "2af190b300cbb0b35e248ccf5f4a06b6072030aeb3da7a98ec73abe5b4cb371f",
+          "size": 7224011
         },
         {
-          "path": "org/bouncycastle/bcpkix-jdk18on/1.85/bcpkix-jdk18on-1.85.jar",
-          "sha256": "c9f82b2d4e99c4bbdfccf684e52cc06ea06a0b567bfd0d08f9c5a3f417055996",
-          "size": 1315409
+          "path": "org/bouncycastle/bcpkix-jdk18on/1.86/bcpkix-jdk18on-1.86.jar",
+          "sha256": "8d8b41a4b149bdae8d331f059a578870954d1e3ff29f8269a9eb3ee19a7e4ef7",
+          "size": 1341621
         },
         {
-          "path": "org/bouncycastle/bcutil-jdk18on/1.85/bcutil-jdk18on-1.85.jar",
-          "sha256": "590f55ed5d68529239898a4a5c4f730b6e37f45d1cfa3fbe51f8485abe32c42d",
-          "size": 718812
+          "path": "org/bouncycastle/bcutil-jdk18on/1.86/bcutil-jdk18on-1.86.jar",
+          "sha256": "1c268e15f785aafb1e4670d8d6e5f856f69475e96c162dadcd1ff9b350e9139f",
+          "size": 789287
         },
         {
           "path": "org/thymeleaf/thymeleaf/3.1.5.RELEASE/thymeleaf-3.1.5.RELEASE.jar",
@@ -606,8 +606,8 @@
           "size": 813607
         }
       ],
-      "key": "b9faa0fab4cb4317f30f0d71775c1c48e11b4da6d0dd65d708e3f43f326e0636",
-      "version": "3.0.8"
+      "key": "e7ead60fd13f2d49916cb62e100fc1c1805e78adf315ac22c294e8393e730f99",
+      "version": "4.0.0"
     },
     "mssql": {
       "files": [
