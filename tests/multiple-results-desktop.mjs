@@ -32,12 +32,16 @@ try {
   await expect(tabs.nth(4)).toHaveAttribute('aria-selected','true');
   await expect(page.locator('.grid-scroll tbody')).toContainText('second');
   await tabs.nth(1).click();await expect(page.locator('.grid-scroll tbody tr')).toHaveCount(2);
+  await page.locator('.grid-scroll td[data-column="0"]').first().click();
+  await page.keyboard.press(`${modifier}+c`);
+  await expect.poll(()=>app.evaluate(({clipboard})=>clipboard.readText())).toBe('first');
   const exportPath=resolve('test-artifacts/multiple-results-selected.csv');
   await app.evaluate(({dialog},filePath)=>{dialog.showSaveDialog=async()=>({canceled:false,filePath});},exportPath);
   await page.getByRole('button',{name:'CSV',exact:true}).click();
   await expect.poll(()=>readFile(exportPath,'utf8').catch(()=>'' )).toContain('first');
   expect(await readFile(exportPath,'utf8')).not.toContain('second');
   await tabs.nth(3).click();await expect(page.locator('.grid-scroll thead')).toContainText('empty');await expect(page.locator('.no-rows')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Копировать выделение',exact:true})).toBeDisabled();
   await tabs.nth(2).click();await expect(page.locator('.result-empty')).toContainText('9007199254740993');
   checks.push('five ordered result tabs, zero/64-bit counts, empty table, selected CSV export');
 

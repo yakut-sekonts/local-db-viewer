@@ -57,6 +57,7 @@ const api: DesktopAPI = {
     removeRelation: (profileId, id) => invoke('schema:remove-relation', profileId, id),
   },
   exportCSV: input => invoke('export:csv', input),
+  copyText: text => invoke('clipboard:write-text', text),
   files: { path: kind => invoke('files:path', kind), open: () => invoke('files:open'), save: sql => invoke('files:save', sql), database: () => invoke('files:database'), certificate: () => invoke('files:certificate') },
 };
 contextBridge.exposeInMainWorld('studio', api);

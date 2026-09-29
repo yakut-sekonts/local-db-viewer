@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, session as electronSession } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, safeStorage, session as electronSession } from 'electron';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -18,6 +18,7 @@ import { filterSchema, schemaAllowed, isSystemSchema } from '../src/schemaSettin
 import { metadataSQL } from './sql';
 import { ProfileStore } from './storage';
 import { csv } from './csv';
+import { validateClipboardText } from '../src/clipboard';
 import { MAX_CA_BYTES, validateCertificate, validateSSL } from './tls';
 import { loadSchema, RelationStore, validateRelation } from './schema';
 import { Updater } from './updater';
@@ -377,6 +378,7 @@ void app.whenReady().then(() => {
     const lease = await sessionPool.acquire(sessionTemplate(await profiles.get(input.profileId), 'introspection'));
     try { return await lease.session.inspect<string>({ ...input, kind: 'preview' }); } finally { await lease.release(); }
   });
+  handle('clipboard:write-text', (text: unknown) => { validateClipboardText(text); clipboard.writeText(text); });
   handle('export:csv', async (input) => {
     if (!input || !Array.isArray(input.columns) || !Array.isArray(input.rows) || input.rows.length > 10000 || !input.rows.every(Array.isArray)) throw new Error('Некорректный результат.');
     const result = await dialog.showSaveDialog(window, { defaultPath: 'result.csv', filters: [{ name: 'CSV', extensions: ['csv'] }] });

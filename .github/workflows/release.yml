@@ -64,6 +64,7 @@ jobs:
             node tests/jdbc-streaming.mjs
             node tests/multiple-results-runtime.mjs
             node tests/multiple-results-desktop.mjs
+            node tests/result-grid-desktop.mjs
             npm run test:ui
             node tests/driver-desktop.mjs
             node tests/driver-feed-desktop.mjs
@@ -83,6 +84,7 @@ jobs:
             export LOCAL_DB_VIEWER_EXECUTABLE="$GITHUB_WORKSPACE/release/win-unpacked/Local DB Viewer.exe"
             node tests/multiple-results-runtime.mjs
             node tests/multiple-results-desktop.mjs
+            node tests/result-grid-desktop.mjs
             node tests/driver-desktop.mjs
             node tests/driver-feed-desktop.mjs
             node tests/script-desktop.mjs

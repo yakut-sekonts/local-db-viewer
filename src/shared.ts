@@ -128,6 +128,7 @@ export interface DesktopAPI {
     removeRelation(profileId: string, id: string): Promise<void>;
   };
   exportCSV(input: { columns: Column[]; rows: Cell[][] }): Promise<boolean>;
+  copyText(text: string): Promise<void>;
   files: { path(kind: 'certificate' | 'key' | 'store' | 'ddl' | 'executable'): Promise<string | null>; open(): Promise<{ name: string; sql: string } | null>; save(sql: string): Promise<boolean>; database(): Promise<string | null>; certificate(): Promise<{ name: string; pem: string } | null> };
 }
 declare global { interface Window { studio: DesktopAPI } }
