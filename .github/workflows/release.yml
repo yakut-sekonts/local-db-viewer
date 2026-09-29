@@ -65,6 +65,7 @@ jobs:
             node tests/multiple-results-runtime.mjs
             node tests/multiple-results-desktop.mjs
             node tests/result-grid-desktop.mjs
+            node tests/history-desktop.mjs
             npm run test:ui
             node tests/driver-desktop.mjs
             node tests/driver-feed-desktop.mjs
@@ -85,6 +86,7 @@ jobs:
             node tests/multiple-results-runtime.mjs
             node tests/multiple-results-desktop.mjs
             node tests/result-grid-desktop.mjs
+            node tests/history-desktop.mjs
             node tests/driver-desktop.mjs
             node tests/driver-feed-desktop.mjs
             node tests/script-desktop.mjs

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Database, History, Settings2, Plus, Play, Square, X, Terminal, ChevronDown, FolderOpen, Save, Command, Activity, Circle, PanelLeftClose, Folder, Files, Menu, ChevronRight, Link2, RefreshCw, Unplug } from 'lucide-react';
 import { SqlEditor, type EditorHandle } from './Editor';
+import { HistoryPanel } from './HistoryPanel';
+import { appendHistory, historyContext, parseHistory, pinHistory, type HistoryItem } from './history';
 import { DriverCenter } from './DriverCenter';
 import { productName, profileDriver } from './drivers';
 import { generatedStyle } from './codeStyle';
@@ -20,7 +22,7 @@ import { previewSQL } from '../electron/sql';
 
 interface Tab { scriptResults?: QuerySnapshot[]; searchPath?: string; applyContext?: boolean; ddlMappingId?: string; templateId?: string; id: string; name: string; sql: string; profileId: string; catalog: string; schema: string; result?: QuerySnapshot }
 interface PendingExecution extends ExecutionConfirmation { input: Omit<QueryInput, 'requestId'> }
-interface HistoryItem { mode?: 'statement' | 'script'; id: string; sql: string; profileId: string; profileName: string; catalog: string; schema: string; state: string; time: number; duration: number }
+interface HistoryRequest { tabId: string; startedAt: number; entry: Omit<HistoryItem, 'id' | 'time' | 'duration' | 'state'> }
 const INITIAL_SQL = '-- Local DB Viewer\n-- Выберите подключение: ⌘ / Ctrl + Enter выполняет запрос\n\nSELECT 1 AS connected;\n';
 const newTab = (profile?: Profile, sql = INITIAL_SQL, name = 'console.sql'): Tab => ({ id: crypto.randomUUID(), name, sql, profileId: profile?.id ?? '', catalog: profile?.catalog ?? '', schema: profile?.schema ?? '' });
 function restoreTabs(): [Tab, ...Tab[]] {
@@ -28,7 +30,7 @@ function restoreTabs(): [Tab, ...Tab[]] {
     const items = JSON.parse(localStorage.getItem('studio.tabs') ?? '[]');
     if (Array.isArray(items)) {
       const valid = items.filter((item: any) => ['name', 'sql', 'profileId', 'catalog', 'schema'].every(key => typeof item?.[key] === 'string') && item.sql.length <= 1_000_000).slice(0, 20);
-      const restored: Tab[] = valid.map((item: Tab) => ({ id: crypto.randomUUID(), name: item.name, sql: item.sql, profileId: item.profileId, catalog: item.catalog, schema: item.schema, searchPath: typeof item.searchPath === 'string' && item.searchPath.length <= 8192 && !/[\r\n\0]/.test(item.searchPath) ? item.searchPath : undefined, templateId: typeof item.templateId === 'string' ? item.templateId : undefined, ddlMappingId: typeof item.ddlMappingId === 'string' ? item.ddlMappingId : undefined }));
+      const restored: Tab[] = valid.map((item: Tab) => ({ id: crypto.randomUUID(), name: item.name, sql: item.sql, profileId: item.profileId, catalog: item.catalog, schema: item.schema, applyContext: item.applyContext === true, searchPath: typeof item.searchPath === 'string' && item.searchPath.length <= 8192 && !/[\r\n\0]/.test(item.searchPath) ? item.searchPath : undefined, templateId: typeof item.templateId === 'string' ? item.templateId : undefined, ddlMappingId: typeof item.ddlMappingId === 'string' ? item.ddlMappingId : undefined }));
       const [first, ...rest] = restored;
       if (first) return [first, ...rest];
     }
@@ -36,10 +38,7 @@ function restoreTabs(): [Tab, ...Tab[]] {
   return [newTab()];
 }
 function restoreHistory(): HistoryItem[] {
-  try {
-    const data = JSON.parse(localStorage.getItem('studio.history') ?? '[]');
-    return Array.isArray(data) ? data.filter(item => ['id', 'sql', 'profileId', 'profileName', 'catalog', 'schema', 'state'].every(name => typeof item?.[name] === 'string') && typeof item.time === 'number' && Number.isFinite(item.time) && typeof item.duration === 'number').slice(0, 100) : [];
-  } catch { return []; }
+  try { return parseHistory(localStorage.getItem('studio.history')); } catch { return []; }
 }
 const labelState = (state?: string) => ({ RUNNING: 'Выполняется', FINISHED: 'Готово', FAILED: 'Ошибка', CANCELED: 'Отменён' })[state ?? ''] ?? 'Готов к работе';
 const bytes = (value = 0): string => value >= 1024 ** 3 ? `${(value / 1024 ** 3).toFixed(1)} GB` : value >= 1024 ** 2 ? `${(value / 1024 ** 2).toFixed(1)} MB` : `${(value / 1024).toFixed(1)} KB`;
@@ -54,6 +53,8 @@ export function App() {
   });
   const [activeId, setActiveId] = useState(() => tabs[0].id);
   const [history, setHistory] = useState<HistoryItem[]>(restoreHistory);
+  const historyRef = useRef(history);
+  function changeHistory(items: HistoryItem[]) { historyRef.current = items; setHistory(items); }
   const [panel, setPanel] = useState<'database' | 'history'>('database');
   const [sidebar, setSidebar] = useState(true);
   const [filesPanel, setFilesPanel] = useState(true);
@@ -73,7 +74,7 @@ export function App() {
   const tabsRef = useRef(tabs);
   const profilesRef = useRef(profiles);
   tabsRef.current = tabs; profilesRef.current = profiles;
-  const requests = useRef(new Map<string, { mode: 'statement' | 'script'; tabId: string; sql: string; profileId: string; catalog: string; schema: string }>());
+  const requests = useRef(new Map<string, HistoryRequest>());
   const tab = tabs.find(item => item.id === activeId) ?? tabs[0];
   const profile = profiles.find(item => item.id === tab.profileId);
   const running = executionState(tab.result) === 'RUNNING';
@@ -83,7 +84,7 @@ export function App() {
     setProfiles(values);
     setTabs(items => items.map(item => {
       const profile = values.find(profile => profile.id === item.profileId), mode = profile?.jdbc?.options?.switchSchema ?? 'automatic';
-      return profile && mode !== 'automatic' && !item.ddlMappingId ? { ...item, catalog: profile.catalog, schema: profile.schema, searchPath: undefined } : item;
+      return profile && mode !== 'automatic' && !(mode === 'manual' && item.applyContext) && !item.ddlMappingId ? { ...item, catalog: profile.catalog, schema: profile.schema, searchPath: undefined } : item;
     }));
   }).catch(error => setError(error.message)); }, []);
   useEffect(() => {
@@ -102,17 +103,29 @@ export function App() {
     if (!request) return;
     setTabs(items => items.map(item => item.id === request.tabId ? { ...item, result, scriptResults: result.script ? [...(item.scriptResults ?? []).filter(previous => previous.script?.index !== result.script?.index), result].sort((a, b) => (a.script?.index ?? 0) - (b.script?.index ?? 0)) : undefined, catalog: result.catalog ?? item.catalog, schema: result.schema ?? item.schema, searchPath: result.searchPath ?? item.searchPath, applyContext: result.contextApplied ? false : item.applyContext } : item));
     if (executionState(result) !== 'RUNNING') {
-      const profileName = profilesRef.current.find(item => item.id === request.profileId)?.name ?? 'Trino';
-      setHistory(items => [{ id: crypto.randomUUID(), sql: request.sql, profileId: request.profileId, profileName, catalog: request.catalog, schema: request.schema, time: Date.now(), mode: request.mode, state: executionState(result) ?? result.state, duration: result.script?.elapsedTimeMillis ?? result.stats.elapsedTimeMillis ?? 0 }, ...items].slice(0, 100));
+      recordHistory(request, (executionState(result) ?? result.state) as HistoryItem['state'], result.script?.elapsedTimeMillis ?? result.stats.elapsedTimeMillis ?? 0);
       requests.current.delete(result.requestId);
     }
   }), []);
   const updateTab = (values: Partial<Tab>) => setTabs(items => items.map(item => item.id === tab.id ? { ...item, ...values } : item));
 
-  function addTab(sql = INITIAL_SQL, name?: string, selectedProfile = profile, context?: { catalog: string; schema: string; ddlMappingId?: string }) {
-    if (tabsRef.current.length >= 20) { setError('Доступно до 20 консолей. Закройте ненужную вкладку.'); return; }
-    const item = { ...newTab(selectedProfile, sql, name ?? `console-${tabsRef.current.length + 1}.sql`), ...context, applyContext: !!context };
+  function recordHistory(request: HistoryRequest, state: HistoryItem['state'], duration: number) {
+    const next = appendHistory(historyRef.current, { ...request.entry, id: crypto.randomUUID(), time: request.startedAt, state, duration });
+    changeHistory(next.items);
+    if (next.warning) setError(next.warning);
+  }
+  function addTab(sql = INITIAL_SQL, name?: string, selectedProfile: Profile | null = profile ?? null, context?: { catalog: string; schema: string; ddlMappingId?: string; templateId?: string; searchPath?: string }) {
+    if (tabsRef.current.length >= 20) { setError('Доступно до 20 консолей. Закройте ненужную вкладку.'); return false; }
+    const item = { ...newTab(selectedProfile ?? undefined, sql, name ?? `console-${tabsRef.current.length + 1}.sql`), ...context, applyContext: !!context };
     setTabs(items => [...items, item]); setActiveId(item.id);
+    return true;
+  }
+  function openHistory(item: HistoryItem) {
+    const target = historyContext(item, profilesRef.current);
+    if (!addTab(item.sql, item.mode === 'script' ? 'history-script.sql' : 'history.sql', target.profile ?? null, target.context)) return false;
+    if (item.maxRows !== undefined && [100, 1000, 5000, 10000].includes(item.maxRows)) setMaxRows(item.maxRows);
+    setError(target.warning ?? '');
+    return true;
   }
   async function closeTab(item: Tab) {
     try {
@@ -156,10 +169,18 @@ export function App() {
     if ([...requests.current.values()].some(request => request.tabId === input.sessionId)) return;
     const requestId = crypto.randomUUID();
     const result: QuerySnapshot = { requestId, queryId: '', state: 'RUNNING', rows: [], columns: [], totalRows: 0, truncated: false, stats: {}, warnings: [], inTransaction: currentTab.result?.inTransaction ?? false };
-    requests.current.set(requestId, { mode: target.mode, tabId: input.sessionId, sql: input.sql, profileId: input.profileId, catalog: input.catalog, schema: input.schema });
+    const executionProfile = profilesRef.current.find(profile => profile.id === input.profileId);
+    const templateId = input.templateId ?? executionProfile?.jdbc?.defaultSessionTemplate ?? '';
+    const historyRequest: HistoryRequest = { tabId: input.sessionId, startedAt: Date.now(), entry: {
+      mode: target.mode, sql: input.sql, profileId: input.profileId, profileName: request.connectionName,
+      catalog: input.catalog, schema: input.schema, searchPath: input.searchPath, maxRows: input.maxRows, templateId,
+      templateName: executionProfile?.jdbc?.sessionTemplates?.find(template => template.id === templateId)?.name,
+    } };
+    requests.current.set(requestId, historyRequest);
     setTabs(items => items.map(item => item.id === input.sessionId ? { ...item, result, scriptResults: undefined } : item)); setError('');
     try { await window.studio.query.run({ ...input, requestId }); }
     catch (error) {
+      if (requests.current.has(requestId)) recordHistory(historyRequest, 'FAILED', Date.now() - historyRequest.startedAt);
       requests.current.delete(requestId);
       setTabs(items => items.map(item => item.id === input.sessionId ? { ...item, result: { ...result, state: 'FAILED', error: (error as Error).message } } : item));
     }
@@ -191,13 +212,13 @@ export function App() {
     <header className="titlebar"><div className="window-controls-space" /><button className="icon-button" aria-label="Показать Database Explorer" onClick={() => setSidebar(!sidebar)}><Menu size={18} /></button><div className="brand"><span className="brand-mark">DB</span>Local DB Viewer</div><div className="title-divider" /><span className="workspace-name">Database workspace</span><div className="spacer" /><button className="icon-button" aria-label="Database Explorer" onClick={() => { setPanel('database'); setSidebar(true); }}><Database size={18} /></button><button className="icon-button" aria-label="История запросов" onClick={() => { setPanel('history'); setSidebar(true); }}><History size={18} /></button><button className="icon-button" aria-label="Панель Files" onClick={() => setFilesPanel(!filesPanel)}><Files size={18} /></button><button className="icon-button" aria-label="Настройки подключения" onClick={() => setDialog({ profile })}><Settings2 size={18} /></button><button className="icon-button" aria-label="DDL mappings" title="DDL mappings" onClick={() => setDdlDialog(true)}><FolderOpen size={18} /></button><button className="icon-button" aria-label="Исходники объектов" title="Исходники объектов" disabled={!profile || !!tab.ddlMappingId} onClick={() => setSourcesDialog(true)}><Files size={18} /></button><DriverCenter /><UpdateCenter beforeRestart={() => {
       if (pendingExecutionRef.current || requests.current.size || tabsRef.current.some(item => item.result?.inTransaction)) throw new Error('Завершите запросы и транзакции перед обновлением.');
       localStorage.setItem('studio.tabs', JSON.stringify(tabsRef.current.map(({ result: _, scriptResults: __, ...item }) => item)));
-      localStorage.setItem('studio.history', JSON.stringify(history));
+      localStorage.setItem('studio.history', JSON.stringify(historyRef.current));
     }} /></header>
     <div className="app-body" style={{ gridTemplateColumns: `${sidebar ? sidebarWidth : 0}px ${sidebar ? 3 : 0}px minmax(360px, 1fr) ${filesPanel ? 3 : 0}px ${filesPanel ? filesWidth : 0}px`, gridTemplateRows: `minmax(230px, 1fr) 4px ${servicesHeight}px` }}>
       {sidebar && <aside className="sidebar">{panel === 'database' ? tab.ddlMappingId ? <><div className="panel-heading">DDL · локальные файлы</div><div className="ddl-local-tree">{completion.index?.tables.map(table => <details key={JSON.stringify([table.catalog,table.schema,table.name])}><summary>{table.name}</summary>{table.columns.map(column => <div key={column.name}>{column.name} <small>{column.type}</small></div>)}</details>)}</div><button className="button secondary" onClick={() => setDdlDialog(true)}>DDL mappings</button></> : <ErrorBoundary resetKey={profile?.id} retry><Explorer profile={profile} onAdd={() => setDialog({})} onSelectSchema={(catalog, schema) => { if (!running && !tab.result?.inTransaction && profile?.jdbc?.options?.switchSchema !== 'disabled') updateTab({ catalog, schema, searchPath: undefined, applyContext: true }); }} onRefresh={() => setSchemaRevision(value => value + 1)} onPreview={(catalog, schema, table) => {
         if (profile!.engine === 'jdbc') void window.studio.jdbc.preview({ profileId: profile!.id, kind: 'columns', catalog, schema, table }).then(sql => addTab(generatedStyle(sql, profile!.engine, profile?.jdbc?.options?.codeStyle), `${table}.sql`, profile, { catalog, schema })).catch(error => setError(error.message));
         else addTab(generatedStyle(previewSQL(profile!.engine, catalog, schema, table), profile!.engine, profile?.jdbc?.options?.codeStyle), `${table}.sql`, profile, { catalog, schema });
-      }} /></ErrorBoundary> : <><div className="panel-heading"><span>ИСТОРИЯ ЗАПРОСОВ</span><span className="count">{history.length}</span></div><div className="history-list">{!history.length && <div className="explorer-empty"><History size={27} /><h3>Каждый запрос под рукой</h3><p>Здесь будут последние 100<br />выполненных запросов.</p></div>}{history.map(item => <button key={item.id} className="history-item" onClick={() => addTab(item.sql, 'history.sql', profiles.find(profile => profile.id === item.profileId), { catalog: item.catalog, schema: item.schema })}><div><span className={`history-dot ${item.state.toLowerCase()}`} /><strong>{item.profileName}</strong><time>{new Date(item.time).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}</time></div><code>{item.sql}</code><small>{labelState(item.state)} · {(item.duration / 1000).toFixed(2)} s</small></button>)}</div><div className="sidebar-foot">Нажмите запрос, чтобы открыть в консоли</div></>}</aside>}
+      }} /></ErrorBoundary> : <HistoryPanel items={history} profiles={profiles} onOpen={openHistory} onPin={id => changeHistory(pinHistory(historyRef.current, id))} onDelete={id => changeHistory(historyRef.current.filter(item => item.id !== id))} />}</aside>}
       {sidebar && <div className="pane-splitter left-splitter" role="separator" aria-label="Ширина Database Explorer" onPointerDown={event => resize(event, 'x', sidebarWidth, 1, setSidebarWidth)} />}
       <main className="workspace">
         <div className="tabbar"><button className="icon-button sidebar-toggle" title="Свернуть / развернуть боковую панель" onClick={() => setSidebar(!sidebar)}><PanelLeftClose size={16} /></button><div className="tabs" role="tablist">{tabs.map(item => <div key={item.id} className={`console-tab ${item.id === tab.id ? 'active' : ''}`}><button role="tab" aria-selected={item.id === tab.id} onClick={() => setActiveId(item.id)}><Terminal size={14} /><span>{item.name}</span>{executionState(item.result) === 'RUNNING' && <span className="running-dot" />}</button><button className="close-tab" disabled={executionState(item.result) === 'RUNNING'} aria-label={`Закрыть ${item.name}`} title={item.result?.inTransaction ? 'Закрыть консоль и выполнить ROLLBACK' : 'Закрыть консоль'} onClick={() => void closeTab(item)}><X size={12} /></button></div>)}</div><button className="icon-button new-tab" aria-label="Новая консоль" onClick={() => addTab()}><Plus size={17} /></button><div className="spacer" /><button className="icon-button" aria-label="Открыть SQL-файл" onClick={() => void openSQL()}><FolderOpen size={15} /></button><button className="icon-button" aria-label="Форматировать SQL" title="Форматировать SQL · Ctrl / ⌘ + Shift + L" onClick={() => void editor.current?.format()}>SQL</button><button className="icon-button" aria-label="Сохранить SQL-файл" onClick={() => void saveSQL()}><Save size={15} /></button></div>

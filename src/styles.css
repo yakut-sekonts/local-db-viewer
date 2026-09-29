@@ -132,3 +132,29 @@
 
 .result-data { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .result-data[hidden] { display: none; }
+
+/* Searchable SQL history and a read-only preview. */
+.history-filters { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-bottom: 1px solid #3b3d42; }
+.history-search { display: flex; align-items: center; gap: 6px; }
+.history-search input { min-width: 0; width: 100%; }
+.history-filters input:not([type=checkbox]), .history-filters select { padding: 6px; font-size: 11px; min-width: 0; width: 100%; }
+.history-filters > div { display: flex; align-items: center; justify-content: space-between; gap: 5px; font-size: 10px; }
+.history-filters > div label { display: flex; align-items: center; gap: 5px; }
+.history-filters > div button { color: #91b5ec; }
+.history-entry { position: relative; border-bottom: 1px solid #3b3d42; }
+.history-entry .history-item { padding: 12px 10px; border: 0; }
+.history-entry .history-item > div { padding-right: 24px; margin-bottom: 4px; }
+.history-entry .history-item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-entry .history-item > time { display: block; color: #a0a8b5; font-size: 10px; margin-bottom: 7px; }
+.history-entry .history-item > code { color: #b5bfcc; overflow-wrap: anywhere; }
+.history-entry .history-item > small { color: #a0a8b5; }
+.history-pin { position: absolute; top: 8px; right: 6px; }
+.history-pin[aria-pressed=true], .history-actions [aria-pressed=true] { color: #86b3f9; background: #31446a; }
+.history-dot.canceled { background: #e3be7c; }
+.history-foot { height: auto; padding: 10px; line-height: 1.7; }
+.history-notice { padding: 8px; font-size: 11px; color: #e3be7c; }
+.history-warning { color: #e3be7c; font-size: 12px; line-height: 1.6; }
+.history-actions { flex-wrap: wrap; gap: 8px; }
+.history-delete-confirm { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; }
+.history-dialog .execute-context dd { overflow-wrap: anywhere; }
+.history-dialog [role=status] { font-size: 12px; color: #e3be7c; }
