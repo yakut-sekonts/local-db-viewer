@@ -95,6 +95,9 @@ try {
   await expect.poll(clipboard).toContain('system_range(1,205)');
   const validation=await page.evaluate(async()=>{try{await window.studio.copyText({bad:true});return '';}catch(error){return error.message;}});
   expect(validation).toContain('Некорректный текст');
+  const before=await clipboard();
+  const nul=await page.evaluate(async()=>{try{await window.studio.copyText('before\0after');return '';}catch(error){return error.message;}});
+  expect(nul).toContain('NUL');expect(await clipboard()).toBe(before);
   expect(errors).toEqual([]);await page.screenshot({path:'test-artifacts/result-grid-desktop.png'});
   await writeFile('test-artifacts/result-grid-desktop.json',JSON.stringify({passed:true,platform:process.platform,checks,rendererErrors:errors},null,2));
   checks.forEach(check=>console.log(`PASS: ${check}`));

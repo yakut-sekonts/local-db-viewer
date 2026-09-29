@@ -42,6 +42,9 @@ test('TSV ranges neutralize text formulas and retain valid numeric values; exact
 test('clipboard rejects invalid, oversized UTF-8 and stale selections before writing',()=>{
   validateClipboardText('');validateClipboardText('名');
   assert.throws(()=>validateClipboardText({text:'x'}),/Некорректный/);
+  assert.throws(()=>validateClipboardText('before\0after'),/NUL/);
+  assert.throws(()=>copyGridRange([{name:'x',type:'text'}],[['before\0after']],range(0,0)),/NUL/);
+  assert.throws(()=>copyGridRange([{name:'x',type:'text'}],[['before\0after'],['next']],range(0,0,1,0)),/NUL/);
   assert.throws(()=>validateClipboardText('名'.repeat(Math.floor(CLIPBOARD_BYTES/3)+1)),/16 MiB/);
   assert.throws(()=>copyGridRange([{name:'x',type:'text'}],[['a']],range(0,0,1,0)),/Выделение/);
   assert.throws(()=>copyGridRange([{name:'x',type:'text'}],[['a']],range(-1,0)),/Выделение/);

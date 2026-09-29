@@ -91,5 +91,7 @@ export function copyGridRange(columns: Column[], rows: Cell[][], selection: Grid
   const selected = columns.slice(bounds.left, bounds.right + 1);
   if (headers) lines.push(selected.map(column => field(column.name, false)).join('\t'));
   for (let row = bounds.top; row <= bounds.bottom; row++) lines.push(selected.map((column, offset) => field(rows[row]?.[bounds.left + offset], columnKind(column.type) === 'numeric')).join('\t'));
-  return lines.join('\r\n');
+  const text = lines.join('\r\n');
+  validateClipboardText(text);
+  return text;
 }
