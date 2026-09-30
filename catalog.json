@@ -639,13 +639,13 @@
     "neo4j": {
       "files": [
         {
-          "path": "org/neo4j/neo4j-jdbc-full-bundle/6.15.0/neo4j-jdbc-full-bundle-6.15.0.jar",
-          "sha256": "b06de42e18d3294d36ae88736fa175fcd66b21f8472c71f11f08f5355d960cba",
-          "size": 10624277
+          "path": "org/neo4j/neo4j-jdbc-full-bundle/6.15.1/neo4j-jdbc-full-bundle-6.15.1.jar",
+          "sha256": "ac5292a6e10341b34d2a6338a1cd36c4f8eba537303fa3b8df051ad3ec5cfadc",
+          "size": 10687792
         }
       ],
-      "key": "53a21e2d760534677423f63ddd9bf0627bd2c388c8b64716525610d05bf9e702",
-      "version": "6.15.0"
+      "key": "d797b95af6bcb9c695525bf9cf001067bed642d2f0b2a4ae4ad0547a03c3d7a6",
+      "version": "6.15.1"
     },
     "oracle": {
       "files": [
