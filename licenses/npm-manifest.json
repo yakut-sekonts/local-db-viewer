@@ -265,7 +265,7 @@
       "license": "MIT",
       "documents": [
         {
-          "path": "npm/@azure/msal-node/node_modules/@azure/msal-common/LICENSE",
+          "path": "npm/@azure/msal-node/__nested__/@azure/msal-common/LICENSE",
           "sha256": "c544adf8f0d43453d9fdf6c11da19605d12d89806a7870653169b8cc97f5bb53",
           "source": "https://registry.npmjs.org/@azure/msal-common/-/msal-common-16.13.0.tgz!/LICENSE"
         }
@@ -475,7 +475,7 @@
       "license": "MIT",
       "documents": [
         {
-          "path": "npm/bl/node_modules/readable-stream/LICENSE",
+          "path": "npm/bl/__nested__/readable-stream/LICENSE",
           "sha256": "ec62dc96da0099b87f4511736c87309335527fb7031639493e06c95728dc8c54",
           "source": "https://registry.npmjs.org/readable-stream/-/readable-stream-4.7.0.tgz!/LICENSE"
         }
@@ -490,7 +490,7 @@
       "license": "MIT",
       "documents": [
         {
-          "path": "npm/bl/node_modules/safe-buffer/LICENSE",
+          "path": "npm/bl/__nested__/safe-buffer/LICENSE",
           "sha256": "c7cc929b57080f4b9d0c6cf57669f0463fc5b39906344dfc8d3bc43426b30eac",
           "source": "https://registry.npmjs.org/safe-buffer/-/safe-buffer-5.2.1.tgz!/LICENSE"
         }
@@ -505,7 +505,7 @@
       "license": "MIT",
       "documents": [
         {
-          "path": "npm/bl/node_modules/string_decoder/LICENSE",
+          "path": "npm/bl/__nested__/string_decoder/LICENSE",
           "sha256": "11f2aafb37d06b3ee5bdaf06e9811141d0da05263c316f3d627f45c20d43261b",
           "source": "https://registry.npmjs.org/string_decoder/-/string_decoder-1.3.0.tgz!/LICENSE"
         }
@@ -1280,7 +1280,7 @@
       "license": "MIT",
       "documents": [
         {
-          "path": "npm/nearley/node_modules/commander/LICENSE",
+          "path": "npm/nearley/__nested__/commander/LICENSE",
           "sha256": "04512a63dce4d2d506ad612dc0bd7681ccf6e3655f7b6eaef7dfac8323d1ec0b",
           "source": "https://registry.npmjs.org/commander/-/commander-2.20.3.tgz!/LICENSE"
         }

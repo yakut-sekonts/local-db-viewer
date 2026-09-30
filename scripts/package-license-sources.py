@@ -6,6 +6,8 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
+import tarfile
 import tempfile
 import urllib.request
 import zipfile
@@ -68,6 +70,13 @@ def main():
         with tempfile.TemporaryDirectory() as directory:
             own = Path(directory) / f'local-db-viewer-{version}-source.tar.gz'
             subprocess.run(['git', 'archive', '--format=tar.gz', f'--prefix=local-db-viewer-{version}/', '-o', str(own), 'HEAD'], cwd=ROOT, check=True)
+            # Check the committed tree, not local ignored/untracked copies of
+            # license files. This must also pass for a fresh GitHub checkout.
+            checkout = Path(directory) / 'checkout'
+            checkout.mkdir()
+            with tarfile.open(own) as archive:
+                archive.extractall(checkout, filter='data')
+            subprocess.run([sys.executable, 'scripts/build-licenses.py', '--check'], cwd=checkout / f'local-db-viewer-{version}', check=True)
             entries = [(p, 'upstream/' + p.name) for p in artifacts] + [(own, own.name)]
             entries += [(ROOT / 'licenses/source-lock.json', 'source-lock.json'), (ROOT / 'THIRD_PARTY_NOTICES.md', 'README.md')]
             entries += [(p, 'build-definitions/' + p.name) for p in sorted((ROOT / 'licenses/source-build').iterdir()) if p.is_file()]

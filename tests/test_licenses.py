@@ -83,6 +83,12 @@ class LicenseInventoryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Missing/unsafe'):
             legal.document_path(self.root, {'path': '../package.json', 'sha256': '0' * 64})
 
+    def test_snapshot_does_not_use_git_ignored_node_modules_paths(self):
+        npm = json.loads((self.root / 'licenses/npm-manifest.json').read_text())
+        for package in npm['packages']:
+            for document in package['documents']:
+                self.assertNotIn('node_modules', Path(document['path']).parts)
+
 
 class SourceDownloadTests(unittest.TestCase):
     def test_integrity_bounds_cleanup_and_cache(self):

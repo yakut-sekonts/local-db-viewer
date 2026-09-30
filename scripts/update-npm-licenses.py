@@ -39,7 +39,9 @@ def main():
                 raise ValueError('Review missing license text: ' + path)
             documents = []
             for file in files:
-                relative = Path(path.removeprefix('node_modules/')) / file.relative_to(package)
+                # A literal nested node_modules directory is omitted by Git and
+                # packaging defaults. Keep identity in the manifest, not its path.
+                relative = Path(path.removeprefix('node_modules/').replace('/node_modules/', '/__nested__/')) / file.relative_to(package)
                 output = staging / relative
                 output.parent.mkdir(parents=True, exist_ok=True)
                 data = file.read_bytes()
