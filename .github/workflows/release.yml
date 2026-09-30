@@ -12,6 +12,29 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  sources:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Validate license inventories
+        run: python scripts/build-licenses.py --check
+      - name: Test license and source integrity checks
+        run: python -m unittest discover -s tests -p 'test_licenses.py'
+      - name: Prepare corresponding source distribution
+        run: python scripts/package-license-sources.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: installers-sources
+          path: release-assets/Local-DB-Viewer-*-third-party-sources.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
   ddl:
     uses: ./.github/workflows/ddl-catalog.yml
   build:
@@ -60,6 +83,8 @@ jobs:
           if [ "$RUNNER_OS" = "macOS" ]; then
             export LOCAL_DB_VIEWER_EXECUTABLE="$GITHUB_WORKSPACE/release/mac-arm64/Local DB Viewer.app/Contents/MacOS/Local DB Viewer"
             export LOCAL_DB_VIEWER_RESOURCES="$GITHUB_WORKSPACE/release/mac-arm64/Local DB Viewer.app/Contents/Resources"
+            node scripts/build-licenses.mjs --resources "$LOCAL_DB_VIEWER_RESOURCES"
+            node tests/licenses-desktop.mjs
             node tests/jdbc-runtime.mjs
             node tests/jdbc-streaming.mjs
             node tests/multiple-results-runtime.mjs
@@ -83,6 +108,8 @@ jobs:
             node tests/windows-install.mjs
             node tests/update-install-windows.mjs
             export LOCAL_DB_VIEWER_EXECUTABLE="$GITHUB_WORKSPACE/release/win-unpacked/Local DB Viewer.exe"
+            node scripts/build-licenses.mjs --resources "$LOCAL_DB_VIEWER_RESOURCES"
+            node tests/licenses-desktop.mjs
             node tests/multiple-results-runtime.mjs
             node tests/multiple-results-desktop.mjs
             node tests/result-grid-desktop.mjs
@@ -119,7 +146,7 @@ jobs:
 
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build, ddl]
+    needs: [build, ddl, sources]
     runs-on: ubuntu-latest
     permissions:
       contents: write

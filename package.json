@@ -1,14 +1,15 @@
 {
   "name": "local-db-viewer",
-  "version": "0.15.0",
+  "version": "0.15.1",
   "private": true,
   "description": "Desktop database IDE with a versioned JDBC driver catalog",
   "main": "dist-electron/main.cjs",
   "scripts": {
-    "build": "node scripts/build-windows-updater.mjs && npm run build:jdbc && tsc --noEmit && vite build --logLevel warn && node scripts/build-electron.mjs",
+    "build": "node scripts/build-licenses.mjs && node scripts/build-windows-updater.mjs && npm run build:jdbc && tsc --noEmit && vite build --logLevel warn && node scripts/build-electron.mjs",
     "start": "npm run build && electron .",
     "start:built": "electron .",
     "test": "tsx --test tests/*.test.ts",
+    "test:licenses": "node scripts/build-licenses.mjs --check",
     "test:ui": "node tests/desktop.mjs",
     "package:mac": "npm run build && electron-builder --mac dmg zip --arm64 --publish never",
     "package:win": "npm run build && electron-builder --win nsis --x64 --publish never",
@@ -116,6 +117,10 @@
       {
         "from": "runtime/common",
         "to": "jdbc"
+      },
+      {
+        "from": "runtime/legal",
+        "to": "legal"
       }
     ]
   },
@@ -152,5 +157,6 @@
     "dompurify": "3.4.15"
   },
   "productName": "Local DB Viewer",
-  "author": "yakut-sekonts"
+  "author": "yakut-sekonts",
+  "license": "Apache-2.0"
 }

@@ -13,6 +13,7 @@ const expected = [
   `Local-DB-Viewer-${version}-mac-arm64.dmg`,
   `Local-DB-Viewer-${version}-mac-arm64.zip`,
   `Local-DB-Viewer-${version}-windows-x64-setup.exe`,
+  `Local-DB-Viewer-${version}-third-party-sources.zip`,
 ];
 const files = await readdir('release-assets');
 for (const name of expected) if (!files.includes(name) || (await stat(join('release-assets', name))).size === 0) throw new Error(`Missing release artifact: ${name}`);

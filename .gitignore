@@ -4,8 +4,10 @@ dist-electron/
 dist-tests/
 build/update-windows.exe
 release/
+release-assets/
 test-artifacts/
 *.log
+__pycache__/
 .DS_Store
 runtime/
 .runtime-cache/

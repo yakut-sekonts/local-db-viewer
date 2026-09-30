@@ -1,0 +1,4 @@
+# Preserve upstream legal texts and their recorded SHA256 on every build OS.
+licenses/** -text -whitespace
+LICENSE -text
+NOTICE -text

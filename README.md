@@ -1,11 +1,11 @@
-# Local DB Viewer 0.15.0
+# Local DB Viewer 0.15.1
 
 Desktop SQL IDE с 71 вариантом JDBC-подключения. Семь драйверов входят в дистрибутив; расширенный каталог содержит SQL, аналитические системы и NoSQL через JDBC. Интерфейс выполнен по предоставленному референсу DataGrip: тёмная тема, Database Explorer, SQL-консоли, Files и нижняя панель Services с результатами. Это самостоятельное приложение, не продукт JetBrains.
 
 ## Установка в профиль пользователя
 
-- **macOS 13 и новее, Apple Silicon (ARM64, M1 и новее):** откройте `Local-DB-Viewer-0.15.0-mac-arm64.dmg` и скопируйте `Local DB Viewer.app` в `~/Applications`. Папку можно создать в своей домашней директории. Intel Mac не поддерживается.
-- **Windows 11 x64:** запустите `Local-DB-Viewer-0.15.0-windows-x64-setup.exe`. NSIS устанавливает приложение для текущего пользователя в `%LOCALAPPDATA%\Programs\Local DB Viewer`, создаёт ярлыки и не запрашивает elevation. Используются `perMachine: false`, `allowElevation: false`, `asInvoker`.
+- **macOS 13 и новее, Apple Silicon (ARM64, M1 и новее):** откройте `Local-DB-Viewer-0.15.1-mac-arm64.dmg` и скопируйте `Local DB Viewer.app` в `~/Applications`. Папку можно создать в своей домашней директории. Intel Mac не поддерживается.
+- **Windows 11 x64:** запустите `Local-DB-Viewer-0.15.1-windows-x64-setup.exe`. NSIS устанавливает приложение для текущего пользователя в `%LOCALAPPDATA%\Programs\Local DB Viewer`, создаёт ярлыки и не запрашивает elevation. Используются `perMachine: false`, `allowElevation: false`, `asInvoker`.
 
 Node.js, Java и Python отдельно не требуются. Семь базовых JDBC-драйверов встроены; дополнительные устанавливаются из окна «JDBC-драйверы». Сборка macOS имеет локальную ad-hoc подпись, но не Developer ID/notarization; Windows не имеет Authenticode-подписи. После обновления ad-hoc сборки macOS может повторно запросить разрешение Keychain; постоянный Developer ID нужен для стабильного доступа без таких запросов. Корпоративные политики запуска, Gatekeeper и SmartScreen действуют независимо от возможности установки без прав администратора.
 
@@ -191,7 +191,13 @@ Workflow собирает обе платформы на их ОС. Windows пр
 
 ## Выпуск новой версии
 
-Изменения коммитятся в Git. Для релиза обновите версию `package.json` и `package-lock.json`, добавьте запись `CHANGELOG.md`, затем отправьте commit и tag `vX.Y.Z`. Workflow `.github/workflows/release.yml` проверяет код, собирает macOS ARM64 и Windows x64, запускает тесты упакованного приложения и публикует Releases только после успешных сборок обеих платформ. Установщики опубликованной версии не заменяются: исправление выпускается следующим номером.
+Изменения коммитятся в Git. Для релиза обновите версию `package.json` и `package-lock.json`, добавьте запись `CHANGELOG.md`, затем отправьте commit и tag `vX.Y.Z`. Workflow `.github/workflows/release.yml` проверяет код, собирает macOS ARM64 и Windows x64, запускает тесты упакованного приложения и публикует Releases только после успешных сборок обеих платформ и архива исходников зависимостей. Установщики опубликованной версии не заменяются: исправление выпускается следующим номером.
+
+## Лицензия
+
+Исходный код Local DB Viewer распространяется под [Apache-2.0](LICENSE). Встроенные зависимости сохраняют свои лицензии: см. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Их тексты доступны без сети через меню **Local DB Viewer → Лицензии**. С каждым новым релизом публикуется отдельный архив исходников закреплённых Java/MySQL/MariaDB/Trino-компонентов и самого приложения.
+
+`npm run test:licenses` проверяет соответствие лицензионного реестра lock-файлам. `npm run build` включает оригинальные уведомления в пакет; release CI дополнительно проверяет их наличие и SHA256 в собранных приложениях обеих платформ. При обновлении зависимостей реестр и исходники необходимо пересмотреть до выпуска.
 
 Java/JDBC загружаются из официальных источников по закреплённым SHA256 в `build/runtime-lock.json`. Runtime, node_modules, пользовательские данные и дистрибутивы не коммитятся в Git. Для Windows-подготовки используйте `python scripts/prepare-runtime.py --platform windows-x64`; для компиляции задайте `JAVA_HOME` на JDK 21 или новее. Пользовательской установке JDK не нужен.
 

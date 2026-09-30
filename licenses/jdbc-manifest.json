@@ -1,0 +1,970 @@
+{
+  "schemaVersion": 1,
+  "runtime": {
+    "java": {
+      "mac-arm64": {
+        "name": "OpenJDK25U-jre_aarch64_mac_hotspot_25.0.4.1_1.tar.gz",
+        "url": "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jre_aarch64_mac_hotspot_25.0.4.1_1.tar.gz",
+        "sha256": "5b02bcc908da092e7e00b9772d4f9bbb87f44a60b7c90f7cf5a91a1d98f37e1b",
+        "version": "25.0.4.1+1",
+        "license": "GPL-2.0-with-classpath-exception"
+      },
+      "windows-x64": {
+        "name": "OpenJDK25U-jre_x64_windows_hotspot_25.0.4.1_1.zip",
+        "url": "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jre_x64_windows_hotspot_25.0.4.1_1.zip",
+        "sha256": "4c95451cea98556def2c54f7782933f52a26d4a36bd85e1d59f0364464828b07",
+        "version": "25.0.4.1+1",
+        "license": "GPL-2.0-with-classpath-exception"
+      },
+      "compiler-mac-arm64": {
+        "name": "OpenJDK25U-jdk_aarch64_mac_hotspot_25.0.4.1_1.tar.gz",
+        "url": "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jdk_aarch64_mac_hotspot_25.0.4.1_1.tar.gz",
+        "sha256": "61979887f7506a24a57439ff99adb8b3a7fc89977d9cfe3b8984f58a981b7b9d",
+        "version": "25.0.4.1+1",
+        "license": "GPL-2.0-with-classpath-exception"
+      }
+    },
+    "jars": [
+      {
+        "name": "trino-jdbc-483.jar",
+        "url": "https://repo.maven.apache.org/maven2/io/trino/trino-jdbc/483/trino-jdbc-483.jar",
+        "sha256": "518062369fdfa937b35f11aa45276daa31cccaaad3c8c05eb51e674e23a419e3",
+        "version": "483",
+        "license": "Apache-2.0"
+      },
+      {
+        "name": "postgresql-42.7.13.jar",
+        "url": "https://repo.maven.apache.org/maven2/org/postgresql/postgresql/42.7.13/postgresql-42.7.13.jar",
+        "sha256": "6e0e4cc2d8cae902084f8a2b18728b073a6fd9d1f87c9d8bff8f298c18185b93",
+        "version": "42.7.13",
+        "license": "BSD-2-Clause"
+      },
+      {
+        "name": "mysql-connector-j-26.7.0.jar",
+        "url": "https://repo.maven.apache.org/maven2/com/mysql/mysql-connector-j/26.7.0/mysql-connector-j-26.7.0.jar",
+        "sha256": "69084713593a4aa8d07c383619b9639276f08bccf8faf1c562178147d389b1e1",
+        "version": "26.7.0",
+        "license": "GPL-2.0-with-universal-foss-exception"
+      },
+      {
+        "name": "mariadb-java-client-3.5.10.jar",
+        "url": "https://repo.maven.apache.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.5.10/mariadb-java-client-3.5.10.jar",
+        "sha256": "919b8c1c771d9ee3465811462f242c9543ab401e140c64988ddbf1d8abcb18b2",
+        "version": "3.5.10",
+        "license": "LGPL-2.1-or-later"
+      },
+      {
+        "name": "sqlite-jdbc-3.53.4.0.jar",
+        "url": "https://repo.maven.apache.org/maven2/org/xerial/sqlite-jdbc/3.53.4.0/sqlite-jdbc-3.53.4.0.jar",
+        "sha256": "bcb1f51e36f940867e83342f9efbf5968ac44a6bef4d397bb4af7b17b45cd2fb",
+        "version": "3.53.4.0",
+        "license": "Apache-2.0"
+      },
+      {
+        "name": "mssql-jdbc-13.6.0.jre11.jar",
+        "url": "https://repo.maven.apache.org/maven2/com/microsoft/sqlserver/mssql-jdbc/13.6.0.jre11/mssql-jdbc-13.6.0.jre11.jar",
+        "sha256": "4c566e4022c4dcf1489aeb639fe49a0f6ffae3d796fdc2f56b5b8882d4c3bf5a",
+        "version": "13.6.0.jre11",
+        "license": "MIT"
+      },
+      {
+        "name": "clickhouse-jdbc-0.10.0-all.jar",
+        "url": "https://repo.maven.apache.org/maven2/com/clickhouse/clickhouse-jdbc/0.10.0/clickhouse-jdbc-0.10.0-all.jar",
+        "sha256": "d83736e24306e11929b0cf81b3306ae903c6f51c735c509ad5680c88640d99ce",
+        "version": "0.10.0",
+        "license": "Apache-2.0"
+      },
+      {
+        "name": "gson-2.14.0.jar",
+        "url": "https://repo.maven.apache.org/maven2/com/google/code/gson/gson/2.14.0/gson-2.14.0.jar",
+        "sha256": "2cbd119bf1961c28788310963dc80ba65f58cdeec1dd139c8bdb1240faa2c36f",
+        "version": "2.14.0",
+        "license": "Apache-2.0"
+      },
+      {
+        "name": "slf4j-api-2.0.19.jar",
+        "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.19/slf4j-api-2.0.19.jar",
+        "sha256": "e91ff6d720609e7a194ffe758c3ed5c84e798617ae07b0a0f6a4fe229741b4bb",
+        "version": "2.0.19",
+        "license": "MIT"
+      },
+      {
+        "name": "slf4j-nop-2.0.19.jar",
+        "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-nop/2.0.19/slf4j-nop-2.0.19.jar",
+        "sha256": "d0226062f9b3a2793f62002f892a8e624eb07f396130fc949e01b1d5f4888cba",
+        "version": "2.0.19",
+        "license": "MIT"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "trino-jdbc-483",
+      "containers": [
+        "trino-jdbc-483.jar"
+      ],
+      "license": "Apache-2.0",
+      "documents": [
+        {
+          "path": "jdbc/trino-jdbc-483/trino-LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://raw.githubusercontent.com/trinodb/trino/483/LICENSE"
+        }
+      ]
+    },
+    {
+      "id": "postgresql-42.7.13",
+      "containers": [
+        "postgresql-42.7.13.jar"
+      ],
+      "license": "BSD-2-Clause",
+      "documents": [
+        {
+          "path": "jdbc/postgresql-42.7.13/META-INF/LICENSE",
+          "sha256": "08bb580d3cb8f9a4a05f008466a294fdb019e0e177d03a035d46f1eb94077de5",
+          "source": "https://repo.maven.apache.org/maven2/org/postgresql/postgresql/42.7.13/postgresql-42.7.13.jar!/META-INF/LICENSE"
+        },
+        {
+          "path": "jdbc/postgresql-42.7.13/META-INF/licenses/com.ongres.scram/scram-client-3.2/META-INF/LICENSE",
+          "sha256": "7c89807167a03a92d2fbfc936aff4f87d8ce31434637381c89e38282c8c99198",
+          "source": "https://repo.maven.apache.org/maven2/org/postgresql/postgresql/42.7.13/postgresql-42.7.13.jar!/META-INF/licenses/com.ongres.scram/scram-client-3.2/META-INF/LICENSE"
+        },
+        {
+          "path": "jdbc/postgresql-42.7.13/META-INF/licenses/com.ongres.scram/scram-common-3.2/META-INF/LICENSE",
+          "sha256": "7c89807167a03a92d2fbfc936aff4f87d8ce31434637381c89e38282c8c99198",
+          "source": "https://repo.maven.apache.org/maven2/org/postgresql/postgresql/42.7.13/postgresql-42.7.13.jar!/META-INF/licenses/com.ongres.scram/scram-common-3.2/META-INF/LICENSE"
+        },
+        {
+          "path": "jdbc/postgresql-42.7.13/META-INF/licenses/com.ongres.stringprep/saslprep-2.2/META-INF/LICENSE",
+          "sha256": "5c49fc155ebccd206277e0d1f424aadbf365f0a9ccfb54d400d728a375d523f9",
+          "source": "https://repo.maven.apache.org/maven2/org/postgresql/postgresql/42.7.13/postgresql-42.7.13.jar!/META-INF/licenses/com.ongres.stringprep/saslprep-2.2/META-INF/LICENSE"
+        },
+        {
+          "path": "jdbc/postgresql-42.7.13/META-INF/licenses/com.ongres.stringprep/stringprep-2.2/META-INF/LICENSE",
+          "sha256": "5c49fc155ebccd206277e0d1f424aadbf365f0a9ccfb54d400d728a375d523f9",
+          "source": "https://repo.maven.apache.org/maven2/org/postgresql/postgresql/42.7.13/postgresql-42.7.13.jar!/META-INF/licenses/com.ongres.stringprep/stringprep-2.2/META-INF/LICENSE"
+        }
+      ]
+    },
+    {
+      "id": "mysql-connector-j-26.7.0",
+      "containers": [
+        "mysql-connector-j-26.7.0.jar"
+      ],
+      "license": "GPL-2.0-with-universal-foss-exception",
+      "documents": [
+        {
+          "path": "jdbc/mysql-connector-j-26.7.0/LICENSE",
+          "sha256": "5883d0aab7e371c00bb64e97026589e3bb59116202010b93b8c4cc6c06502f1c",
+          "source": "https://repo.maven.apache.org/maven2/com/mysql/mysql-connector-j/26.7.0/mysql-connector-j-26.7.0.jar!/LICENSE"
+        }
+      ]
+    },
+    {
+      "id": "mariadb-java-client-3.5.10",
+      "containers": [
+        "mariadb-java-client-3.5.10.jar"
+      ],
+      "license": "LGPL-2.1-or-later",
+      "documents": [
+        {
+          "path": "jdbc/mariadb-java-client-3.5.10/mariadb-LICENSE.txt",
+          "sha256": "c8cfa082f122323774057c2808eb7e796703bde9459fa04ff6f2c9cc25f74eff",
+          "source": "https://raw.githubusercontent.com/mariadb-corporation/mariadb-connector-j/6164678e83aa9d203939d5bec73bd4571cbec8a2/LICENSE"
+        }
+      ]
+    },
+    {
+      "id": "sqlite-jdbc-3.53.4.0",
+      "containers": [
+        "sqlite-jdbc-3.53.4.0.jar"
+      ],
+      "license": "Apache-2.0",
+      "documents": [
+        {
+          "path": "jdbc/sqlite-jdbc-3.53.4.0/META-INF/maven/org.xerial/sqlite-jdbc/LICENSE",
+          "sha256": "3ddf9be5c28fe27dad143a5dc76eea25222ad1dd68934a047064e56ed2fa40c5",
+          "source": "https://repo.maven.apache.org/maven2/org/xerial/sqlite-jdbc/3.53.4.0/sqlite-jdbc-3.53.4.0.jar!/META-INF/maven/org.xerial/sqlite-jdbc/LICENSE"
+        },
+        {
+          "path": "jdbc/sqlite-jdbc-3.53.4.0/META-INF/maven/org.xerial/sqlite-jdbc/LICENSE.zentus",
+          "sha256": "89167dab92289c7e5e2b65b044f0856b703d05e5d5e35c3548e73d9c7d2f5048",
+          "source": "https://repo.maven.apache.org/maven2/org/xerial/sqlite-jdbc/3.53.4.0/sqlite-jdbc-3.53.4.0.jar!/META-INF/maven/org.xerial/sqlite-jdbc/LICENSE.zentus"
+        }
+      ]
+    },
+    {
+      "id": "mssql-jdbc-13.6.0.jre11",
+      "containers": [
+        "mssql-jdbc-13.6.0.jre11.jar"
+      ],
+      "license": "MIT",
+      "documents": [
+        {
+          "path": "jdbc/mssql-jdbc-13.6.0.jre11/mssql-LICENSE.txt",
+          "sha256": "508a77d2e7b51d98adeed32648ad124b7b30241a8e70b2e72c99f92d8e5874d1",
+          "source": "https://raw.githubusercontent.com/microsoft/mssql-jdbc/v13.6.0/LICENSE"
+        }
+      ]
+    },
+    {
+      "id": "clickhouse-jdbc-0.10.0-all",
+      "containers": [
+        "clickhouse-jdbc-0.10.0-all.jar"
+      ],
+      "license": "Apache-2.0",
+      "documents": [
+        {
+          "path": "jdbc/clickhouse-jdbc-0.10.0-all/META-INF/NOTICE",
+          "sha256": "6a586a2e27baa532cc1b4f339f14b8e66bf0a597db967b361b2b55041a74784a",
+          "source": "https://repo.maven.apache.org/maven2/com/clickhouse/clickhouse-jdbc/0.10.0/clickhouse-jdbc-0.10.0-all.jar!/META-INF/NOTICE"
+        },
+        {
+          "path": "jdbc/clickhouse-jdbc-0.10.0-all/clickhouse-LICENSE.txt",
+          "sha256": "9ca5882bb75d1dd2fe1bb78b5240c35c3d8bcb335d15a5228bd320cb3bb0d791",
+          "source": "https://raw.githubusercontent.com/ClickHouse/clickhouse-java/v0.10.0/LICENSE"
+        }
+      ]
+    },
+    {
+      "id": "gson-2.14.0",
+      "containers": [
+        "gson-2.14.0.jar"
+      ],
+      "license": "Apache-2.0",
+      "documents": [
+        {
+          "path": "jdbc/gson-2.14.0/gson-LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://raw.githubusercontent.com/google/gson/gson-parent-2.14.0/LICENSE"
+        }
+      ]
+    },
+    {
+      "id": "slf4j-api-2.0.19",
+      "containers": [
+        "slf4j-api-2.0.19.jar"
+      ],
+      "license": "MIT",
+      "documents": [
+        {
+          "path": "jdbc/slf4j-api-2.0.19/META-INF/LICENSE.txt",
+          "sha256": "6632f550c207be8d7d6b5e87f5d7b905bee218d18392d531df457bf60bec1447",
+          "source": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.19/slf4j-api-2.0.19.jar!/META-INF/LICENSE.txt"
+        }
+      ]
+    },
+    {
+      "id": "slf4j-nop-2.0.19",
+      "containers": [
+        "slf4j-nop-2.0.19.jar"
+      ],
+      "license": "MIT",
+      "documents": [
+        {
+          "path": "jdbc/slf4j-nop-2.0.19/META-INF/LICENSE.txt",
+          "sha256": "6632f550c207be8d7d6b5e87f5d7b905bee218d18392d531df457bf60bec1447",
+          "source": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-nop/2.0.19/slf4j-nop-2.0.19.jar!/META-INF/LICENSE.txt"
+        }
+      ]
+    },
+    {
+      "id": "RoaringBitmap-1.0.6",
+      "containers": [
+        "clickhouse-jdbc-0.10.0-all.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/org/roaringbitmap/RoaringBitmap/1.0.6/RoaringBitmap-1.0.6.jar",
+        "sha256": "3f20bd5582463253d6651b03564179c522023e348cf6a1bef02349067e2827b8"
+      },
+      "documents": [
+        {
+          "path": "jdbc/RoaringBitmap-1.0.6/roaring-LICENSE.txt",
+          "sha256": "f0e65bf78a43892f1aea5d598ee4ecbf3067c49fa9d5875094b1754dc2106e7e",
+          "source": "https://raw.githubusercontent.com/RoaringBitmap/RoaringBitmap/1.0.6/LICENSE"
+        }
+      ]
+    },
+    {
+      "id": "aircompressor-2.0.3",
+      "containers": [
+        "trino-jdbc-483.jar"
+      ],
+      "license": "Apache-2.0 AND BSD-3-Clause",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/io/airlift/aircompressor/2.0.3/aircompressor-2.0.3.jar",
+        "sha256": "b86bb66f610079e0bf790d62e2ff68853eb0dc4748a6d68ae28bce92b68094aa"
+      },
+      "documents": [
+        {
+          "path": "jdbc/aircompressor-2.0.3/aircompressor-LICENSE.txt",
+          "sha256": "8c6db340475136df3c1201d458fa5755698eace76e510471ecc9d857d6083dac",
+          "source": "https://raw.githubusercontent.com/airlift/aircompressor/2.0.3/license.txt"
+        },
+        {
+          "path": "jdbc/aircompressor-2.0.3/aircompressor-NOTICE.txt",
+          "sha256": "304b0042470fde5507ff68f05d5e3a5545494d8f3c8f11f5cd4b7789da0b4ea1",
+          "source": "https://raw.githubusercontent.com/airlift/aircompressor/2.0.3/notice.md"
+        }
+      ]
+    },
+    {
+      "id": "antlr4-runtime-4.13.2",
+      "containers": [
+        "clickhouse-jdbc-0.10.0-all.jar"
+      ],
+      "license": "BSD-3-Clause",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/org/antlr/antlr4-runtime/4.13.2/antlr4-runtime-4.13.2.jar",
+        "sha256": "dd3e8a13a2d669bf84fb8d834de35ce4875f27157698d206241ec8488aadcaf7"
+      },
+      "documents": [
+        {
+          "path": "jdbc/antlr4-runtime-4.13.2/antlr-LICENSE.txt",
+          "sha256": "3db1fb3ee79a4b4f9918fc4d0f6133bf18a3cf787f126cd22f8aa9b862281c0c",
+          "source": "https://raw.githubusercontent.com/antlr/antlr4/4.13.2/LICENSE.txt"
+        }
+      ]
+    },
+    {
+      "id": "asm-9.7",
+      "containers": [
+        "clickhouse-jdbc-0.10.0-all.jar"
+      ],
+      "license": "BSD-3-Clause",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm/9.7/asm-9.7.jar",
+        "sha256": "adf46d5e34940bdf148ecdd26a9ee8eea94496a72034ff7141066b3eea5c4e9d"
+      },
+      "documents": [
+        {
+          "path": "jdbc/asm-9.7/source-copyrights.txt",
+          "sha256": "569e4cf5a7dd337d0f1fad43cabba11f0cd0d5f6b034d260c8e295041cc21390",
+          "source": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm/9.7/asm-9.7-sources.jar (original source headers)"
+        }
+      ]
+    },
+    {
+      "id": "commons-codec-1.19.0",
+      "containers": [
+        "clickhouse-jdbc-0.10.0-all.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/commons-codec/commons-codec/1.19.0/commons-codec-1.19.0.jar",
+        "sha256": "5c3881e4f556855e9c532927ee0c9dfde94cc66760d5805c031a59887070af5f"
+      },
+      "documents": [
+        {
+          "path": "jdbc/commons-codec-1.19.0/META-INF/LICENSE.txt",
+          "sha256": "b1d2870f1a00e4d7f56576e5f0870cba109e041f8af66866cf5b499478e654e7",
+          "source": "https://repo.maven.apache.org/maven2/commons-codec/commons-codec/1.19.0/commons-codec-1.19.0.jar!/META-INF/LICENSE.txt"
+        },
+        {
+          "path": "jdbc/commons-codec-1.19.0/META-INF/NOTICE.txt",
+          "sha256": "b64933ee1d36d14659156223a2604edadb60bffdd465d5368ff422d7689db5fb",
+          "source": "https://repo.maven.apache.org/maven2/commons-codec/commons-codec/1.19.0/commons-codec-1.19.0.jar!/META-INF/NOTICE.txt"
+        }
+      ]
+    },
+    {
+      "id": "commons-compress-1.28.0",
+      "containers": [
+        "clickhouse-jdbc-0.10.0-all.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/org/apache/commons/commons-compress/1.28.0/commons-compress-1.28.0.jar",
+        "sha256": "e1522945218456f3649a39bc4afd70ce4bd466221519dba7d378f2141a4642ca"
+      },
+      "documents": [
+        {
+          "path": "jdbc/commons-compress-1.28.0/META-INF/LICENSE.txt",
+          "sha256": "51b88fd3e9e24edcdce1dd145a4fca2dcd12911407f00b06dfa6ff600f9733c1",
+          "source": "https://repo.maven.apache.org/maven2/org/apache/commons/commons-compress/1.28.0/commons-compress-1.28.0.jar!/META-INF/LICENSE.txt"
+        },
+        {
+          "path": "jdbc/commons-compress-1.28.0/META-INF/NOTICE.txt",
+          "sha256": "0d98967f0ab328af8d9d536aa9a5c684b5dd665657245f6ee6b5915affe811c0",
+          "source": "https://repo.maven.apache.org/maven2/org/apache/commons/commons-compress/1.28.0/commons-compress-1.28.0.jar!/META-INF/NOTICE.txt"
+        }
+      ]
+    },
+    {
+      "id": "commons-io-2.20.0",
+      "containers": [
+        "clickhouse-jdbc-0.10.0-all.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/commons-io/commons-io/2.20.0/commons-io-2.20.0.jar",
+        "sha256": "df90bba0fe3cb586b7f164e78fe8f8f4da3f2dd5c27fa645f888100ccc25dd72"
+      },
+      "documents": [
+        {
+          "path": "jdbc/commons-io-2.20.0/META-INF/LICENSE.txt",
+          "sha256": "c1d1a38c99c48ccad170890ade6066e2e240bb6ce59861d4eb7f672eddd2a4c6",
+          "source": "https://repo.maven.apache.org/maven2/commons-io/commons-io/2.20.0/commons-io-2.20.0.jar!/META-INF/LICENSE.txt"
+        },
+        {
+          "path": "jdbc/commons-io-2.20.0/META-INF/NOTICE.txt",
+          "sha256": "b54b0db6c617273efff79ba193bb01b05eadcddfff55c24063b38b2acef714c3",
+          "source": "https://repo.maven.apache.org/maven2/commons-io/commons-io/2.20.0/commons-io-2.20.0.jar!/META-INF/NOTICE.txt"
+        }
+      ]
+    },
+    {
+      "id": "commons-lang3-3.20.0",
+      "containers": [
+        "clickhouse-jdbc-0.10.0-all.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/org/apache/commons/commons-lang3/3.20.0/commons-lang3-3.20.0.jar",
+        "sha256": "69e5c9fa35da7a51a5fd2099dfe56a2d8d32cf233e2f6d770e796146440263f4"
+      },
+      "documents": [
+        {
+          "path": "jdbc/commons-lang3-3.20.0/META-INF/LICENSE.txt",
+          "sha256": "b1d2870f1a00e4d7f56576e5f0870cba109e041f8af66866cf5b499478e654e7",
+          "source": "https://repo.maven.apache.org/maven2/org/apache/commons/commons-lang3/3.20.0/commons-lang3-3.20.0.jar!/META-INF/LICENSE.txt"
+        },
+        {
+          "path": "jdbc/commons-lang3-3.20.0/META-INF/NOTICE.txt",
+          "sha256": "64bc8696af3f6c770521412b85d3a733fa44b2ef5b0f4bd739e0c4d02eca492a",
+          "source": "https://repo.maven.apache.org/maven2/org/apache/commons/commons-lang3/3.20.0/commons-lang3-3.20.0.jar!/META-INF/NOTICE.txt"
+        }
+      ]
+    },
+    {
+      "id": "error_prone_annotations-2.36.0",
+      "containers": [
+        "clickhouse-jdbc-0.10.0-all.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/com/google/errorprone/error_prone_annotations/2.36.0/error_prone_annotations-2.36.0.jar",
+        "sha256": "77440e270b0bc9a249903c5a076c36a722c4886ca4f42675f2903a1c53ed61a5"
+      },
+      "documents": [
+        {
+          "path": "jdbc/error_prone_annotations-2.36.0/errorprone-LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://raw.githubusercontent.com/google/error-prone/v2.36.0/COPYING"
+        }
+      ]
+    },
+    {
+      "id": "failsafe-3.3.2",
+      "containers": [
+        "trino-jdbc-483.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/dev/failsafe/failsafe/3.3.2/failsafe-3.3.2.jar",
+        "sha256": "2c5dc879a6dac7ea3a7b29d795e27bd49b8e7908b05c2f3e56053c19d79850f5"
+      },
+      "documents": [
+        {
+          "path": "jdbc/failsafe-3.3.2/failsafe-LICENSE.txt",
+          "sha256": "0cec06e0e55fbc3dc5cee4fca9b607f66cb8f4e4dbcf3b3c013594dd156732e9",
+          "source": "https://raw.githubusercontent.com/failsafe-lib/failsafe/failsafe-parent-3.3.2/LICENSE"
+        }
+      ]
+    },
+    {
+      "id": "failureaccess-1.0.3",
+      "containers": [
+        "trino-jdbc-483.jar",
+        "clickhouse-jdbc-0.10.0-all.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/com/google/guava/failureaccess/1.0.3/failureaccess-1.0.3.jar",
+        "sha256": "cbfc3906b19b8f55dd7cfd6dfe0aa4532e834250d7f080bd8d211a3e246b59cb"
+      },
+      "documents": [
+        {
+          "path": "jdbc/failureaccess-1.0.3/META-INF/LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://repo.maven.apache.org/maven2/com/google/guava/failureaccess/1.0.3/failureaccess-1.0.3.jar!/META-INF/LICENSE"
+        }
+      ]
+    },
+    {
+      "id": "guava-33.4.6-jre",
+      "containers": [
+        "clickhouse-jdbc-0.10.0-all.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/com/google/guava/guava/33.4.6-jre/guava-33.4.6-jre.jar",
+        "sha256": "958a035b74ff6c7d0cdff9c384524b645eb618f7117b60e1ee915f9cffd0e716"
+      },
+      "documents": [
+        {
+          "path": "jdbc/guava-33.4.6-jre/META-INF/LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://repo.maven.apache.org/maven2/com/google/guava/guava/33.4.6-jre/guava-33.4.6-jre.jar!/META-INF/LICENSE"
+        }
+      ]
+    },
+    {
+      "id": "guava-33.6.0-jre",
+      "containers": [
+        "trino-jdbc-483.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/com/google/guava/guava/33.6.0-jre/guava-33.6.0-jre.jar",
+        "sha256": "dc573e1fca4fd5454f4a5fd3d7da2df03002876a4175bafc14a95980dd7713b3"
+      },
+      "documents": [
+        {
+          "path": "jdbc/guava-33.6.0-jre/META-INF/LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://repo.maven.apache.org/maven2/com/google/guava/guava/33.6.0-jre/guava-33.6.0-jre.jar!/META-INF/LICENSE"
+        }
+      ]
+    },
+    {
+      "id": "httpclient5-5.4.4",
+      "containers": [
+        "clickhouse-jdbc-0.10.0-all.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/org/apache/httpcomponents/client5/httpclient5/5.4.4/httpclient5-5.4.4.jar",
+        "sha256": "3f8657eab91b7533e5cf232d4e268253c4ff9f99f1e4bcd67841618bed67f2de"
+      },
+      "documents": [
+        {
+          "path": "jdbc/httpclient5-5.4.4/META-INF/LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://repo.maven.apache.org/maven2/org/apache/httpcomponents/client5/httpclient5/5.4.4/httpclient5-5.4.4.jar!/META-INF/LICENSE"
+        },
+        {
+          "path": "jdbc/httpclient5-5.4.4/META-INF/NOTICE",
+          "sha256": "4ad1973880c25e0c41fdf45fb47fbb3cb935b322982cca535d4dbf8062cc5a47",
+          "source": "https://repo.maven.apache.org/maven2/org/apache/httpcomponents/client5/httpclient5/5.4.4/httpclient5-5.4.4.jar!/META-INF/NOTICE"
+        }
+      ]
+    },
+    {
+      "id": "httpcore5-5.3.4",
+      "containers": [
+        "clickhouse-jdbc-0.10.0-all.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/org/apache/httpcomponents/core5/httpcore5/5.3.4/httpcore5-5.3.4.jar",
+        "sha256": "f2b2fd7a0164e8c3120cd8437bc9fea439239e165c17262b3e907daa7e979f80"
+      },
+      "documents": [
+        {
+          "path": "jdbc/httpcore5-5.3.4/META-INF/LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://repo.maven.apache.org/maven2/org/apache/httpcomponents/core5/httpcore5/5.3.4/httpcore5-5.3.4.jar!/META-INF/LICENSE"
+        },
+        {
+          "path": "jdbc/httpcore5-5.3.4/META-INF/NOTICE",
+          "sha256": "94a71d64ef74b0ca85db2d5e538118a4265ff8eed2f978eda58d2cfa5d88a310",
+          "source": "https://repo.maven.apache.org/maven2/org/apache/httpcomponents/core5/httpcore5/5.3.4/httpcore5-5.3.4.jar!/META-INF/NOTICE"
+        }
+      ]
+    },
+    {
+      "id": "httpcore5-h2-5.3.4",
+      "containers": [
+        "clickhouse-jdbc-0.10.0-all.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/org/apache/httpcomponents/core5/httpcore5-h2/5.3.4/httpcore5-h2-5.3.4.jar",
+        "sha256": "1fb4f34e4b612e7c127ad693335583587850b17ce9b1c366f9de1ca49fe2c781"
+      },
+      "documents": [
+        {
+          "path": "jdbc/httpcore5-h2-5.3.4/META-INF/LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://repo.maven.apache.org/maven2/org/apache/httpcomponents/core5/httpcore5-h2/5.3.4/httpcore5-h2-5.3.4.jar!/META-INF/LICENSE"
+        },
+        {
+          "path": "jdbc/httpcore5-h2-5.3.4/META-INF/NOTICE",
+          "sha256": "9c9b2e926919e38adf222b3191267806a742ce1adcd1e13dc91d11014b85bd57",
+          "source": "https://repo.maven.apache.org/maven2/org/apache/httpcomponents/core5/httpcore5-h2/5.3.4/httpcore5-h2-5.3.4.jar!/META-INF/NOTICE"
+        }
+      ]
+    },
+    {
+      "id": "j2objc-annotations-3.0.0",
+      "containers": [
+        "clickhouse-jdbc-0.10.0-all.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/com/google/j2objc/j2objc-annotations/3.0.0/j2objc-annotations-3.0.0.jar",
+        "sha256": "88241573467ddca44ffd4d74aa04c2bbfd11bf7c17e0c342c94c9de7a70a7c64"
+      },
+      "documents": [
+        {
+          "path": "jdbc/j2objc-annotations-3.0.0/j2objc-LICENSE.txt",
+          "sha256": "22418fba3d2030cc22690f1c0c38ae423d5540110e9d61519027e3210ac29726",
+          "source": "https://raw.githubusercontent.com/google/j2objc/3.0.0/LICENSE"
+        }
+      ]
+    },
+    {
+      "id": "jackson-annotations-2.22",
+      "containers": [
+        "trino-jdbc-483.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.22/jackson-annotations-2.22.jar",
+        "sha256": "21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0"
+      },
+      "documents": [
+        {
+          "path": "jdbc/jackson-annotations-2.22/META-INF/LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.22/jackson-annotations-2.22.jar!/META-INF/LICENSE"
+        },
+        {
+          "path": "jdbc/jackson-annotations-2.22/META-INF/NOTICE",
+          "sha256": "612b14bc77c944ce229cbba0d14919162cfea8ed802cbf06a8e865e032d03201",
+          "source": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.22/jackson-annotations-2.22.jar!/META-INF/NOTICE"
+        }
+      ]
+    },
+    {
+      "id": "jackson-core-2.22.1",
+      "containers": [
+        "trino-jdbc-483.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-core/2.22.1/jackson-core-2.22.1.jar",
+        "sha256": "941ff029bcdb93e83d209ce516c1a7fb8bbac07d0a2fa122f5bf194b2cd7b4f4"
+      },
+      "documents": [
+        {
+          "path": "jdbc/jackson-core-2.22.1/META-INF/LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-core/2.22.1/jackson-core-2.22.1.jar!/META-INF/LICENSE"
+        },
+        {
+          "path": "jdbc/jackson-core-2.22.1/META-INF/NOTICE",
+          "sha256": "e6aef1c0f4cf5b0f802c16b31fce309b3c3737450b93c40d6291bf6540aae3d1",
+          "source": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-core/2.22.1/jackson-core-2.22.1.jar!/META-INF/NOTICE"
+        }
+      ]
+    },
+    {
+      "id": "jackson-databind-2.22.1",
+      "containers": [
+        "trino-jdbc-483.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.22.1/jackson-databind-2.22.1.jar",
+        "sha256": "7dcd7e53bec1f56c7ad278bd1ca0840bebcc595d61ce44d6a8439abb75b965b2"
+      },
+      "documents": [
+        {
+          "path": "jdbc/jackson-databind-2.22.1/META-INF/LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.22.1/jackson-databind-2.22.1.jar!/META-INF/LICENSE"
+        },
+        {
+          "path": "jdbc/jackson-databind-2.22.1/META-INF/NOTICE",
+          "sha256": "612b14bc77c944ce229cbba0d14919162cfea8ed802cbf06a8e865e032d03201",
+          "source": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.22.1/jackson-databind-2.22.1.jar!/META-INF/NOTICE"
+        }
+      ]
+    },
+    {
+      "id": "jackson-datatype-jdk8-2.22.1",
+      "containers": [
+        "trino-jdbc-483.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/datatype/jackson-datatype-jdk8/2.22.1/jackson-datatype-jdk8-2.22.1.jar",
+        "sha256": "2d5ee03fcaa017db0c947a5921ede8b39481d1d637af39079840a87d55e907eb"
+      },
+      "documents": [
+        {
+          "path": "jdbc/jackson-datatype-jdk8-2.22.1/META-INF/LICENSE",
+          "sha256": "bc3d1a9b9fe02f5b9186447ca2896a63015e5e626eccfdda6a04bd7d71be3ce0",
+          "source": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/datatype/jackson-datatype-jdk8/2.22.1/jackson-datatype-jdk8-2.22.1.jar!/META-INF/LICENSE"
+        },
+        {
+          "path": "jdbc/jackson-datatype-jdk8-2.22.1/META-INF/NOTICE",
+          "sha256": "7347397a0665f6898b32894a1869a514251abef7da7620902b0e57c5026cf1ed",
+          "source": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/datatype/jackson-datatype-jdk8/2.22.1/jackson-datatype-jdk8-2.22.1.jar!/META-INF/NOTICE"
+        }
+      ]
+    },
+    {
+      "id": "jakarta.annotation-api-3.0.0",
+      "containers": [
+        "trino-jdbc-483.jar"
+      ],
+      "license": "EPL-2.0 OR (GPL-2.0-only WITH Classpath-exception-2.0)",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/jakarta/annotation/jakarta.annotation-api/3.0.0/jakarta.annotation-api-3.0.0.jar",
+        "sha256": "b01f55552284cfb149411e64eabca75e942d26d2e1786b32914250e4330afaa2"
+      },
+      "documents": [
+        {
+          "path": "jdbc/jakarta.annotation-api-3.0.0/META-INF/LICENSE.md",
+          "sha256": "6e1f002892b81cbe0647019b150c8a056efc1add565671a4f8af629b6cd2cc7b",
+          "source": "https://repo.maven.apache.org/maven2/jakarta/annotation/jakarta.annotation-api/3.0.0/jakarta.annotation-api-3.0.0.jar!/META-INF/LICENSE.md"
+        },
+        {
+          "path": "jdbc/jakarta.annotation-api-3.0.0/META-INF/NOTICE.md",
+          "sha256": "20bf986a153cc3095639379c99ef0a5a3bf99ac4895429920d380414a3eecf08",
+          "source": "https://repo.maven.apache.org/maven2/jakarta/annotation/jakarta.annotation-api/3.0.0/jakarta.annotation-api-3.0.0.jar!/META-INF/NOTICE.md"
+        }
+      ]
+    },
+    {
+      "id": "joda-time-2.14.2",
+      "containers": [
+        "trino-jdbc-483.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/joda-time/joda-time/2.14.2/joda-time-2.14.2.jar",
+        "sha256": "6f65df20eed028bc1a2eba1506e27f943203534d099f94e16b6842391afb72f5"
+      },
+      "documents": [
+        {
+          "path": "jdbc/joda-time-2.14.2/META-INF/LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://repo.maven.apache.org/maven2/joda-time/joda-time/2.14.2/joda-time-2.14.2.jar!/META-INF/LICENSE.txt"
+        },
+        {
+          "path": "jdbc/joda-time-2.14.2/META-INF/NOTICE.txt",
+          "sha256": "9a84172635a8bb2ef10aa795b104ed7a44bdc8577b7d9d292c2eca48f034bd94",
+          "source": "https://repo.maven.apache.org/maven2/joda-time/joda-time/2.14.2/joda-time-2.14.2.jar!/META-INF/NOTICE.txt"
+        }
+      ]
+    },
+    {
+      "id": "jspecify-1.0.0",
+      "containers": [
+        "clickhouse-jdbc-0.10.0-all.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar",
+        "sha256": "1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab"
+      },
+      "documents": [
+        {
+          "path": "jdbc/jspecify-1.0.0/jspecify-LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://raw.githubusercontent.com/jspecify/jspecify/v1.0.0/LICENSE"
+        }
+      ]
+    },
+    {
+      "id": "kotlin-stdlib-2.4.0",
+      "containers": [
+        "trino-jdbc-483.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.0/kotlin-stdlib-2.4.0.jar",
+        "sha256": "ccb14ff83fabcb11458b798dbc9824748ccdffeec79c9aba789e6ed1cda86b1c"
+      },
+      "documents": [
+        {
+          "path": "jdbc/kotlin-stdlib-2.4.0/kotlin-LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://raw.githubusercontent.com/JetBrains/kotlin/v2.4.0/license/LICENSE.txt"
+        },
+        {
+          "path": "jdbc/kotlin-stdlib-2.4.0/kotlin-NOTICE.txt",
+          "sha256": "0b09a83d3ef7795c7dec65e815866597c066c53898f2852a76599b8f5552941a",
+          "source": "https://raw.githubusercontent.com/JetBrains/kotlin/v2.4.0/license/NOTICE.txt"
+        }
+      ]
+    },
+    {
+      "id": "logging-interceptor-5.4.0",
+      "containers": [
+        "trino-jdbc-483.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/com/squareup/okhttp3/logging-interceptor/5.4.0/logging-interceptor-5.4.0.jar",
+        "sha256": "44abfdb49fb13ac012ae4a36bfb734eba9ad5479cb09361b84f053b6b809ee47"
+      },
+      "documents": [
+        {
+          "path": "jdbc/logging-interceptor-5.4.0/okhttp-LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://raw.githubusercontent.com/square/okhttp/parent-5.4.0/LICENSE.txt"
+        }
+      ]
+    },
+    {
+      "id": "lz4-java-1.10.4",
+      "containers": [
+        "clickhouse-jdbc-0.10.0-all.jar"
+      ],
+      "license": "Apache-2.0 AND BSD-2-Clause",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/at/yawk/lz4/lz4-java/1.10.4/lz4-java-1.10.4.jar",
+        "sha256": "cfc173bd3c7c34751ae2100fc084787ebd1ff1f3f5e494c5787b0c2c382cbfbe"
+      },
+      "documents": [
+        {
+          "path": "jdbc/lz4-java-1.10.4/LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://codeload.github.com/yawkat/lz4-java/tar.gz/refs/tags/v1.10.4!/LICENSE.txt"
+        },
+        {
+          "path": "jdbc/lz4-java-1.10.4/lz4-native-LICENSE.txt",
+          "sha256": "8b58c446121a109ccf32edc094bba3010a3d85e4ee3702950db55e4d3e87736c",
+          "source": "https://raw.githubusercontent.com/lz4/lz4/ebb370ca83af193212df4dcbadcc5d87bc0de2f0/lib/LICENSE"
+        },
+        {
+          "path": "jdbc/lz4-java-1.10.4/xxhash-copyright.txt",
+          "sha256": "07ab483e553e0d2e5e03480127bce6d80db2d94a8411171785c875affc5cdfa9",
+          "source": "https://raw.githubusercontent.com/lz4/lz4/ebb370ca83af193212df4dcbadcc5d87bc0de2f0/lib/xxhash.h"
+        }
+      ]
+    },
+    {
+      "id": "okhttp-java-net-cookiejar-5.4.0",
+      "containers": [
+        "trino-jdbc-483.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/com/squareup/okhttp3/okhttp-java-net-cookiejar/5.4.0/okhttp-java-net-cookiejar-5.4.0.jar",
+        "sha256": "39e9358709ed73b568a9c4f5b1b2e4eba77e7ac0d371ad6c12318152ba764855"
+      },
+      "documents": [
+        {
+          "path": "jdbc/okhttp-java-net-cookiejar-5.4.0/okhttp-LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://raw.githubusercontent.com/square/okhttp/parent-5.4.0/LICENSE.txt"
+        }
+      ]
+    },
+    {
+      "id": "okhttp-jvm-5.4.0",
+      "containers": [
+        "trino-jdbc-483.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/com/squareup/okhttp3/okhttp-jvm/5.4.0/okhttp-jvm-5.4.0.jar",
+        "sha256": "b15e605ca0a4b12c62ea7f657dad413c236c947e875854767349cdbe20df473c"
+      },
+      "documents": [
+        {
+          "path": "jdbc/okhttp-jvm-5.4.0/okhttp-LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://raw.githubusercontent.com/square/okhttp/parent-5.4.0/LICENSE.txt"
+        }
+      ]
+    },
+    {
+      "id": "okhttp-urlconnection-5.4.0",
+      "containers": [
+        "trino-jdbc-483.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/com/squareup/okhttp3/okhttp-urlconnection/5.4.0/okhttp-urlconnection-5.4.0.jar",
+        "sha256": "bfa5095ca3143988de0fc9103581b72e0659307da48fa58cfb44a7ce092f0514"
+      },
+      "documents": [
+        {
+          "path": "jdbc/okhttp-urlconnection-5.4.0/okhttp-LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://raw.githubusercontent.com/square/okhttp/parent-5.4.0/LICENSE.txt"
+        }
+      ]
+    },
+    {
+      "id": "okio-jvm-3.17.0",
+      "containers": [
+        "trino-jdbc-483.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/com/squareup/okio/okio-jvm/3.17.0/okio-jvm-3.17.0.jar",
+        "sha256": "3b13dcc3e1573047c2d507fc4f7fcb0bb0cbcd9d395da21d20e09406e2cd6a73"
+      },
+      "documents": [
+        {
+          "path": "jdbc/okio-jvm-3.17.0/okio-LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://raw.githubusercontent.com/square/okio/parent-3.17.0/LICENSE.txt"
+        }
+      ]
+    },
+    {
+      "id": "opentelemetry-okhttp-3.0-2.29.0-alpha",
+      "containers": [
+        "trino-jdbc-483.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/io/opentelemetry/instrumentation/opentelemetry-okhttp-3.0/2.29.0-alpha/opentelemetry-okhttp-3.0-2.29.0-alpha.jar",
+        "sha256": "dd41f6ec34a06836e76d3432f06e5d7ef124cc2b4746eb02f67ce405138d3884"
+      },
+      "documents": [
+        {
+          "path": "jdbc/opentelemetry-okhttp-3.0-2.29.0-alpha/otel-LICENSE.txt",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "source": "https://raw.githubusercontent.com/open-telemetry/opentelemetry-java-instrumentation/v2.29.0/LICENSE"
+        }
+      ]
+    },
+    {
+      "id": "trino-client-483",
+      "containers": [
+        "trino-jdbc-483.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/io/trino/trino-client/483/trino-client-483.jar",
+        "sha256": "eca6a49b3fc523a052620cfd50fcd9b9ca89817c1265a4b95e03e003941a3eca"
+      },
+      "documents": [
+        {
+          "path": "jdbc/trino-client-483/trino-LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://raw.githubusercontent.com/trinodb/trino/483/LICENSE"
+        }
+      ]
+    },
+    {
+      "id": "units-1.8",
+      "containers": [
+        "trino-jdbc-483.jar"
+      ],
+      "license": "Apache-2.0",
+      "upstreamArtifact": {
+        "url": "https://repo.maven.apache.org/maven2/io/airlift/units/1.8/units-1.8.jar",
+        "sha256": "0a5fdd70c4f5c7b736f12c17d28b8268b80083cd4bc227501c2304a64c494415"
+      },
+      "documents": [
+        {
+          "path": "jdbc/units-1.8/units-LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://raw.githubusercontent.com/airlift/units/1.8/LICENSE"
+        }
+      ]
+    }
+  ]
+}

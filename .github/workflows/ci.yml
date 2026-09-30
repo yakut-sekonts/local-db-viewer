@@ -1,0 +1,47 @@
+name: Push and pull request checks
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Verify licenses and corresponding source inventory
+        run: python scripts/build-licenses.py --check
+      - name: Exercise legal packaging failure cases
+        run: python -m unittest discover -s tests -p 'test_licenses.py'
+      - run: npm ci
+      - run: python scripts/prepare-runtime.py --jars-only
+      - run: npm test
+      - name: Compile TypeScript, renderer, Electron and Java bridge
+        run: npm run build
+  ddl:
+    uses: ./.github/workflows/ddl-catalog.yml

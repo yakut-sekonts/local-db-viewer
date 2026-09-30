@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, safeStorage, session as electronSession } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, safeStorage, session as electronSession, shell } from 'electron';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -179,7 +179,12 @@ void app.whenReady().then(() => {
     await drivers.import(id, version, result.filePaths); return true;
   });
   Menu.setApplicationMenu(Menu.buildFromTemplate([
-    { label: 'Local DB Viewer', submenu: [{ role: 'about' }, { type: 'separator' }, { role: 'hide' }, { role: 'quit' }] },
+    { label: 'Local DB Viewer', submenu: [{ role: 'about' }, { id: 'licenses', label: 'Лицензии', click: async () => {
+      try {
+        const error = await shell.openPath(join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'runtime'), 'legal', 'index.html'));
+        if (error) dialog.showErrorBox('Лицензии', error);
+      } catch (error) { dialog.showErrorBox('Лицензии', error instanceof Error ? error.message : String(error)); }
+    } }, { type: 'separator' }, { role: 'hide' }, { role: 'quit' }] },
     { label: 'Правка', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
     { label: 'Вид', submenu: [{ role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { role: 'togglefullscreen' }] },
   ]));
