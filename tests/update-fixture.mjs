@@ -13,10 +13,13 @@ export async function installUpdateFixture(app, fixture) {
       request.setHeader = () => {};
       request.abort = () => { response?.destroy(); request.emit('close'); };
       request.end = () => queueMicrotask(() => {
-        response = url.endsWith('/latest') ? Readable.from([Buffer.from(JSON.stringify({ tag_name: `v${fixture.version}`, body: 'Test release notes', assets: [
+        const release = { tag_name: `v${fixture.version}`, draft: false, prerelease: fixture.version.includes('-beta.'), body: 'Test release notes', assets: [
           { id: 100, name: `Local-DB-Viewer-${fixture.version}-mac-arm64.zip`, size: fixture.size, digest: fixture.digest },
           { id: 101, name: `Local-DB-Viewer-${fixture.version}-windows-x64-setup.exe`, size: fixture.size, digest: fixture.digest },
-        ] }))]) : fixture.archive ? createReadStream(fixture.archive) : Readable.from([Buffer.from(fixture.bytes)]);
+        ] };
+        response = url.endsWith('/latest') ? Readable.from([Buffer.from(JSON.stringify(release))])
+          : url.includes('/releases?') ? Readable.from([Buffer.from(JSON.stringify(fixture.releases ?? [release]))])
+          : fixture.archive ? createReadStream(fixture.archive) : Readable.from([Buffer.from(fixture.bytes)]);
         response.statusCode = 200; response.headers = {};
         response.once('close', () => request.emit('close'));
         request.emit('response', response);

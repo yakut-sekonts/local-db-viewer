@@ -1,12 +1,13 @@
 import { readFile, writeFile, rename } from 'node:fs/promises';
 import { join } from 'node:path';
+import { parseReleaseVersion } from '../src/release-version';
 export interface InstallState { phase: 'waiting' | 'installing' | 'restarting' | 'complete' | 'error'; message: string; version: string; token: string; timestamp: string }
 export async function installState(directory: string): Promise<InstallState | undefined> {
   try {
     const input: unknown = JSON.parse(await readFile(join(directory, 'install-state.json'), 'utf8'));
     if (!input || typeof input !== 'object') return;
     const value = input as InstallState;
-    if (!['waiting','installing','restarting','complete','error'].includes(value.phase) || typeof value.message !== 'string' || value.message.length > 8000 || typeof value.version !== 'string' || !/^\d+\.\d+\.\d+$/.test(value.version) || typeof value.token !== 'string' || !/^[a-f0-9-]{36}$/.test(value.token) || !Number.isFinite(Date.parse(value.timestamp))) return;
+    if (!['waiting','installing','restarting','complete','error'].includes(value.phase) || typeof value.message !== 'string' || value.message.length > 8000 || !parseReleaseVersion(value.version) || typeof value.token !== 'string' || !/^[a-f0-9-]{36}$/.test(value.token) || !Number.isFinite(Date.parse(value.timestamp))) return;
     return value;
   } catch { return; }
 }

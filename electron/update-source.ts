@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 import { open, rename, rm } from 'node:fs/promises';
+import { compareReleaseVersions, parseReleaseVersion } from '../src/release-version';
+import type { UpdateChannel } from '../src/updates';
 
 export interface ReleaseAsset { id: number; name: string; size: number; digest: string }
 export interface UpdateRelease { version: string; notes: string; asset: ReleaseAsset }
@@ -14,20 +16,18 @@ export function validRepository(value: string): string {
   return repository;
 }
 export function newerVersion(candidate: string, current: string): boolean {
-  const parse = (version: string): number[] => {
-    if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) throw new Error('Некорректная стабильная версия релиза.');
-    const values = version.split('.').map(Number);
-    if (!values.every(Number.isSafeInteger)) throw new Error('Номер версии слишком большой.');
-    return values;
-  };
-  const a = parse(candidate), b = parse(current);
-  for (let index = 0; index < 3; index++) if ((a[index] ?? 0) !== (b[index] ?? 0)) return (a[index] ?? 0) > (b[index] ?? 0);
-  return false;
+  return compareReleaseVersions(candidate, current) > 0;
 }
-export function selectRelease(data: any, current: string, platform: NodeJS.Platform, arch: string): UpdateRelease | undefined {
-  if (data.draft || data.prerelease) return;
+export function selectRelease(data: any, current: string, platform: NodeJS.Platform, arch: string, channel: UpdateChannel = 'stable'): UpdateRelease | undefined {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Некорректное описание релиза GitHub.');
+  if (data.draft || (data.prerelease && channel === 'stable')) return;
   if (typeof data.tag_name !== 'string') throw new Error('В релизе отсутствует версия.');
   const version = data.tag_name.replace(/^v/, '');
+  const parsed = parseReleaseVersion(version);
+  if (!parsed) throw new Error('Некорректная версия релиза.');
+  // A beta tag accidentally marked stable must never reach stable devices.
+  if (parsed.beta !== undefined && (channel !== 'beta' || data.prerelease !== true)) return;
+  if (parsed.beta === undefined && data.prerelease) return;
   if (!newerVersion(version, current)) return;
   const suffix = platform === 'darwin' && arch === 'arm64' ? 'mac-arm64.zip'
     : platform === 'win32' && arch === 'x64' ? 'windows-x64-setup.exe' : undefined;
@@ -38,6 +38,19 @@ export function selectRelease(data: any, current: string, platform: NodeJS.Platf
     throw new Error('Релиз не содержит подходящего установщика с контрольной суммой SHA256.');
   }
   return { version, notes: typeof data.body === 'string' ? data.body.slice(0, 16000) : '', asset: { id: asset.id, name, size: asset.size, digest: asset.digest } };
+}
+export function selectNewestRelease(data: unknown[], current: string, platform: NodeJS.Platform, arch: string, channel: UpdateChannel): UpdateRelease | undefined {
+  const candidates = data.filter((item): item is Record<string, any> => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
+    const release = item as Record<string, unknown>;
+    if (release.draft || typeof release.tag_name !== 'string') return false;
+    const version = parseReleaseVersion(release.tag_name.replace(/^v/, ''));
+    return !!version && (version.beta === undefined ? !release.prerelease : channel === 'beta' && release.prerelease === true);
+  }).sort((a, b) => compareReleaseVersions(b.tag_name.replace(/^v/, ''), a.tag_name.replace(/^v/, '')));
+  // Validate the newest candidate's installer. Do not silently hide a broken
+  // release by offering an older one or by saying the application is current.
+  const candidate = candidates[0];
+  return candidate ? selectRelease(candidate, current, platform, arch, channel) : undefined;
 }
 function headers(token: string | undefined, accept: string): Record<string, string> {
   return { ...(token ? { Authorization: `Bearer ${token}` } : {}), Accept: accept, 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'Local DB Viewer' };
@@ -92,6 +105,18 @@ export async function latestRelease(repository: string, token: string | undefine
     redirect: 'error', signal: AbortSignal.timeout(30000),
   }, fetchUpdate);
   return readGitHubJSON(response);
+}
+export async function releaseList(repository: string, token: string | undefined, fetchUpdate: UpdateFetch): Promise<unknown[]> {
+  const releases: unknown[] = [], owner = validRepository(repository);
+  const signal = AbortSignal.timeout(30000);
+  for (let page = 1; page <= 5; page++) {
+    const response = await apiRequest(`https://api.github.com/repos/${owner}/releases?per_page=100&page=${page}`, token, 'application/vnd.github+json', { redirect: 'error', signal }, fetchUpdate);
+    const entries = await readGitHubJSON(response);
+    if (!Array.isArray(entries) || entries.length > 100) throw new Error('GitHub вернул некорректный список релизов.');
+    releases.push(...entries);
+    if (entries.length < 100) return releases;
+  }
+  throw new Error('Достигнут лимит 500 релизов: полный список beta-обновлений проверить не удалось. Выберите стабильный канал.');
 }
 export async function driverCatalog(repository: string, token: string | undefined, fetchUpdate: UpdateFetch): Promise<unknown> {
   const response = await apiRequest(`https://api.github.com/repos/${validRepository(repository)}/contents/catalog.json?ref=driver-catalog`, token, 'application/vnd.github.raw+json', {

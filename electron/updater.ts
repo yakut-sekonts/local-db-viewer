@@ -3,14 +3,14 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { downloadAsset, latestRelease, driverCatalog, selectRelease, validRepository, type UpdateRelease, type UpdateFetch } from './update-source';
-import type { UpdateState } from '../src/updates';
+import { downloadAsset, latestRelease, releaseList, driverCatalog, selectRelease, selectNewestRelease, validRepository, type UpdateRelease, type UpdateFetch } from './update-source';
+import type { UpdateState, UpdateChannel } from '../src/updates';
 import { installState } from './update-install-state';
 
-interface StoredSettings { repository: string; automatic: boolean; encryptedToken?: string }
+interface StoredSettings { repository: string; automatic: boolean; channel: UpdateChannel; encryptedToken?: string }
 interface Encryption { encrypt(value: string): string; decrypt(value: string): string }
 export class Updater {
-  private settings: StoredSettings = { repository: '', automatic: true };
+  private settings: StoredSettings = { repository: '', automatic: true, channel: 'stable' };
   private status: UpdateState;
   private release?: UpdateRelease;
   private downloaded?: string;
@@ -18,7 +18,7 @@ export class Updater {
   private timer?: ReturnType<typeof setInterval>;
   constructor(private directory: string, private version: string, private encryption: Encryption,
     private notify: (value: UpdateState) => void, private installer: (path: string, version: string) => Promise<void>, private fetchUpdate: UpdateFetch) {
-    this.status = { currentVersion: version, phase: 'unconfigured', settings: { repository: '', automatic: true, hasToken: false } };
+    this.status = { currentVersion: version, phase: 'unconfigured', settings: { repository: '', automatic: true, channel: 'stable', hasToken: false } };
   }
   async initialize(defaultRepository = ''): Promise<void> {
     const installation = await installState(this.directory);
@@ -28,7 +28,8 @@ export class Updater {
     } else if (installation?.phase === 'error') this.status.installationError = `Обновление установлено, но перезапуск завершился с ошибкой: ${installation.message}`;
     try {
       const input: StoredSettings = JSON.parse(await readFile(join(this.directory, 'settings.json'), 'utf8'));
-      this.settings = { repository: input.repository ? validRepository(input.repository) : '', automatic: input.automatic !== false, encryptedToken: input.encryptedToken };
+      if (input.channel !== undefined && input.channel !== 'stable' && input.channel !== 'beta') throw new Error('Invalid update channel');
+      this.settings = { repository: input.repository ? validRepository(input.repository) : '', automatic: input.automatic !== false, channel: input.channel ?? 'stable', encryptedToken: input.encryptedToken };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') this.status.error = 'Не удалось прочитать настройки обновления. Настройте доступ повторно.';
       if (defaultRepository) this.settings.repository = validRepository(defaultRepository);
@@ -46,15 +47,15 @@ export class Updater {
   private configured(): boolean { return !!this.settings.repository; }
   private token(): string | undefined { return this.settings.encryptedToken ? this.encryption.decrypt(this.settings.encryptedToken) : undefined; }
   private publish(values: Partial<UpdateState>): UpdateState {
-    this.status = { ...this.status, ...values, settings: { repository: this.settings.repository, automatic: this.settings.automatic, hasToken: !!this.settings.encryptedToken } };
+    this.status = { ...this.status, ...values, settings: { repository: this.settings.repository, automatic: this.settings.automatic, channel: this.settings.channel, hasToken: !!this.settings.encryptedToken } };
     this.notify(this.state()); return this.state();
   }
-  async configure(input: { repository: string; automatic: boolean; token?: string }): Promise<UpdateState> {
+  async configure(input: { repository: string; automatic: boolean; channel?: UpdateChannel; token?: string }): Promise<UpdateState> {
     if (this.busy) throw new Error('Дождитесь завершения операции обновления.');
-    if (!input || typeof input.repository !== 'string' || typeof input.automatic !== 'boolean' || (input.token !== undefined && (typeof input.token !== 'string' || input.token.length > 4096 || /\s/.test(input.token)))) throw new Error('Некорректные настройки обновления.');
+    if (!input || typeof input.repository !== 'string' || typeof input.automatic !== 'boolean' || (input.channel !== undefined && input.channel !== 'stable' && input.channel !== 'beta') || (input.token !== undefined && (typeof input.token !== 'string' || input.token.length > 4096 || /\s/.test(input.token)))) throw new Error('Некорректные настройки обновления.');
     const repository = validRepository(input.repository);
     const encryptedToken = input.token === undefined ? this.settings.encryptedToken : input.token ? this.encryption.encrypt(input.token) : undefined;
-    const settings = { repository, automatic: input.automatic, encryptedToken };
+    const settings = { repository, automatic: input.automatic, channel: input.channel ?? this.settings.channel, encryptedToken };
     this.busy = true;
     try {
       await mkdir(this.directory, { recursive: true, mode: 0o700 });
@@ -71,8 +72,9 @@ export class Updater {
     if (this.downloaded && this.release) return this.publish({ phase: 'ready' });
     this.busy = true; this.publish({ phase: 'checking', error: undefined });
     try {
-      const data = await latestRelease(this.settings.repository, this.token(), this.fetchUpdate);
-      this.release = selectRelease(data, this.version, process.platform, process.arch);
+      this.release = this.settings.channel === 'beta'
+        ? selectNewestRelease(await releaseList(this.settings.repository, this.token(), this.fetchUpdate), this.version, process.platform, process.arch, 'beta')
+        : selectRelease(await latestRelease(this.settings.repository, this.token(), this.fetchUpdate), this.version, process.platform, process.arch);
       return this.publish({ phase: this.release ? 'available' : 'idle', version: this.release?.version, notes: this.release?.notes, checkedAt: Date.now() });
     } catch (error) { return this.publish({ phase: 'error', error: (error as Error).message }); }
     finally { this.busy = false; }

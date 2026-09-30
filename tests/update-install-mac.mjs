@@ -7,6 +7,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import * as asar from '@electron/asar';
 import { installUpdateFixture } from './update-fixture.mjs';
+import { parseReleaseVersion } from '../src/release-version.ts';
 
 if (process.platform !== 'darwin') throw new Error('This test exercises the macOS updater.');
 const execute = promisify(execFile);
@@ -17,15 +18,18 @@ const original = resolve('release/mac-arm64/Local DB Viewer.app');
 const installed = join(work, 'installed/Local DB Viewer.app');
 const replacement = join(work, 'replacement/Local DB Viewer.app');
 const dataDirectory = join(work, 'user-data');
+const betaUpdate = process.env.LDV_UPDATE_BETA === '1';
 await mkdir(join(dataDirectory, 'updates'), { recursive: true });
-await writeFile(join(dataDirectory, 'updates/settings.json'), JSON.stringify({ repository: 'fixture/public', automatic: false }));
+await writeFile(join(dataDirectory, 'updates/settings.json'), JSON.stringify({ repository: 'fixture/public', automatic: false, channel: betaUpdate ? 'beta' : 'stable' }));
 await mkdir(join(dataDirectory, 'drivers'), { recursive: true });
 await writeFile(join(dataDirectory, 'drivers/settings.json'), JSON.stringify({ automatic: false, installed: {}, selected: {} }));
 const marker = join(work, 'restarted.json');
 const progressPath = join(work, 'restart-progress.json');
 const sourceVersion = JSON.parse(asar.extractFile(join(original, 'Contents/Resources/app.asar'), 'package.json').toString('utf8')).version;
-const [major, minor, patch] = sourceVersion.split('.').map(Number);
-const version = `${major}.${minor}.${patch + 1}`;
+const parsed = parseReleaseVersion(sourceVersion);
+if (!parsed) throw new Error('Invalid source version');
+const { major, minor, patch } = parsed;
+const version = `${major}.${minor}.${patch + 1}${betaUpdate ? '-beta.2' : ''}`;
 await cp(original, installed, { recursive: true, verbatimSymlinks: true });
 await cp(original, replacement, { recursive: true, verbatimSymlinks: true });
 const unpacked = join(work, 'asar');
@@ -133,7 +137,7 @@ try {
   expect(result.profiles.map(profile => profile.name)).toContain('Kept connection');
   expect(result.tabs.some(tab => tab.sql.includes('SELECT 42 AS kept_sql'))).toBe(true);
   expect((await readdir(join(work, 'installed'))).some(name => name.startsWith('.Local-DB-Viewer-backup-'))).toBe(true);
-  await writeFile(join(artifacts, 'update-install-results.json'), JSON.stringify({ passed: true, from: sourceVersion, to: version, retainedProfile: true, retainedSQL: true, backup: true, testedAt: new Date().toISOString() }, null, 2));
+  await writeFile(join(artifacts, betaUpdate ? 'update-install-beta-results.json' : 'update-install-results.json'), JSON.stringify({ passed: true, from: sourceVersion, to: version, retainedProfile: true, retainedSQL: true, backup: true, testedAt: new Date().toISOString() }, null, 2));
   console.log(`PASS: click → replace application → restart ${version} → connection and SQL restored; previous app retained`);
 } catch (error) {
   const diagnostics = { error: error.message, progress: await readFile(progressPath, 'utf8').catch(() => 'not started'), logs: [] };
@@ -147,6 +151,6 @@ try {
     const log = await readFile(join(dataDirectory, 'updates', folder, 'install.log'), 'utf8').catch(() => '');
     if (log) diagnostics.logs.push(log);
   }
-  await writeFile(join(artifacts, 'update-install-failure.json'), JSON.stringify(diagnostics, null, 2));
+  await writeFile(join(artifacts, betaUpdate ? 'update-install-beta-failure.json' : 'update-install-failure.json'), JSON.stringify(diagnostics, null, 2));
   console.error(JSON.stringify(diagnostics)); throw error;
 } finally { if (app && !quit) await app.close().catch(() => {}); await restoreKeychain(); }

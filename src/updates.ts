@@ -1,7 +1,9 @@
+export type UpdateChannel = 'stable' | 'beta';
 export interface UpdateSettings {
   repository: string;
   automatic: boolean;
   hasToken: boolean;
+  channel: UpdateChannel;
 }
 export interface UpdateState {
   currentVersion: string;
@@ -16,7 +18,7 @@ export interface UpdateState {
 }
 export interface UpdateAPI {
   state(): Promise<UpdateState>;
-  configure(input: { repository: string; automatic: boolean; token?: string }): Promise<UpdateState>;
+  configure(input: { repository: string; automatic: boolean; channel?: UpdateChannel; token?: string }): Promise<UpdateState>;
   check(): Promise<UpdateState>;
   download(): Promise<UpdateState>;
   install(): Promise<void>;

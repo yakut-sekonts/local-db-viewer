@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { spawn } from 'node:child_process';
 import { installUpdateFixture } from './update-fixture.mjs';
+import { parseReleaseVersion } from '../src/release-version.ts';
 
 if (process.platform !== 'win32' || process.env.CI !== 'true') throw new Error('Run only on a disposable Windows CI account.');
 const root = resolve('.'), artifacts = join(root, 'test-artifacts'); await mkdir(artifacts, { recursive: true });
@@ -13,7 +14,10 @@ const work = await mkdtemp(join(homedir(), 'LocalDBViewer-update-'));
 const installation = join(work, 'Локальная БД Local DB Viewer'), executable = join(installation, 'Local DB Viewer.exe');
 const dataDirectory = join(work, 'user-data'), marker = join(work, 'restarted.json');
 const pkg = JSON.parse(await readFile('package.json', 'utf8'));
-const [major, minor, patch] = pkg.version.split('.').map(Number), version = `${major}.${minor}.${patch + 1}`;
+const parsed = parseReleaseVersion(pkg.version);
+if (!parsed) throw new Error('Invalid source version');
+const { major, minor, patch } = parsed, betaUpdate = process.env.LDV_UPDATE_BETA === '1';
+const version = `${major}.${minor}.${patch + 1}${betaUpdate ? '-beta.2' : ''}`;
 const original = resolve(`release/Local-DB-Viewer-${pkg.version}-windows-x64-setup.exe`);
 async function run(file, args, options = {}) {
   return new Promise((resolve, reject) => {
@@ -24,7 +28,7 @@ async function run(file, args, options = {}) {
 let app, quit = false;
 try {
   await mkdir(join(dataDirectory, 'updates'), { recursive: true });
-  await writeFile(join(dataDirectory, 'updates/settings.json'), JSON.stringify({ repository: 'fixture/releases', automatic: false }));
+  await writeFile(join(dataDirectory, 'updates/settings.json'), JSON.stringify({ repository: 'fixture/releases', automatic: false, channel: betaUpdate ? 'beta' : 'stable' }));
   await mkdir(join(dataDirectory, 'drivers'));
   await writeFile(join(dataDirectory, 'drivers/settings.json'), JSON.stringify({ automatic: false, installed: {}, selected: {} }));
   await run(original, ['/S', `/D=${installation}`], { windowsVerbatimArguments: true });
@@ -74,14 +78,14 @@ require('electron').app.on('browser-window-created', (_event, window) => window.
   expect(result.path.toLowerCase()).toBe(executable.toLowerCase());
   expect(result.profiles.map(profile => profile.name)).toContain('Kept Windows connection');
   expect(result.tabs.some(tab => tab.sql.includes('SELECT 42 AS kept_sql'))).toBe(true);
-  await writeFile(join(artifacts, 'update-install-windows-results.json'), JSON.stringify({ passed: true, from: pkg.version, to: version, sameDirectory: true, unicodePath: true, restartConfirmed: true, retainedProfile: true, retainedSQL: true }, null, 2));
+  await writeFile(join(artifacts, betaUpdate ? 'update-install-windows-beta-results.json' : 'update-install-windows-results.json'), JSON.stringify({ passed: true, from: pkg.version, to: version, sameDirectory: true, unicodePath: true, restartConfirmed: true, retainedProfile: true, retainedSQL: true }, null, 2));
   console.log(`PASS: Windows click → NSIS in same Unicode path → restart ${version} confirmed → connection and SQL preserved`);
 } catch (error) {
   const logs = [];
   for (const folder of await readdir(join(dataDirectory, 'updates')).catch(() => [])) {
     const text = await readFile(join(dataDirectory, 'updates', folder, 'install.log'), 'utf8').catch(() => ''); if (text) logs.push(text);
   }
-  await writeFile(join(artifacts, 'update-install-windows-failure.json'), JSON.stringify({ error: error.message, logs, state: await readFile(join(dataDirectory, 'updates/install-state.json'), 'utf8').catch(() => '') }, null, 2));
+  await writeFile(join(artifacts, betaUpdate ? 'update-install-windows-beta-failure.json' : 'update-install-windows-failure.json'), JSON.stringify({ error: error.message, logs, state: await readFile(join(dataDirectory, 'updates/install-state.json'), 'utf8').catch(() => '') }, null, 2));
   throw error;
 } finally {
   if (app && !quit) await app.close().catch(() => {});

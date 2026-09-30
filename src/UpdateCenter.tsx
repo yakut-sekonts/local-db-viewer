@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bell, Download, RefreshCw, X } from 'lucide-react';
-import type { UpdateState } from './updates';
+import type { UpdateState, UpdateChannel } from './updates';
 
 export function UpdateCenter({ beforeRestart }: { beforeRestart(): void }) {
   const [state, setState] = useState<UpdateState>();
@@ -11,6 +11,7 @@ export function UpdateCenter({ beforeRestart }: { beforeRestart(): void }) {
   const [repository, setRepository] = useState('');
   const [token, setToken] = useState('');
   const [automatic, setAutomatic] = useState(true);
+  const [channel, setChannel] = useState<UpdateChannel>('stable');
   const [editing, setEditing] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -18,7 +19,7 @@ export function UpdateCenter({ beforeRestart }: { beforeRestart(): void }) {
     return window.studio.updates.onChange(setState);
   }, []);
   useEffect(() => { if (open) dialog.current?.showModal(); }, [open]);
-  function show() { setRepository(state?.settings.repository ?? ''); setAutomatic(state?.settings.automatic ?? true); setToken(''); setError(''); setEditing(!state?.settings.repository); setOpen(true); }
+  function show() { setRepository(state?.settings.repository ?? ''); setAutomatic(state?.settings.automatic ?? true); setChannel(state?.settings.channel ?? 'stable'); setToken(''); setError(''); setEditing(!state?.settings.repository); setOpen(true); }
   async function perform(task: () => Promise<unknown>) { setError(''); try { await task(); } catch (error) { setError((error as Error).message); } }
   const busy = !!state && ['checking', 'downloading', 'installing'].includes(state.phase);
   const available = !!state?.version && ['available', 'ready', 'downloading', 'installing'].includes(state.phase);
@@ -37,7 +38,9 @@ export function UpdateCenter({ beforeRestart }: { beforeRestart(): void }) {
       <div className="dialog-heading"><div><h2>Обновления Local DB Viewer</h2><p>Установлена версия {state?.currentVersion}</p></div><button className="icon-button" aria-label="Закрыть обновления" disabled={state?.phase === 'installing'} onClick={() => setOpen(false)}><X size={18} /></button></div>
       <div className="dialog-body">
         {state?.version && <><h3>Версия {state.version}</h3><pre className="release-notes">{state.notes || 'Новая версия Local DB Viewer.'}</pre></>}
-        {state?.phase === 'idle' && state.checkedAt && <p>У вас последняя доступная версия.</p>}
+        {state?.phase === 'idle' && state.checkedAt && <p>Для выбранного канала нет версии новее установленной.</p>}
+        <p>Канал: {state?.settings.channel === 'beta' ? 'Beta — стабильные и тестовые версии' : 'Stable — стабильные версии'}</p>
+        {state?.settings.channel === 'stable' && state.currentVersion.includes('-beta.') && <small>Переход на Stable произойдёт после выхода стабильной версии новее установленной. Автоматический откат на более старую версию не выполняется.</small>}
         {state?.phase === 'downloading' && <label>Загрузка: {state.progress ?? 0}%<progress max={100} value={state.progress ?? 0} /></label>}
         {state?.phase === 'installing' && <p>Подготовка обновления и перезапуска…</p>}
         {state?.phase === 'ready' && <p>Обновление загружено и проверено. Приложение готово к перезапуску.</p>}
@@ -45,11 +48,12 @@ export function UpdateCenter({ beforeRestart }: { beforeRestart(): void }) {
         <button className="ssl-summary" onClick={() => setEditing(!editing)}>{editing ? 'Скрыть настройки доступа' : 'Настройки доступа к обновлениям'}</button>
         {editing && <div className="update-access">
           <label>GitHub-репозиторий<input placeholder="owner/local-db-viewer-releases" value={repository} disabled={busy} onChange={event => setRepository(event.target.value)} /></label>
+          <label>Канал обновлений<select value={channel} disabled={busy} onChange={event => setChannel(event.target.value as UpdateChannel)}><option value="stable">Stable — только стабильные версии</option><option value="beta">Beta — стабильные и тестовые версии</option></select><small>Beta позволяет проверить новые функции до стабильного выпуска.</small></label>
           <label>Личный токен GitHub (необязательно)<input type="password" autoComplete="off" placeholder={state?.settings.hasToken ? 'Сохранён · оставьте пустым, чтобы сохранить' : 'Для приватного репозитория'} value={token} disabled={busy} onChange={event => setToken(event.target.value)} /><small>Для публичного репозитория токен не нужен. Сохранённый токен можно удалить кнопкой ниже. Токен хранится зашифрованным только на этом устройстве.</small></label>
           <small>Обновления используют системные настройки proxy и проверку TLS-сертификатов.</small>
           <label className="checkbox-row"><input type="checkbox" checked={automatic} disabled={busy} onChange={event => setAutomatic(event.target.checked)} />Проверять при запуске и каждые 15 минут</label>
-          <button className="button secondary" disabled={busy} onClick={() => void perform(async () => { await window.studio.updates.configure({ repository, automatic, token: token || undefined }); setToken(''); setEditing(false); await window.studio.updates.check(); })}>Сохранить и проверить</button>
-          {state?.settings.hasToken && <button className="button secondary" disabled={busy} onClick={() => void perform(() => window.studio.updates.configure({ repository, automatic, token: '' }))}>Удалить токен с устройства</button>}
+          <button className="button secondary" disabled={busy} onClick={() => void perform(async () => { await window.studio.updates.configure({ repository, automatic, channel, token: token || undefined }); setToken(''); setEditing(false); await window.studio.updates.check(); })}>Сохранить и проверить</button>
+          {state?.settings.hasToken && <button className="button secondary" disabled={busy} onClick={() => void perform(() => window.studio.updates.configure({ repository, automatic, channel, token: '' }))}>Удалить токен с устройства</button>}
         </div>}
         {state?.installationError && <div className="form-message error" role="alert">{state.installationError}</div>}
         {(error || state?.error) && <div className="form-message error" role="alert">{error || state?.error}</div>}

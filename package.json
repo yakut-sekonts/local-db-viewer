@@ -1,6 +1,6 @@
 {
   "name": "local-db-viewer",
-  "version": "0.15.2",
+  "version": "0.16.0",
   "private": true,
   "description": "Desktop database IDE with a versioned JDBC driver catalog",
   "main": "dist-electron/main.cjs",
@@ -8,7 +8,7 @@
     "build": "node scripts/build-licenses.mjs && node scripts/build-windows-updater.mjs && npm run build:jdbc && tsc --noEmit && vite build --logLevel warn && node scripts/build-electron.mjs",
     "start": "npm run build && electron .",
     "start:built": "electron .",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx --test tests/*.test.ts tests/*.test.mjs",
     "test:licenses": "node scripts/build-licenses.mjs --check",
     "test:ui": "node tests/desktop.mjs",
     "package:mac": "npm run build && electron-builder --mac dmg zip --arm64 --publish never",

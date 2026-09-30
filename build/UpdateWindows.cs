@@ -5,6 +5,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using System.Text.RegularExpressions;
 using System.Web.Script.Serialization;
 
 // Runs from the update cache, never from the application directory being replaced.
@@ -37,6 +38,8 @@ internal static class UpdateWindows {
         try {
             if (args.Length != 1) throw new ArgumentException("Expected an update request file");
             request = Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(args[0], Encoding.UTF8));
+            Match version = Regex.Match(Value("version"), @"^(\d+\.\d+\.\d+)(?:-beta\.\d+)?$");
+            if (!version.Success) throw new ArgumentException("Invalid release version");
             string installer = Path.GetFullPath(Value("installer")), application = Path.GetFullPath(Value("application"));
             string directory = Path.GetDirectoryName(application), work = Path.GetDirectoryName(args[0]);
             status = Path.GetFullPath(Value("status")); log = Path.Combine(work, "install.log");
@@ -57,7 +60,10 @@ internal static class UpdateWindows {
                 if (setup.ExitCode != 0) throw new IOException("Installer exited with code " + setup.ExitCode);
             }
             string installedVersion = FileVersionInfo.GetVersionInfo(application).ProductVersion;
-            if (installedVersion != Value("version") && installedVersion != Value("version") + ".0") throw new IOException("Installer finished but application version is " + installedVersion + "; expected " + Value("version"));
+            // Windows PE ProductVersion has only numeric components. Beta identity
+            // is checked by the exact app version in the startup acknowledgement.
+            string numericVersion = version.Groups[1].Value;
+            if (installedVersion != Value("version") && installedVersion != numericVersion && installedVersion != numericVersion + ".0") throw new IOException("Installer finished but application version is " + installedVersion + "; expected " + Value("version"));
             State("restarting", "Installer completed; starting the updated application");
             using (Process restarted = Start(application, "--updated", directory)) {
                 string ackPath = Path.Combine(Path.GetDirectoryName(status), "startup-ack.json");
