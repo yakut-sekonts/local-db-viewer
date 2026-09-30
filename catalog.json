@@ -710,13 +710,13 @@
     "snowflake": {
       "files": [
         {
-          "path": "net/snowflake/snowflake-jdbc/4.3.4/snowflake-jdbc-4.3.4.jar",
-          "sha256": "b2556c6fa200aa1a7839c42a8b2ef7a11f104018c7638c8c6f40e42dee0b409b",
-          "size": 106921354
+          "path": "net/snowflake/snowflake-jdbc/4.4.0/snowflake-jdbc-4.4.0.jar",
+          "sha256": "eeabc114d2fd429365f8bdde0cb5dd00f0cf529b22aab754751bab1b09fc65c0",
+          "size": 98569339
         }
       ],
-      "key": "3ea17bed21a2caff825c33117003246a37c6680b54a635cdeadb2bd0c10d6f80",
-      "version": "4.3.4"
+      "key": "8ca653a8362d1e89713f1f4d8450cc73050b43fe60f1659360fd53f239092603",
+      "version": "4.4.0"
     },
     "spanner": {
       "files": [
