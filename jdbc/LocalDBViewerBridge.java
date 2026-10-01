@@ -55,13 +55,28 @@ public final class LocalDBViewerBridge {
         return (Driver) Class.forName(config.get("driverClass").getAsString(), true, driverLoader).getDeclaredConstructor().newInstance();
     }
     private static JsonObject options() { return config.has("options") ? config.getAsJsonObject("options") : new JsonObject(); }
+    private static void connectionPhase(boolean opening) {
+        JsonObject phase = message("connection"); phase.addProperty("opening", opening); send(phase);
+    }
     private static Connection connect() throws Exception {
         if (connection != null && !connection.isClosed()) return connection;
         if (!certificatesReady) { prepareCertificates(); certificatesReady = true; }
         DriverManager.setLoginTimeout(number(options(), "connectTimeoutSeconds", 30));
         if (string(config, "engine", "").equals("sqlite") && bool(options(), "readOnly", false)) properties.putIfAbsent("open_mode", "1");
-        connection = driver().connect(config.get("url").getAsString(), properties);
-        if (connection == null) throw new SQLException("JDBC driver does not accept this URL");
+        connectionPhase(true);
+        try {
+            connection = driver().connect(config.get("url").getAsString(), properties);
+            if (connection == null) throw new SQLException("JDBC driver does not accept this URL");
+            // HTTP drivers connect lazily; metadata/isValid() may do no I/O.
+            // Complete a read-only round trip within the connection deadline;
+            // otherwise Test Connection could succeed with an unreachable host.
+            if (Set.of("io.trino.jdbc.TrinoDriver", "com.clickhouse.jdbc.ClickHouseDriver").contains(string(config, "driverClass", ""))) {
+                try (Statement probe = connection.createStatement()) { probe.execute("SELECT 1"); }
+            }
+        } catch (Exception failure) {
+            if (connection != null) { try { connection.close(); } catch (SQLException ignored) {} connection = null; }
+            throw failure;
+        } finally { connectionPhase(false); }
         try {
             if (bool(options(), "readOnly", false)) connection.setReadOnly(true);
             String isolation = string(options(), "isolation", "default");

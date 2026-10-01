@@ -47,6 +47,7 @@ export class DatabaseSession {
     this.worker = worker;
     this.schedule();
     worker.on('message', message => {
+      if (this.worker !== worker) return;
       if ((message.kind === 'done' || message.kind === 'update') && this.current) {
         this.current.latest = message.snapshot;
         this.inTransaction = message.snapshot.inTransaction;
@@ -58,7 +59,7 @@ export class DatabaseSession {
         this.cancelResolve = undefined;
       }
     });
-    worker.on('error', error => { this.fail(error); if (this.worker === worker) this.worker = undefined; void worker.terminate(); });
+    worker.on('error', error => { if (this.worker === worker) { this.fail(error); this.worker = undefined; } void worker.terminate(); });
     worker.on('exit', code => { if (this.worker === worker) { this.worker = undefined; this.inTransaction = false; if (this.current) this.fail(new Error(`Драйвер завершился (${code}). Сессия закрыта.`)); } });
     return worker;
   }
@@ -97,10 +98,11 @@ export class DatabaseSession {
   inspect<T>(request: { kind: string; [key: string]: unknown }, timeout = 60000): Promise<T> { return this.enqueue(() => this.inspectNow<T>(request, timeout)); }
   private async inspectNow<T>(request: { kind: string; [key: string]: unknown }, timeout: number): Promise<T> {
     if (!this.connection.jdbc) throw new Error('Inspection требует JDBC.');
+    const operationTimeout = timeout;
     if (!this.worker) timeout += startupTimeout(this.connection.jdbc);
     const worker = this.ensureWorker(), requestId = crypto.randomUUID();
     return new Promise<T>((resolve, reject) => {
-      const cleanup = () => { clearTimeout(timer); worker.off('message', message); worker.off('error', failure); worker.off('exit', exited); };
+      const cleanup = () => { clearTimeout(timer); worker.off('connection', connection); worker.off('message', message); worker.off('error', failure); worker.off('exit', exited); };
       const failure = (error: Error) => { cleanup(); reject(error); };
       const exited = () => failure(new Error('JDBC-сессия закрыта.'));
       const message = (value: any) => {
@@ -108,7 +110,10 @@ export class DatabaseSession {
         cleanup(); this.inTransaction = Boolean(value.inTransaction);
         if (value.error) reject(new Error(value.error)); else resolve(value.value);
       };
-      const timer = setTimeout(() => { failure(new Error('Таймаут JDBC metadata/keep-alive.')); void worker.terminate(); }, timeout);
+      const timedOut = () => { failure(new Error('Таймаут JDBC metadata/keep-alive.')); void worker.terminate(); };
+      let timer = setTimeout(timedOut, timeout);
+      const connection = (opening: boolean) => { clearTimeout(timer); if (!opening) timer = setTimeout(timedOut, operationTimeout); };
+      worker.on('connection', connection);
       worker.on('message', message); worker.once('error', failure); worker.once('exit', exited);
       try { worker.postMessage({ ...request, requestId }); } catch (error) { failure(error as Error); }
     });
@@ -133,11 +138,12 @@ export class DatabaseSession {
       },
       cancel: async () => {
         if (!this.current || this.current.requestId !== requestId) return;
-        if (this.connection.engine === 'sqlite') {
+        if (this.connection.engine === 'sqlite' || this.worker instanceof JdbcWorker && this.worker.isConnecting) {
           const worker = this.worker; this.worker = undefined;
           await worker?.terminate();
           if (this.current) {
-            const result: QuerySnapshot = { ...this.current.latest, state: 'CANCELED', inTransaction: false, warnings: ['SQLite-сессия закрыта. Незавершённая транзакция откатывается.'] };
+            const warning = this.connection.engine === 'sqlite' ? 'SQLite-сессия закрыта. Незавершённая транзакция откатывается.' : 'Открытие JDBC-соединения отменено; сессия закрыта.';
+            const result: QuerySnapshot = { ...this.current.latest, state: 'CANCELED', inTransaction: false, warnings: [warning] };
             this.current.notify(result); this.current.resolve(result); this.current = undefined;
           }
           return;

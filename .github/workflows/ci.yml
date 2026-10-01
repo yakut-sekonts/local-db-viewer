@@ -43,5 +43,11 @@ jobs:
       - run: npm test
       - name: Compile TypeScript, renderer, Electron and Java bridge
         run: npm run build
+      - name: Prepare Windows runtime for connection deadline tests
+        if: runner.os == 'Windows'
+        run: python scripts/prepare-runtime.py --platform windows-x64
+      - name: Verify real JDBC connection deadlines
+        if: runner.os == 'Windows'
+        run: node tests/connection-timeout.mjs
   ddl:
     uses: ./.github/workflows/ddl-catalog.yml

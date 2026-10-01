@@ -87,6 +87,8 @@ jobs:
             node tests/licenses-desktop.mjs
             node tests/update-channels-desktop.mjs
             node tests/jdbc-runtime.mjs
+            node tests/connection-timeout.mjs
+            node tests/connection-timeout-desktop.mjs
             node tests/jdbc-streaming.mjs
             node tests/multiple-results-runtime.mjs
             node tests/multiple-results-desktop.mjs
@@ -106,6 +108,7 @@ jobs:
           else
             export LOCAL_DB_VIEWER_RESOURCES="$GITHUB_WORKSPACE/release/win-unpacked/resources"
             node tests/jdbc-runtime.mjs
+            node tests/connection-timeout.mjs
             node tests/jdbc-streaming.mjs
             node tests/windows-install.mjs
             node tests/update-install-windows.mjs
@@ -114,6 +117,7 @@ jobs:
             node scripts/build-licenses.mjs --resources "$LOCAL_DB_VIEWER_RESOURCES"
             node tests/licenses-desktop.mjs
             node tests/update-channels-desktop.mjs
+            node tests/connection-timeout-desktop.mjs
             node tests/multiple-results-runtime.mjs
             node tests/multiple-results-desktop.mjs
             node tests/result-grid-desktop.mjs

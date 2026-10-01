@@ -243,7 +243,7 @@ void app.whenReady().then(() => {
     if (installingUpdate) throw new Error('Приложение обновляется.');
     validateDraft(draft);
     const connection = await prepareDriver(sessionTemplate(await profiles.resolve(draft), 'console'));
-    if (connection.jdbc) return inspectJdbc<string>(connection, { kind: 'test' }, (connection.jdbc.options?.connectTimeoutSeconds || 30) * 1000);
+    if (connection.jdbc) return inspectJdbc<string>(connection, { kind: 'test' });
     const session = new DatabaseSession(await prepareDriver(connection));
     const query = session.createQuery(randomUUID(), 1);
     const id = randomUUID();

@@ -5,6 +5,7 @@ import type { Connection } from './trino';
 import { singleStatement } from './sql';
 import { driverDefinition, profileDriver, sqlEngine, DATABASE_PRODUCTS } from '../src/drivers';
 import { validateConnectionOptions } from './connection-options';
+import { connectionTimeoutDefaults, sqlServerUrlPropertyNames } from './jdbc-timeout';
 
 export function validateJdbc(input: JdbcSettings | undefined): void {
   if (input === undefined) return;
@@ -95,10 +96,21 @@ export function jdbcConfig(profile: Connection | ProfileDraft) {
     if (profile.auth === 'bearer' && profile.secret) properties.accessToken = profile.secret;
   }
   if (custom.url) url = custom.url;
+  const driverClass = custom.driverClass || driverDefinition(profileDriver(profile)).className || DRIVER_CLASSES[engine];
+  const defaults = connectionTimeoutDefaults(driverClass, custom.options?.connectTimeoutSeconds ?? 30);
+  for (const [key, value] of Object.entries(defaults)) {
+    // SQL Server property names are case-insensitive. Never pass a second
+    // differently cased default alongside an explicit Advanced value.
+    if (driverClass === 'com.microsoft.sqlserver.jdbc.SQLServerDriver' && Object.keys(custom.properties ?? {}).some(name => name.toLowerCase() === key.toLowerCase())) continue;
+    properties[key] = value;
+  }
   // Explicit Advanced values win over General defaults. Parameters in a custom URL
   // stay in the URL; Trino rejects duplicate values in Properties and the URL.
   Object.assign(properties, custom.properties);
-  if (custom.url) for (const key of [...new URLSearchParams(custom.url.split('?')[1] ?? '').keys()]) delete properties[key];
+  if (driverClass === 'com.microsoft.sqlserver.jdbc.SQLServerDriver') {
+    const urlProperties = sqlServerUrlPropertyNames(url);
+    for (const key of Object.keys(properties)) if (urlProperties.has(key.toLowerCase())) delete properties[key];
+  } else for (const key of new URLSearchParams(url.split('?')[1] ?? '').keys()) delete properties[key];
   for (const [key, value] of Object.entries(properties)) if (value === '' && secretProperty(key)) delete properties[key];
-  return { url, properties, driverClass: custom.driverClass || driverDefinition(profileDriver(profile)).className || DRIVER_CLASSES[engine], options: custom.options ?? {}, startupStatements: custom.options?.startupStatements ?? [] };
+  return { url, properties, driverClass, options: custom.options ?? {}, startupStatements: custom.options?.startupStatements ?? [] };
 }

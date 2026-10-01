@@ -24,6 +24,9 @@ export class JdbcWorker extends EventEmitter {
   private cleanup?: Promise<void>;
   private output = '';
   private closed = false;
+  private connectTimer?: ReturnType<typeof setTimeout>;
+  private connecting = false;
+  get isConnecting(): boolean { return this.connecting; }
   constructor(profile: Connection, inspectionOnly = false) {
     super();
     this.initialization = this.initialize(profile, inspectionOnly).catch(error => { if (!this.closed) this.emit('error', error); void this.terminate(); });
@@ -60,7 +63,19 @@ export class JdbcWorker extends EventEmitter {
       for (;;) {
         const newline = this.output.indexOf('\n'); if (newline < 0) break;
         const line = this.output.slice(0, newline); this.output = this.output.slice(newline + 1);
-        try { this.emit('message', JSON.parse(line)); }
+        try {
+          const message = JSON.parse(line);
+          if (message.kind === 'connection' && typeof message.opening === 'boolean') {
+            this.connecting = message.opening;
+            clearTimeout(this.connectTimer);
+            const seconds = profile.jdbc?.options?.connectTimeoutSeconds ?? 30;
+            if (message.opening && seconds > 0) this.connectTimer = setTimeout(() => {
+              this.emit('error', new Error(`Превышен лимит подключения JDBC (${seconds} сек.). Сессия закрыта.`));
+              void this.terminate();
+            }, seconds * 1000);
+            this.emit('connection', message.opening);
+          } else this.emit('message', message);
+        }
         catch { this.emit('error', new Error('Некорректный ответ JDBC bridge.')); void this.terminate(); }
       }
     });
@@ -69,7 +84,7 @@ export class JdbcWorker extends EventEmitter {
     this.child.stderr.resume();
     this.child.stdin.on('error', error => { if (!this.closed) this.emit('error', error); });
     this.child.on('error', error => this.emit('error', error));
-    this.child.on('exit', code => { this.closed = true; this.controller.abort(); this.tunnel?.close(); void this.cleanFiles(); this.emit('exit', code); });
+    this.child.on('exit', code => { clearTimeout(this.connectTimer); this.closed = true; this.controller.abort(); this.tunnel?.close(); void this.cleanFiles(); this.emit('exit', code); });
     this.postMessage({ ...config, engine: profile.engine, driverId: profileDriver(profile), certificateDirectory: this.certificateDirectory, certificates: profile.jdbc?.certificates ?? {}, sslCa: profile.sslCa ?? '', driverClasspath });
     for (const message of this.queued.splice(0)) this.postMessage(message);
   }
@@ -79,6 +94,8 @@ export class JdbcWorker extends EventEmitter {
     else this.queued.push(value);
   }
   async terminate(): Promise<number> {
+    clearTimeout(this.connectTimer);
+    this.connecting = false;
     if (this.closed) { await this.cleanFiles(); return this.child?.exitCode ?? 0; }
     this.closed = true;
     this.controller.abort(); this.tunnel?.close(); this.queued = [];
@@ -102,12 +119,18 @@ export async function inspectJdbc<T>(profile: Connection, request: { kind: strin
   if (!['properties', 'probe'].includes(request.kind)) timeout += startupTimeout(profile.jdbc);
   try {
     return await new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`JDBC-драйвер не ответил за ${timeout / 1000} секунд.`)), timeout);
-      worker.on('error', error => { clearTimeout(timer); reject(error); });
-      worker.on('exit', () => { clearTimeout(timer); reject(new Error('JDBC bridge завершился до получения ответа.')); });
+      const operationTimeout = timeout - (['properties', 'probe'].includes(request.kind) ? 0 : startupTimeout(profile.jdbc));
+      let timer: ReturnType<typeof setTimeout>;
+      const failure = () => { cleanup(); reject(new Error('Таймаут ответа JDBC-драйвера.')); };
+      const connection = (opening: boolean) => { clearTimeout(timer); if (!opening) timer = setTimeout(failure, operationTimeout); };
+      const cleanup = () => { clearTimeout(timer); worker.off('connection', connection); };
+      timer = setTimeout(failure, timeout);
+      worker.on('connection', connection);
+      worker.on('error', error => { cleanup(); reject(error); });
+      worker.on('exit', () => { cleanup(); reject(new Error('JDBC bridge завершился до получения ответа.')); });
       worker.on('message', message => {
         if (message.kind !== request.kind) return;
-        clearTimeout(timer);
+        cleanup();
         if (message.error) reject(new Error(message.error)); else resolve(request.kind === 'properties' ? message.properties : message.value);
       });
       worker.postMessage(request);
