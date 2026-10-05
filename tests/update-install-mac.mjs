@@ -1,3 +1,4 @@
+import { assertReleaseFuses, enableFixtureInspector } from './fuses-helpers.mjs';
 import { _electron as electron, expect } from '@playwright/test';
 import { cp, mkdir, mkdtemp, readFile, writeFile, readdir } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
@@ -32,6 +33,7 @@ const { major, minor, patch } = parsed;
 const version = `${major}.${minor}.${patch + 1}${betaUpdate ? '-beta.2' : ''}`;
 await cp(original, installed, { recursive: true, verbatimSymlinks: true });
 await cp(original, replacement, { recursive: true, verbatimSymlinks: true });
+await enableFixtureInspector(join(installed, 'Contents/MacOS/Local DB Viewer'), work);
 const unpacked = join(work, 'asar');
 asar.extractAll(join(replacement, 'Contents/Resources/app.asar'), unpacked);
 const pkg = JSON.parse(await readFile(join(unpacked, 'package.json'), 'utf8')); pkg.version = version;
@@ -62,6 +64,7 @@ await execute('/usr/libexec/PlistBuddy', ['-c', `Set :ElectronAsarIntegrity:Reso
 await execute('/usr/libexec/PlistBuddy', ['-c', `Set :CFBundleShortVersionString ${version}`, join(replacement, 'Contents/Info.plist')]);
 await execute('/usr/libexec/PlistBuddy', ['-c', `Set :CFBundleVersion ${version}`, join(replacement, 'Contents/Info.plist')]);
 await execute('/usr/bin/codesign', ['--force', '--deep', '--sign', '-', '--preserve-metadata=entitlements,requirements,flags', replacement], { timeout: 120000 });
+await assertReleaseFuses(join(replacement, 'Contents/MacOS/Local DB Viewer'));
 const archive = join(work, `Local-DB-Viewer-${version}-mac-arm64.zip`);
 await execute('/usr/bin/ditto', ['-c', '-k', '--sequesterRsrc', '--keepParent', replacement, archive], { timeout: 180000 });
 const hash = createHash('sha256'); let size = 0;
@@ -145,7 +148,8 @@ try {
   expect(result.profiles.map(profile => profile.name)).toContain('Kept connection');
   expect(result.tabs.some(tab => tab.sql.includes('SELECT 42 AS kept_sql'))).toBe(true);
   expect((await readdir(join(work, 'installed'))).some(name => name.startsWith('.Local-DB-Viewer-backup-'))).toBe(true);
-  await writeFile(join(artifacts, betaUpdate ? 'update-install-beta-results.json' : 'update-install-results.json'), JSON.stringify({ passed: true, from: sourceVersion, to: version, retainedProfile: true, retainedSQL: true, backup: true, transfer, testedAt: new Date().toISOString() }, null, 2));
+  await assertReleaseFuses(join(installed, 'Contents/MacOS/Local DB Viewer'));
+  await writeFile(join(artifacts, betaUpdate ? 'update-install-beta-results.json' : 'update-install-results.json'), JSON.stringify({ passed: true, from: sourceVersion, to: version, retainedProfile: true, retainedSQL: true, backup: true, releaseFusesRestored: true, transfer, testedAt: new Date().toISOString() }, null, 2));
   console.log(`PASS: click → replace application → restart ${version} → connection and SQL restored; previous app retained`);
 } catch (error) {
   const diagnostics = { error: error.message, progress: await readFile(progressPath, 'utf8').catch(() => 'not started'), logs: [] };

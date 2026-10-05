@@ -1,3 +1,4 @@
+import { assertReleaseFuses, enableFixtureInspector } from './fuses-helpers.mjs';
 import { spawn } from 'node:child_process';
 import { access, mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -22,13 +23,15 @@ try {
   // NSIS requires /D last and without quotes, including when the path has spaces.
   await run(installer, ['/S', `/D=${installation}`], { windowsVerbatimArguments: true });
   await access(executable);
+  await assertReleaseFuses(executable);
   const bytes = await readFile(executable);
   const header = bytes.readUInt32LE(0x3c);
   if (bytes.readUInt16LE(header + 4) !== 0x8664 || !bytes.toString('latin1').includes('level="asInvoker"')) throw new Error('Expected an x64 application with an asInvoker manifest.');
   console.log('PASS: NSIS installed under the current user; x64/asInvoker application found');
+  await enableFixtureInspector(executable, work);
   await run(process.execPath, ['tests/desktop.mjs'], { env: { ...process.env, LOCAL_DB_VIEWER_EXECUTABLE: executable } });
   await mkdir('test-artifacts', { recursive: true });
-  await writeFile('test-artifacts/windows-install-results.json', JSON.stringify({ passed: true, version: pkg.version, perUserPath: true, architecture: 'x64', requestedExecutionLevel: 'asInvoker', testedAt: new Date().toISOString() }, null, 2));
+  await writeFile('test-artifacts/windows-install-results.json', JSON.stringify({ passed: true, version: pkg.version, perUserPath: true, releaseFusesVerified: true, architecture: 'x64', requestedExecutionLevel: 'asInvoker', testedAt: new Date().toISOString() }, null, 2));
 } finally {
   const uninstaller = (await readdir(installation).catch(() => [])).find(name => /^uninstall.*\.exe$/i.test(name));
   if (uninstaller) await run(join(installation, uninstaller), ['/S']);

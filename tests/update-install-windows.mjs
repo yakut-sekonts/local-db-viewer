@@ -1,3 +1,4 @@
+import { assertReleaseFuses, enableFixtureInspector } from './fuses-helpers.mjs';
 import { _electron as electron, expect } from '@playwright/test';
 import { mkdir, mkdtemp, readFile, writeFile, readdir } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
@@ -32,6 +33,7 @@ try {
   await mkdir(join(dataDirectory, 'drivers'));
   await writeFile(join(dataDirectory, 'drivers/settings.json'), JSON.stringify({ automatic: false, installed: {}, selected: {} }));
   await run(original, ['/S', `/D=${installation}`], { windowsVerbatimArguments: true });
+  await enableFixtureInspector(executable, work);
   const main = resolve('dist-electron/main.cjs'), content = await readFile(main, 'utf8');
   const bootstrap = `
 process.env.LOCAL_DB_VIEWER_DATA_DIR = ${JSON.stringify(dataDirectory)};
@@ -81,7 +83,8 @@ require('electron').app.on('browser-window-created', (_event, window) => window.
   expect(result.path.toLowerCase()).toBe(executable.toLowerCase());
   expect(result.profiles.map(profile => profile.name)).toContain('Kept Windows connection');
   expect(result.tabs.some(tab => tab.sql.includes('SELECT 42 AS kept_sql'))).toBe(true);
-  await writeFile(join(artifacts, betaUpdate ? 'update-install-windows-beta-results.json' : 'update-install-windows-results.json'), JSON.stringify({ passed: true, from: pkg.version, to: version, sameDirectory: true, unicodePath: true, restartConfirmed: true, retainedProfile: true, retainedSQL: true, transfer }, null, 2));
+  await assertReleaseFuses(executable);
+  await writeFile(join(artifacts, betaUpdate ? 'update-install-windows-beta-results.json' : 'update-install-windows-results.json'), JSON.stringify({ passed: true, from: pkg.version, to: version, sameDirectory: true, unicodePath: true, restartConfirmed: true, releaseFusesRestored: true, retainedProfile: true, retainedSQL: true, transfer }, null, 2));
   console.log(`PASS: Windows click → NSIS in same Unicode path → restart ${version} confirmed → connection and SQL preserved`);
 } catch (error) {
   const logs = [];

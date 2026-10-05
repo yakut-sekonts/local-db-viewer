@@ -49,7 +49,7 @@ jobs:
             platform: windows-x64
             package: win
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v6
         with:
@@ -76,12 +76,19 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - name: Test packaged desktop
-        timeout-minutes: 20
+        timeout-minutes: 25
         shell: bash
         run: |
           node scripts/test-connections.mjs
           if [ "$RUNNER_OS" = "macOS" ]; then
-            export LOCAL_DB_VIEWER_EXECUTABLE="$GITHUB_WORKSPACE/release/mac-arm64/Local DB Viewer.app/Contents/MacOS/Local DB Viewer"
+            export LOCAL_DB_VIEWER_RELEASE_EXECUTABLE="$GITHUB_WORKSPACE/release/mac-arm64/Local DB Viewer.app/Contents/MacOS/Local DB Viewer"
+          else
+            export LOCAL_DB_VIEWER_RELEASE_EXECUTABLE="$GITHUB_WORKSPACE/release/win-unpacked/Local DB Viewer.exe"
+          fi
+          node tests/fuses-runtime.mjs
+          node tests/fuses-release.mjs --prepare-inspector-copy
+          export LOCAL_DB_VIEWER_EXECUTABLE="$(cat test-artifacts/inspector-executable.txt)"
+          if [ "$RUNNER_OS" = "macOS" ]; then
             export LOCAL_DB_VIEWER_RESOURCES="$GITHUB_WORKSPACE/release/mac-arm64/Local DB Viewer.app/Contents/Resources"
             node scripts/build-licenses.mjs --resources "$LOCAL_DB_VIEWER_RESOURCES"
             node tests/licenses-desktop.mjs
@@ -113,7 +120,6 @@ jobs:
             node tests/windows-install.mjs
             node tests/update-install-windows.mjs
             LDV_UPDATE_BETA=1 node tests/update-install-windows.mjs
-            export LOCAL_DB_VIEWER_EXECUTABLE="$GITHUB_WORKSPACE/release/win-unpacked/Local DB Viewer.exe"
             node scripts/build-licenses.mjs --resources "$LOCAL_DB_VIEWER_RESOURCES"
             node tests/licenses-desktop.mjs
             node tests/update-channels-desktop.mjs
@@ -131,6 +137,7 @@ jobs:
             node tests/ddl-desktop.mjs
             node tests/completion-desktop.mjs
           fi
+          node tests/fuses-release.mjs --verify-unchanged
       - uses: actions/upload-artifact@v7
         with:
           name: installers-${{ matrix.platform }}
