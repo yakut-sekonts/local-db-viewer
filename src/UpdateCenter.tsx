@@ -44,6 +44,11 @@ export function UpdateCenter({ beforeRestart }: { beforeRestart(): void }) {
         {state?.phase === 'downloading' && <label>Загрузка: {state.progress ?? 0}%<progress max={100} value={state.progress ?? 0} /></label>}
         {state?.phase === 'installing' && <p>Подготовка обновления и перезапуска…</p>}
         {state?.phase === 'ready' && <p>Обновление загружено и проверено. Приложение готово к перезапуску.</p>}
+        {state?.transfer && ['downloading', 'ready'].includes(state.phase) && <p className="update-transfer" role="status">
+          {state.transfer.mode === 'delta' ? 'Загрузка изменений' : 'Полная загрузка'} · Получено {(state.transfer.downloadedBytes / 1024 ** 2).toFixed(1)} MiB
+          {state.transfer.mode === 'delta' && ` · Повторно использовано ${(state.transfer.reusedBytes / 1024 ** 2).toFixed(1)} MiB`}
+          {state.transfer.fallback && <small> Загрузка изменений недоступна. Выполняется полная загрузка с проверкой целостности.</small>}
+        </p>}
         {state?.checkedAt && <small>Последняя проверка: {new Date(state.checkedAt).toLocaleString('ru')}</small>}
         <button className="ssl-summary" onClick={() => setEditing(!editing)}>{editing ? 'Скрыть настройки доступа' : 'Настройки доступа к обновлениям'}</button>
         {editing && <div className="update-access">

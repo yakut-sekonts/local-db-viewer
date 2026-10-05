@@ -19,6 +19,8 @@ export async function publishRelease({ directory = process.cwd(), ref = process.
     `Local-DB-Viewer-${version}-mac-arm64.dmg`,
     `Local-DB-Viewer-${version}-mac-arm64.zip`,
     `Local-DB-Viewer-${version}-windows-x64-setup.exe`,
+    `Local-DB-Viewer-${version}-mac-arm64.zip.blockmap`,
+    `Local-DB-Viewer-${version}-windows-x64-setup.exe.blockmap`,
     `Local-DB-Viewer-${version}-third-party-sources.zip`,
   ];
   const files = await readdir(join(directory, 'release-assets'));

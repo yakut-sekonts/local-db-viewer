@@ -4,9 +4,10 @@ import { compareReleaseVersions, parseReleaseVersion } from '../src/release-vers
 import type { UpdateChannel } from '../src/updates';
 
 export interface ReleaseAsset { id: number; name: string; size: number; digest: string }
-export interface UpdateRelease { version: string; notes: string; asset: ReleaseAsset }
+export interface UpdateRelease { version: string; notes: string; asset: ReleaseAsset; blockmap?: ReleaseAsset }
 export type UpdateFetch = (url: string, options: RequestInit) => Promise<Response>;
-const MAX_DOWNLOAD = 2 * 1024 ** 3;
+export const MAX_DOWNLOAD = 2 * 1024 ** 3;
+export const MAX_BLOCKMAP = 8 * 1024 ** 2;
 const DOWNLOAD_HOSTS = new Set(['api.github.com', 'github.com', 'release-assets.githubusercontent.com', 'objects.githubusercontent.com']);
 export function validRepository(value: string): string {
   const repository = value.trim().replace(/^https:\/\/github\.com\//i, '').replace(/\.git$/, '').replace(/\/$/, '');
@@ -37,7 +38,14 @@ export function selectRelease(data: any, current: string, platform: NodeJS.Platf
   if (!asset || !Number.isSafeInteger(asset.id) || asset.id <= 0 || !Number.isSafeInteger(asset.size) || asset.size <= 0 || asset.size > MAX_DOWNLOAD || !/^sha256:[a-f0-9]{64}$/.test(asset.digest)) {
     throw new Error('Релиз не содержит подходящего установщика с контрольной суммой SHA256.');
   }
-  return { version, notes: typeof data.body === 'string' ? data.body.slice(0, 16000) : '', asset: { id: asset.id, name, size: asset.size, digest: asset.digest } };
+  const map = data.assets.find((item: ReleaseAsset) => item?.name === `${name}.blockmap`);
+  // Optional metadata must never prevent a full update of older installations.
+  const blockmap = validAsset(map, MAX_BLOCKMAP) ? { id: map.id, name: `${name}.blockmap`, size: map.size, digest: map.digest } : undefined;
+  return { version, notes: typeof data.body === 'string' ? data.body.slice(0, 16000) : '', asset: { id: asset.id, name, size: asset.size, digest: asset.digest }, blockmap };
+}
+export function validAsset(value: unknown, maximum = MAX_DOWNLOAD): value is ReleaseAsset {
+  const asset = value as ReleaseAsset | undefined;
+  return !!asset && typeof asset.name === 'string' && Number.isSafeInteger(asset.id) && asset.id > 0 && Number.isSafeInteger(asset.size) && asset.size > 0 && asset.size <= maximum && /^sha256:[a-f0-9]{64}$/.test(asset.digest);
 }
 export function selectNewestRelease(data: unknown[], current: string, platform: NodeJS.Platform, arch: string, channel: UpdateChannel): UpdateRelease | undefined {
   const candidates = data.filter((item): item is Record<string, any> => {
@@ -88,12 +96,13 @@ async function request(url: string, options: RequestInit, fetchUpdate: UpdateFet
   catch (error) { throw updateNetworkError(error, new URL(url).hostname); }
 }
 async function apiRequest(url: string, token: string | undefined, accept: string, options: RequestInit, fetchUpdate: UpdateFetch): Promise<Response> {
-  const response = await request(url, { ...options, headers: headers(token, accept) }, fetchUpdate);
+  const requestHeaders = (value: string | undefined) => ({ ...Object.fromEntries(new Headers(options.headers)), ...headers(value, accept) });
+  const response = await request(url, { ...options, headers: requestHeaders(token) }, fetchUpdate);
   if (token && [401, 403].includes(response.status)) {
     // A saved token must not prevent access after a repository becomes public.
     const error = responseError(response);
     await response.body?.cancel();
-    const anonymous = await request(url, { ...options, headers: headers(undefined, accept) }, fetchUpdate);
+    const anonymous = await request(url, { ...options, headers: requestHeaders(undefined) }, fetchUpdate);
     if (anonymous.ok || [301, 302, 303, 307, 308].includes(anonymous.status)) return anonymous;
     await anonymous.body?.cancel();
     throw error;
@@ -105,6 +114,12 @@ export async function latestRelease(repository: string, token: string | undefine
     redirect: 'error', signal: AbortSignal.timeout(30000),
   }, fetchUpdate);
   return readGitHubJSON(response);
+}
+export async function releaseByVersion(repository: string, token: string | undefined, version: string, fetchUpdate: UpdateFetch): Promise<unknown> {
+  if (!parseReleaseVersion(version)) throw new Error('Некорректная версия релиза.');
+  return readGitHubJSON(await apiRequest(`https://api.github.com/repos/${validRepository(repository)}/releases/tags/v${version}`, token, 'application/vnd.github+json', {
+    redirect: 'error', signal: AbortSignal.timeout(30000),
+  }, fetchUpdate));
 }
 export async function releaseList(repository: string, token: string | undefined, fetchUpdate: UpdateFetch): Promise<unknown[]> {
   const releases: unknown[] = [], owner = validRepository(repository);
@@ -135,21 +150,26 @@ async function readGitHubJSON(response: Response): Promise<unknown> {
   try { return JSON.parse(Buffer.concat(parts).toString('utf8')); }
   catch { throw new Error('Сервер вернул некорректное описание релиза. Проверьте, не заменяет ли proxy ответ GitHub страницей авторизации.'); }
 }
-export async function downloadAsset(repository: string, token: string | undefined, asset: ReleaseAsset, destination: string, progress: (percent: number) => void, fetchUpdate: UpdateFetch): Promise<void> {
-  let url = new URL(`https://api.github.com/repos/${validRepository(repository)}/releases/assets/${asset.id}`);
+export async function assetResponse(repository: string, token: string | undefined, asset: ReleaseAsset, fetchUpdate: UpdateFetch,
+  signal: AbortSignal, range?: { start: number; end: number }, resolvedURL?: string): Promise<{ response: Response; url: string }> {
+  let url = new URL(resolvedURL ?? `https://api.github.com/repos/${validRepository(repository)}/releases/assets/${asset.id}`);
   let response: Response | undefined;
-  const signal = AbortSignal.timeout(30 * 60 * 1000);
+  const extraHeaders = { 'Accept-Encoding': 'identity', ...(range ? { Range: `bytes=${range.start}-${range.end - 1}` } : {}) };
   for (let redirect = 0; redirect <= 5; redirect++) {
     if (url.protocol !== 'https:' || url.username || url.password || !DOWNLOAD_HOSTS.has(url.hostname) || (url.port && url.port !== '443')) throw new Error('GitHub вернул недопустимый адрес загрузки.');
     response = url.origin === 'https://api.github.com'
-      ? await apiRequest(url.href, token, 'application/octet-stream', { redirect: 'manual', signal }, fetchUpdate)
-      : await request(url.href, { redirect: 'manual', signal, headers: { Accept: 'application/octet-stream' } }, fetchUpdate);
+      ? await apiRequest(url.href, token, 'application/octet-stream', { redirect: 'manual', signal, headers: extraHeaders }, fetchUpdate)
+      : await request(url.href, { redirect: 'manual', signal, headers: { Accept: 'application/octet-stream', ...extraHeaders } }, fetchUpdate);
     if (![301, 302, 303, 307, 308].includes(response.status)) break;
     const location = response.headers.get('location'); await response.body?.cancel();
     if (!location || redirect === 5) throw new Error('Слишком много перенаправлений GitHub.');
     url = new URL(location, url);
   }
   if (!response) throw new Error('Сервер обновлений не вернул ответ.');
+  return { response, url: url.href };
+}
+export async function downloadAsset(repository: string, token: string | undefined, asset: ReleaseAsset, destination: string, progress: (percent: number) => void, fetchUpdate: UpdateFetch, received: (bytes: number) => void = () => {}, signal = AbortSignal.timeout(30 * 60 * 1000)): Promise<void> {
+  const { response, url } = await assetResponse(repository, token, asset, fetchUpdate, signal);
   if (!response.ok) { await response.body?.cancel(); throw responseError(response); }
   if (!response.body) throw new Error('Сервер обновлений вернул пустой файл.');
   const temporary = `${destination}.part`;
@@ -158,7 +178,8 @@ export async function downloadAsset(repository: string, token: string | undefine
   const reader = response.body.getReader();
   try {
     for (;;) {
-      const { done, value } = await reader.read().catch(error => { throw updateNetworkError(error, url.hostname); }); if (done) break;
+      const { done, value } = await reader.read().catch(error => { throw updateNetworkError(error, new URL(url).hostname); }); if (done) break;
+      received(value.byteLength);
       size += value.byteLength;
       if (size > asset.size || size > MAX_DOWNLOAD) throw new Error('Размер загрузки не соответствует релизу.');
       hash.update(value);

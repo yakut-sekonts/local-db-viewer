@@ -1,4 +1,11 @@
 export type UpdateChannel = 'stable' | 'beta';
+export interface UpdateTransfer {
+  mode: 'full' | 'delta';
+  downloadedBytes: number;
+  reusedBytes: number;
+  totalBytes: number;
+  fallback?: boolean;
+}
 export interface UpdateSettings {
   repository: string;
   automatic: boolean;
@@ -12,6 +19,7 @@ export interface UpdateState {
   version?: string;
   notes?: string;
   progress?: number;
+  transfer?: UpdateTransfer;
   error?: string;
   installationError?: string;
   checkedAt?: number;

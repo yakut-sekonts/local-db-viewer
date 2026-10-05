@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { spawn } from 'node:child_process';
-import { installUpdateFixture } from './update-fixture.mjs';
+import { installUpdateFixture, prepareDeltaFixture } from './update-fixture.mjs';
 import { parseReleaseVersion } from '../src/release-version.ts';
 
 if (process.platform !== 'win32' || process.env.CI !== 'true') throw new Error('Run only on a disposable Windows CI account.');
@@ -60,8 +60,11 @@ require('electron').app.on('browser-window-created', (_event, window) => window.
   await page.evaluate(database => window.studio.profiles.save({ engine: 'sqlite', name: 'Kept Windows connection', endpoint: database, user: '', auth: 'none', tls: false, catalog: '', schema: '', jdbc: {} }), database);
   await page.locator('.monaco-editor').click({ position: { x: 100, y: 20 } });
   await page.keyboard.press('Control+A'); await page.keyboard.insertText('SELECT 42 AS kept_sql;');
-  await installUpdateFixture(app, { archive, version, size, digest: `sha256:${hash.digest('hex')}` });
+  const deltaFixture = betaUpdate ? undefined : await prepareDeltaFixture({ directory: join(dataDirectory, 'updates'), currentVersion: pkg.version, version, baseArchive: original, archive });
+  await installUpdateFixture(app, deltaFixture ?? { archive, version, size, digest: `sha256:${hash.digest('hex')}` });
   await page.evaluate(async () => { await window.studio.updates.check(); const state = await window.studio.updates.download(); if (state.phase !== 'ready') throw new Error(state.error || state.phase); });
+  const transfer = (await page.evaluate(() => window.studio.updates.state())).transfer;
+  if (!betaUpdate) { expect(transfer.mode).toBe('delta'); expect(transfer.reusedBytes).toBeGreaterThan(size * 0.1); expect(transfer.downloadedBytes).toBeLessThan(size); }
   await page.getByRole('button', { name: 'Обновления Local DB Viewer', exact: true }).click();
   const closed = new Promise(resolve => app.once('close', resolve));
   await page.getByRole('button', { name: 'Перезапустить и обновить', exact: true }).click();
@@ -78,7 +81,7 @@ require('electron').app.on('browser-window-created', (_event, window) => window.
   expect(result.path.toLowerCase()).toBe(executable.toLowerCase());
   expect(result.profiles.map(profile => profile.name)).toContain('Kept Windows connection');
   expect(result.tabs.some(tab => tab.sql.includes('SELECT 42 AS kept_sql'))).toBe(true);
-  await writeFile(join(artifacts, betaUpdate ? 'update-install-windows-beta-results.json' : 'update-install-windows-results.json'), JSON.stringify({ passed: true, from: pkg.version, to: version, sameDirectory: true, unicodePath: true, restartConfirmed: true, retainedProfile: true, retainedSQL: true }, null, 2));
+  await writeFile(join(artifacts, betaUpdate ? 'update-install-windows-beta-results.json' : 'update-install-windows-results.json'), JSON.stringify({ passed: true, from: pkg.version, to: version, sameDirectory: true, unicodePath: true, restartConfirmed: true, retainedProfile: true, retainedSQL: true, transfer }, null, 2));
   console.log(`PASS: Windows click → NSIS in same Unicode path → restart ${version} confirmed → connection and SQL preserved`);
 } catch (error) {
   const logs = [];

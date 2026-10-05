@@ -138,6 +138,8 @@ jobs:
             release/Local-DB-Viewer-*.dmg
             release/Local-DB-Viewer-*.zip
             release/Local-DB-Viewer-*-setup.exe
+            release/Local-DB-Viewer-*.zip.blockmap
+            release/Local-DB-Viewer-*-setup.exe.blockmap
           if-no-files-found: error
           compression-level: 0
           retention-days: 14

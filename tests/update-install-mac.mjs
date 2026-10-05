@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import * as asar from '@electron/asar';
-import { installUpdateFixture } from './update-fixture.mjs';
+import { installUpdateFixture, prepareDeltaFixture } from './update-fixture.mjs';
 import { parseReleaseVersion } from '../src/release-version.ts';
 
 if (process.platform !== 'darwin') throw new Error('This test exercises the macOS updater.');
@@ -116,12 +116,20 @@ try {
   await page.locator('.monaco-editor').click({ position: { x: 100, y: 20 } });
   await page.keyboard.press('Meta+A'); await page.keyboard.insertText('SELECT 42 AS kept_sql;');
   await expect(page.locator('.view-lines')).toContainText('SELECT 42 AS kept_sql');
-  await installUpdateFixture(app, { archive, version, size, digest });
+  let deltaFixture;
+  if (!betaUpdate) {
+    const baseArchive = join(work, 'base.zip');
+    await execute('/usr/bin/ditto', ['-c', '-k', '--sequesterRsrc', '--keepParent', original, baseArchive], { timeout: 180000 });
+    deltaFixture = await prepareDeltaFixture({ directory: join(dataDirectory, 'updates'), currentVersion: sourceVersion, version, baseArchive, archive });
+  }
+  await installUpdateFixture(app, deltaFixture ?? { archive, version, size, digest });
   await page.evaluate(async () => {
     await window.studio.updates.configure({ repository: 'fixture/releases', automatic: false, token: 'isolated-token' });
     await window.studio.updates.check();
     const result = await window.studio.updates.download(); if (result.phase !== 'ready') throw new Error(result.error || result.phase);
   });
+  const transfer = (await page.evaluate(() => window.studio.updates.state())).transfer;
+  if (!betaUpdate) { expect(transfer.mode).toBe('delta'); expect(transfer.reusedBytes).toBeGreaterThan(size * 0.1); expect(transfer.downloadedBytes).toBeLessThan(size); }
   await page.getByRole('button', { name: 'Обновления Local DB Viewer', exact: true }).click();
   const closed = new Promise(resolve => app.once('close', resolve));
   await page.getByRole('button', { name: 'Перезапустить и обновить', exact: true }).click();
@@ -137,7 +145,7 @@ try {
   expect(result.profiles.map(profile => profile.name)).toContain('Kept connection');
   expect(result.tabs.some(tab => tab.sql.includes('SELECT 42 AS kept_sql'))).toBe(true);
   expect((await readdir(join(work, 'installed'))).some(name => name.startsWith('.Local-DB-Viewer-backup-'))).toBe(true);
-  await writeFile(join(artifacts, betaUpdate ? 'update-install-beta-results.json' : 'update-install-results.json'), JSON.stringify({ passed: true, from: sourceVersion, to: version, retainedProfile: true, retainedSQL: true, backup: true, testedAt: new Date().toISOString() }, null, 2));
+  await writeFile(join(artifacts, betaUpdate ? 'update-install-beta-results.json' : 'update-install-results.json'), JSON.stringify({ passed: true, from: sourceVersion, to: version, retainedProfile: true, retainedSQL: true, backup: true, transfer, testedAt: new Date().toISOString() }, null, 2));
   console.log(`PASS: click → replace application → restart ${version} → connection and SQL restored; previous app retained`);
 } catch (error) {
   const diagnostics = { error: error.message, progress: await readFile(progressPath, 'utf8').catch(() => 'not started'), logs: [] };

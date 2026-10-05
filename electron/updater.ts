@@ -3,7 +3,8 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { downloadAsset, latestRelease, releaseList, driverCatalog, selectRelease, selectNewestRelease, validRepository, type UpdateRelease, type UpdateFetch } from './update-source';
+import { latestRelease, releaseList, driverCatalog, selectRelease, selectNewestRelease, validRepository, type UpdateRelease, type UpdateFetch } from './update-source';
+import { downloadUpdate } from './update-delta';
 import type { UpdateState, UpdateChannel } from '../src/updates';
 import { installState } from './update-install-state';
 
@@ -63,7 +64,7 @@ export class Updater {
       try { await writeFile(temporary, JSON.stringify(settings), { mode: 0o600 }); await rename(temporary, path); }
       finally { await rm(temporary, { force: true }); }
       this.settings = settings; this.release = undefined; this.downloaded = undefined;
-      return this.publish({ phase: this.configured() ? 'idle' : 'unconfigured', error: undefined, version: undefined, notes: undefined, progress: undefined, checkedAt: undefined });
+      return this.publish({ phase: this.configured() ? 'idle' : 'unconfigured', error: undefined, version: undefined, notes: undefined, progress: undefined, transfer: undefined, checkedAt: undefined });
     } finally { this.busy = false; }
   }
   async check(): Promise<UpdateState> {
@@ -75,20 +76,22 @@ export class Updater {
       this.release = this.settings.channel === 'beta'
         ? selectNewestRelease(await releaseList(this.settings.repository, this.token(), this.fetchUpdate), this.version, process.platform, process.arch, 'beta')
         : selectRelease(await latestRelease(this.settings.repository, this.token(), this.fetchUpdate), this.version, process.platform, process.arch);
-      return this.publish({ phase: this.release ? 'available' : 'idle', version: this.release?.version, notes: this.release?.notes, checkedAt: Date.now() });
+      return this.publish({ phase: this.release ? 'available' : 'idle', version: this.release?.version, notes: this.release?.notes, transfer: undefined, checkedAt: Date.now() });
     } catch (error) { return this.publish({ phase: 'error', error: (error as Error).message }); }
     finally { this.busy = false; }
   }
   async download(): Promise<UpdateState> {
     if (this.busy) throw new Error('Обновление уже выполняется.');
     if (!this.release || !this.configured()) throw new Error('Сначала проверьте наличие новой версии.');
-    this.busy = true; this.publish({ phase: 'downloading', progress: 0, error: undefined });
+    this.busy = true; this.publish({ phase: 'downloading', progress: 0, transfer: undefined, error: undefined });
     const directory = join(this.directory, randomUUID());
     try {
       await mkdir(directory, { recursive: true, mode: 0o700 });
       const path = join(directory, this.release.asset.name);
-      await downloadAsset(this.settings.repository, this.token(), this.release.asset, path, progress => this.publish({ progress }), this.fetchUpdate);
-      this.downloaded = path; return this.publish({ phase: 'ready', progress: 100 });
+      const transfer = await downloadUpdate({ directory: this.directory, repository: this.settings.repository, currentVersion: this.version,
+        token: this.token(), release: this.release, destination: path, fetchUpdate: this.fetchUpdate,
+        progress: (progress, transfer) => this.publish({ progress, transfer }) });
+      this.downloaded = path; return this.publish({ phase: 'ready', progress: 100, transfer });
     } catch (error) { await rm(directory, { recursive: true, force: true }); return this.publish({ phase: 'error', error: (error as Error).message }); }
     finally { this.busy = false; }
   }

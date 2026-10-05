@@ -10,7 +10,7 @@ async function fixture(version) {
   await mkdir(join(directory, 'release-assets'));
   await writeFile(join(directory, 'package.json'), JSON.stringify({ version }));
   await writeFile(join(directory, 'CHANGELOG.md'), `# Changes\n\n## ${version}\n\nRelease notes\n\n## 0.0.1\n\nOld notes\n`);
-  for (const suffix of ['mac-arm64.dmg', 'mac-arm64.zip', 'windows-x64-setup.exe', 'third-party-sources.zip']) await writeFile(join(directory, 'release-assets', `Local-DB-Viewer-${version}-${suffix}`), 'fixture asset');
+  for (const suffix of ['mac-arm64.dmg', 'mac-arm64.zip', 'windows-x64-setup.exe', 'mac-arm64.zip.blockmap', 'windows-x64-setup.exe.blockmap', 'third-party-sources.zip']) await writeFile(join(directory, 'release-assets', `Local-DB-Viewer-${version}-${suffix}`), 'fixture asset');
   return directory;
 }
 
@@ -26,7 +26,8 @@ test('publisher stages all installers and corresponding sources before publishin
       assert.equal(calls[3].includes('--latest'), !version.includes('-beta.'));
       assert.ok(calls[3].includes('--draft=false'));
       assert.ok(calls[2].some(a => a.endsWith('-third-party-sources.zip')));
-      assert.equal((await readFile(join(directory, 'release-assets/SHA256SUMS.txt'), 'utf8')).trim().split('\n').length, 4);
+      assert.equal(calls[2].filter(a => a.endsWith('.blockmap')).length, 2);
+      assert.equal((await readFile(join(directory, 'release-assets/SHA256SUMS.txt'), 'utf8')).trim().split('\n').length, 6);
       assert.equal((await readFile(join(directory, 'release-notes.md'), 'utf8')).trim(), 'Release notes');
     } finally { await rm(directory, { recursive: true, force: true }); }
   }

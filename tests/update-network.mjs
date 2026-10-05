@@ -7,6 +7,8 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { gzipSync } from 'node:zlib';
+import { expect } from '@playwright/test';
 
 // Exercise the actual packaged updater over HTTPS CONNECT, without sending any
 // requests or credentials to GitHub. Only this disposable session trusts the fixture.
@@ -28,10 +30,11 @@ export async function testUpdateNetwork(app, page, directory, artifacts) {
   const trustedCertificate = await fixtureCertificate('trusted');
   const bytes = Buffer.from('HTTPS installer fixture: Кириллица 🌍');
   const digest = 'sha256:' + createHash('sha256').update(bytes).digest('hex');
+  let payload = bytes, payloadDigest = digest, map, refuseRange = false;
   const calls = [], tunnels = [], sockets = new Set();
   let rejectTunnel = false;
   const tls = createTLS({ pfx: untrustedCertificate.pfx, passphrase: password }, (request, response) => {
-    calls.push({ host: request.headers.host, auth: request.headers.authorization ?? null, cookie: request.headers.cookie ?? null });
+    calls.push({ host: request.headers.host, auth: request.headers.authorization ?? null, cookie: request.headers.cookie ?? null, range: request.headers.range ?? null });
     if (request.url === '/auth-fixture') {
       if (request.headers.authorization === 'Basic ' + Buffer.from('fixture-user:fixture-password').toString('base64')) { response.end('ok'); }
       else { response.writeHead(401, { 'WWW-Authenticate': 'Basic realm="disposable-fixture"' }); response.end(); }
@@ -41,12 +44,20 @@ export async function testUpdateNetwork(app, page, directory, artifacts) {
     if (request.url.endsWith('/latest')) {
       response.setHeader('Content-Type', 'application/json');
       response.end(JSON.stringify({ tag_name: 'v9.9.9', assets: [
-        { id: 10, name: 'Local-DB-Viewer-9.9.9-windows-x64-setup.exe', size: bytes.length, digest },
-        { id: 11, name: 'Local-DB-Viewer-9.9.9-mac-arm64.zip', size: bytes.length, digest },
+        { id: 10, name: 'Local-DB-Viewer-9.9.9-windows-x64-setup.exe', size: payload.length, digest: payloadDigest },
+        { id: 11, name: 'Local-DB-Viewer-9.9.9-mac-arm64.zip', size: payload.length, digest: payloadDigest },
+        ...(map ? [{ id: 12, name: `Local-DB-Viewer-9.9.9-${process.platform === 'win32' ? 'windows-x64-setup.exe' : 'mac-arm64.zip'}.blockmap`, size: map.length, digest: 'sha256:' + createHash('sha256').update(map).digest('hex') }] : []),
       ] }));
     } else if (request.url.includes('/assets/')) {
-      response.writeHead(302, { Location: 'https://release-assets.githubusercontent.com/fixture?signature=not-for-ui' }); response.end();
-    } else { response.end(bytes); }
+      response.writeHead(302, { Location: `https://release-assets.githubusercontent.com/${request.url.endsWith('/12') ? 'map' : 'fixture'}?signature=not-for-ui` }); response.end();
+    } else if (request.url.startsWith('/map')) { response.end(map); }
+    else {
+      const range = /^bytes=(\d+)-(\d+)$/.exec(request.headers.range ?? '');
+      if (range && !refuseRange) {
+        response.writeHead(206, { 'Content-Range': `bytes ${range[1]}-${range[2]}/${payload.length}` });
+        response.end(payload.subarray(Number(range[1]), Number(range[2]) + 1));
+      } else response.end(payload);
+    }
   });
   const proxy = createProxy((_request, response) => { response.writeHead(400); response.end(); });
   proxy.on('connect', (request, client, head) => {
@@ -119,6 +130,31 @@ export async function testUpdateNetwork(app, page, directory, artifacts) {
       const files = await readdir(join(directory, 'updates', folder.name));
       for (const file of files) assert.deepEqual(await readFile(join(directory, 'updates', folder.name, file)), bytes);
     }
+    function deltaPayload(chunks) {
+      payload = Buffer.concat(chunks); payloadDigest = 'sha256:' + createHash('sha256').update(payload).digest('hex');
+      map = gzipSync(JSON.stringify({ version: '2', files: [{ name: 'file', offset: 0, sizes: chunks.map(c => c.length), checksums: chunks.map(c => createHash('sha256').update(c).digest().subarray(0, 18).toString('base64')) }] }));
+    }
+    const left = Buffer.alloc(256 * 1024, 17), right = Buffer.alloc(256 * 1024, 31);
+    deltaPayload([left, right]);
+    async function fetchFixture() {
+      await page.evaluate(async () => { await window.studio.updates.configure({ repository: 'fixture/public', automatic: false, token: 'valid-fixture' }); await window.studio.updates.check(); });
+      const result = await page.evaluate(() => window.studio.updates.download());
+      assert.equal(result.phase, 'ready', result.error); return result.transfer;
+    }
+    assert.equal((await fetchFixture()).mode, 'full');
+    deltaPayload([left, Buffer.alloc(10000, 42), right]); calls.length = 0;
+    const delta = await fetchFixture();
+    assert.equal(delta.mode, 'delta'); assert.equal(delta.reusedBytes, left.length + right.length);
+    assert.ok(delta.downloadedBytes < payload.length / 10);
+    assert.ok(calls.some(c => c.host === 'release-assets.githubusercontent.com' && c.range));
+    assert.ok(calls.filter(c => c.host === 'release-assets.githubusercontent.com').every(c => c.auth === null && c.cookie === null));
+    await page.getByRole('button', { name: 'Обновления Local DB Viewer', exact: true }).click();
+    await expect(page.locator('.update-transfer')).toContainText('Загрузка изменений');
+    await expect(page.locator('.update-transfer')).toContainText('Повторно использовано');
+    await page.screenshot({ path: join(artifacts, 'update-delta.png') });
+    await page.getByRole('button', { name: 'Закрыть обновления', exact: true }).click();
+    deltaPayload([left, Buffer.alloc(10000, 50), right]); refuseRange = true;
+    const fallback = await fetchFixture(); assert.equal(fallback.mode, 'full'); assert.equal(fallback.fallback, true);
     assert.ok(tunnels.includes('api.github.com:443')); assert.ok(tunnels.includes('release-assets.githubusercontent.com:443'));
     rejectTunnel = true;
     await app.evaluate(({ session }) => session.defaultSession.closeAllConnections());
@@ -126,7 +162,7 @@ export async function testUpdateNetwork(app, page, directory, artifacts) {
     const blocked = await page.evaluate(() => window.studio.updates.check());
     assert.equal(blocked.phase, 'error'); assert.match(blocked.error, /ERR_TUNNEL_CONNECTION_FAILED/);
     assert.ok(!blocked.error.includes('signature='));
-    await writeFile(join(artifacts, 'update-network-results.json'), JSON.stringify({ passed: true, platform: process.platform, checks: ['HTTPS CONNECT proxy', 'untrusted TLS rejected', 'public tokenless check and download', 'private token encrypted', 'expired token public fallback', 'CDN has no credentials', 'streamed size and SHA256', 'proxy failure diagnostic'], testedAt: new Date().toISOString() }, null, 2));
+    await writeFile(join(artifacts, 'update-network-results.json'), JSON.stringify({ passed: true, platform: process.platform, delta, fallback, checks: ['HTTPS CONNECT proxy', 'untrusted TLS rejected', 'public tokenless check and download', 'private token encrypted', 'expired token public fallback', 'CDN has no credentials', 'streamed size and SHA256', 'real Chromium Range through proxy', 'proxy ignoring Range falls back to full', 'proxy failure diagnostic'], testedAt: new Date().toISOString() }, null, 2));
     console.log('PASS: real Electron updater, HTTPS proxy, TLS verification, public/private access, redirects and diagnostics');
   } finally {
     await app.evaluate(async ({ session }) => {
