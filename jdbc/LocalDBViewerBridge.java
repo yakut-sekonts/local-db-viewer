@@ -176,6 +176,10 @@ public final class LocalDBViewerBridge {
     }
     private static void run(JsonObject request) {
         long started = System.nanoTime();
+        String driverClass = string(config, "driverClass", "");
+        boolean mysqlStreaming = driverClass.startsWith("com.mysql.");
+        boolean mariaStreaming = driverClass.equals("org.mariadb.jdbc.Driver");
+        boolean timedOut = false;
         JsonObject snapshot = new JsonObject();
         snapshot.addProperty("requestId", request.get("requestId").getAsString());
         snapshot.addProperty("queryId", ""); snapshot.addProperty("state", "RUNNING");
@@ -210,11 +214,13 @@ public final class LocalDBViewerBridge {
                 }
                 snapshot.addProperty("contextApplied", true);
             }
-            boolean mysqlStreaming = string(config, "driverClass", "").startsWith("com.mysql.");
-            try (Statement statement = mysqlStreaming ? active.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY) : active.createStatement()) {
+            try (Statement statement = mysqlStreaming || mariaStreaming ? active.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY) : active.createStatement()) {
                 runningStatement = statement;
                 // Connector/J otherwise materializes the entire result before next().
                 if (mysqlStreaming) statement.setFetchSize(Integer.MIN_VALUE);
+                // MariaDB requires a positive fetch size. A single row avoids
+                // multiplying memory consumption for wide LONGTEXT/BLOB rows.
+                else if (mariaStreaming) statement.setFetchSize(1);
                 int timeout = number(options(), "queryTimeoutSeconds", 0);
                 if (timeout > 0) statement.setQueryTimeout(timeout);
                 if (CANCELED.get()) throw new CancellationException("Query canceled");
@@ -243,9 +249,22 @@ public final class LocalDBViewerBridge {
                 if (postgres) snapshot.addProperty("searchPath", current.searchPath());
             } catch (SQLException unsupported) { warnings.add("Не удалось получить текущие catalog/schema: " + error(unsupported)); }
         } catch (Throwable failure) {
+            timedOut = failure instanceof SQLTimeoutException;
             snapshot.addProperty("state", CANCELED.get() || failure instanceof CancellationException ? "CANCELED" : "FAILED");
             snapshot.addProperty("error", error(failure));
         } finally {
+            if (mysqlStreaming && (timedOut || CANCELED.get())) {
+                // Connector/J can throw from execute() after opening a streaming
+                // result but before assigning it to Statement. Statement.close()
+                // then cannot release that result; reusing the connection fails.
+                // Abort the physical connection, never replay the interrupted SQL.
+                Connection discarded = connection; connection = null; explicitTransaction = false;
+                if (discarded != null) {
+                    try { discarded.abort(Runnable::run); }
+                    catch (SQLException | AbstractMethodError unsupported) { try { discarded.close(); } catch (SQLException ignored) {} }
+                    warnings.add("MySQL-соединение закрыто после отмены или таймаута. Незавершённая транзакция откатывается; следующий запрос откроет новое соединение.");
+                }
+            }
             snapshot.addProperty("inTransaction", explicitTransaction);
             snapshot.getAsJsonObject("stats").addProperty("elapsedTimeMillis", (System.nanoTime() - started) / 1_000_000);
             JsonObject result = message("done"); result.add("snapshot", snapshot); send(result);

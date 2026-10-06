@@ -147,20 +147,36 @@ try {
   assert.deepEqual((await run(main, 'SELECT id FROM transactions_fixture')).rows, [['1']]);
   passed('script stops on SQL error and leaves an explicit rollback available');
 
-  const timed = session({ options: { queryTimeoutSeconds: 1 } });
+  const timed = session({ options: { queryTimeoutSeconds: 1, autoCommit: false } });
+  await run(timed, 'INSERT INTO transactions_fixture VALUES (9)');
   const timeoutStarted = Date.now();
   const timedResult = await timed.createQuery('query-timeout').run('SELECT SLEEP(20)');
   assert.equal(timedResult.state, 'FAILED'); assert.ok(Date.now() - timeoutStarted < 10000);
+  if (engine === 'mysql') {
+    assert.equal(timedResult.inTransaction, false);
+    assert.ok(timedResult.warnings.some(message => message.includes('соединение закрыто')));
+    assert.deepEqual((await run(main, 'SELECT id FROM transactions_fixture')).rows, [['1']]);
+  } else await run(timed, 'ROLLBACK');
   assert.deepEqual((await run(timed, 'SELECT 42')).rows, [['42']]);
   await timed.close();
-  const connectionId = String((await run(main, 'SELECT CONNECTION_ID()')).rows[0]?.[0]);
+  let connectionId = String((await run(main, 'SELECT CONNECTION_ID()')).rows[0]?.[0]);
   assert.match(connectionId, /^\d+$/);
+  await run(main, 'BEGIN'); await run(main, 'INSERT INTO transactions_fixture VALUES (8)');
   const cancellation = main.createQuery('cancel');
   const running = cancellation.run('SELECT /* LDV_CANCEL */ SLEEP(30)');
   await waitForQuery(connectionId, 'LDV_CANCEL'); await cancellation.cancel();
-  assert.equal((await running).state, 'CANCELED');
+  const canceled = await running;
+  assert.equal(canceled.state, 'CANCELED');
+  if (engine === 'mysql') {
+    assert.equal(canceled.inTransaction, false);
+    assert.ok(canceled.warnings.some(message => message.includes('соединение закрыто')));
+  } else await run(main, 'ROLLBACK');
+  assert.deepEqual((await run(main, 'SELECT id FROM transactions_fixture')).rows, [['1']]);
   assert.deepEqual((await run(main, 'SELECT 43')).rows, [['43']]);
-  passed('query timeout and explicit cancellation interrupt server work; next query succeeds');
+  const afterCancelId = String((await run(main, 'SELECT CONNECTION_ID()')).rows[0]?.[0]);
+  if (engine === 'mysql') assert.notEqual(afterCancelId, connectionId);
+  connectionId = afterCancelId;
+  passed('query timeout/cancel, transaction cleanup and next query; MySQL replaces the poisoned connection');
 
   await run(main, 'BEGIN'); await run(main, 'INSERT INTO transactions_fixture VALUES (7)');
   const interrupted = main.createQuery('network-interrupted').run('SELECT /* LDV_DISCONNECT */ SLEEP(30)');
