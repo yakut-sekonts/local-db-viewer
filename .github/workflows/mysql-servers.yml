@@ -1,0 +1,74 @@
+name: MySQL and MariaDB JDBC integration
+on:
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  mysql:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - server: mysql-8.4
+            engine: mysql
+            image: mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
+            health: mysqladmin ping -h 127.0.0.1 --silent
+          - server: mariadb-10.11
+            engine: mariadb
+            image: mariadb:10.11@sha256:7db29378d4fdab73f8123bbc2b48905c90d1a4b00cf848b028f1e81e623257f2
+            health: healthcheck.sh --connect --innodb_initialized
+          - server: mariadb-11.4
+            engine: mariadb
+            image: mariadb:11.4@sha256:1292844148b311e4ed4300022a996d39083f415a963e970cf47cad1b3b18e3a6
+            health: healthcheck.sh --connect --innodb_initialized
+    services:
+      database:
+        image: ${{ matrix.image }}
+        env:
+          MYSQL_ROOT_PASSWORD: fixture-root-only
+          MYSQL_DATABASE: ldv_fixture
+          MYSQL_USER: ldv_fixture
+          MYSQL_PASSWORD: fixture-jdbc-only
+          MARIADB_ROOT_PASSWORD: fixture-root-only
+          MARIADB_DATABASE: ldv_fixture
+          MARIADB_USER: ldv_fixture
+          MARIADB_PASSWORD: fixture-jdbc-only
+        ports: ['3306/tcp']
+        options: >-
+          --health-cmd "${{ matrix.health }}"
+          --health-interval 5s --health-timeout 5s --health-retries 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: python scripts/prepare-runtime.py --jars-only
+      - run: npm run build:jdbc
+      - name: Verify JDBC against a real disposable database
+        run: node --import tsx tests/mysql-servers.ts
+        env:
+          LDV_MYSQL_SERVER_TEST: '1'
+          LDV_MYSQL_ENGINE: ${{ matrix.engine }}
+          LDV_MYSQL_SERVER: ${{ matrix.server }}
+          LDV_MYSQL_IMAGE: ${{ matrix.image }}
+          LDV_MYSQL_PORT: ${{ job.services.database.ports[3306] }}
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: jdbc-${{ matrix.server }}
+          path: test-artifacts/mysql-server-results.json
+          if-no-files-found: warn
+          retention-days: 7

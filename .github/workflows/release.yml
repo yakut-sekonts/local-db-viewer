@@ -37,6 +37,8 @@ jobs:
           retention-days: 14
   ddl:
     uses: ./.github/workflows/ddl-catalog.yml
+  mysql:
+    uses: ./.github/workflows/mysql-servers.yml
   build:
     strategy:
       fail-fast: false
@@ -163,7 +165,7 @@ jobs:
 
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build, ddl, sources]
+    needs: [build, ddl, mysql, sources]
     runs-on: ubuntu-latest
     permissions:
       contents: write
