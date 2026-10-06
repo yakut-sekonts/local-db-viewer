@@ -35,3 +35,9 @@ Push и pull request запускают `.github/workflows/ci.yml`. Релиз �
 Java получает `-Dstdout.encoding=windows-1252`: проверяется, что JSON-протокол явно использует UTF-8. Это воспроизведение условия кодировки, а не запуск живых MySQL/MariaDB на Windows. Упакованное приложение, JDBC runtime, Fuses, установка и обновление отдельно проверяются на настоящих Windows x64 и macOS ARM64 runners.
 
 `mysql-server-results.json` сохраняется в artifacts `jdbc-mysql-8.4`, `jdbc-mariadb-10.11` и `jdbc-mariadb-11.4`, включая завершённые проверки и ошибку при падении. Обновление digest образов требует повторного прогона всех трёх вариантов. Локальная установка Docker для обычной сборки IDE не нужна.
+
+## Проверенный выпуск 0.18.1
+
+[Push CI](https://github.com/yakut-sekonts/local-db-viewer/actions/runs/37440148772) и [release CI](https://github.com/yakut-sekonts/local-db-viewer/actions/runs/37442700476) завершились успешно. MySQL 8.4.11 с Connector/J 26.7.0 и MariaDB 10.11.19/11.4.13 с Connector/J 3.5.10 прошли все 11 проверок каждый, включая чтение результата примерно 117 MiB при heap 48 MiB. Точные версии драйверов сохранены в отчётах CI.
+
+Для [опубликованного релиза](https://github.com/yakut-sekonts/local-db-viewer/releases/tag/v0.18.1) проверены анонимная доступность установщиков и исходников, соответствие SHA256SUMS хешам GitHub и обе blockmap. Упакованные Windows x64 и macOS ARM64 прошли desktop/JDBC/Fuses-проверки и реальные установки тестовых обновлений 0.18.1 → 0.18.2 и 0.18.2-beta.2 с сохранением профиля и SQL. Stable проверяет восстановление установщика по дельте, Beta — полную загрузку; Windows также подтверждает перезапуск в том же каталоге с кириллицей. Эти целевые версии — локальные fixtures CI, а не дополнительные опубликованные релизы.
