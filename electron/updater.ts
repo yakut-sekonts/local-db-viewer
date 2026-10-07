@@ -7,6 +7,7 @@ import { latestRelease, releaseList, driverCatalog, selectRelease, selectNewestR
 import { downloadUpdate } from './update-delta';
 import type { UpdateState, UpdateChannel } from '../src/updates';
 import { installState } from './update-install-state';
+import { externalOperation, type NetworkPolicy } from './network-policy';
 
 interface StoredSettings { repository: string; automatic: boolean; channel: UpdateChannel; encryptedToken?: string }
 interface Encryption { encrypt(value: string): string; decrypt(value: string): string }
@@ -18,7 +19,7 @@ export class Updater {
   private busy = false;
   private timer?: ReturnType<typeof setInterval>;
   constructor(private directory: string, private version: string, private encryption: Encryption,
-    private notify: (value: UpdateState) => void, private installer: (path: string, version: string) => Promise<void>, private fetchUpdate: UpdateFetch) {
+    private notify: (value: UpdateState) => void, private installer: (path: string, version: string) => Promise<void>, private fetchUpdate: UpdateFetch, private network?: NetworkPolicy) {
     this.status = { currentVersion: version, phase: 'unconfigured', settings: { repository: '', automatic: true, channel: 'stable', hasToken: false } };
   }
   async initialize(defaultRepository = ''): Promise<void> {
@@ -36,12 +37,12 @@ export class Updater {
       if (defaultRepository) this.settings.repository = validRepository(defaultRepository);
     }
     this.publish({ phase: this.configured() ? 'idle' : 'unconfigured' });
-    this.timer = setInterval(() => { if (this.settings.automatic && this.configured() && !this.busy && this.status.phase !== 'ready') void this.check().catch(() => {}); }, 15 * 60 * 1000);
+    this.timer = setInterval(() => { if (this.network?.allowed() !== false && this.settings.automatic && this.configured() && !this.busy && this.status.phase !== 'ready') void this.check().catch(() => {}); }, 15 * 60 * 1000);
     this.timer.unref();
-    if (this.settings.automatic && this.configured()) void this.check().catch(() => {});
+    if (this.network?.allowed() !== false && this.settings.automatic && this.configured()) void this.check().catch(() => {});
   }
   readDriverCatalog(): Promise<unknown> {
-    return driverCatalog(this.settings.repository || 'yakut-sekonts/local-db-viewer', this.token(), this.fetchUpdate);
+    return externalOperation(this.network, () => driverCatalog(this.settings.repository || 'yakut-sekonts/local-db-viewer', this.token(), this.fetchUpdate));
   }
   dispose(): void { clearInterval(this.timer); }
   state(): UpdateState { return structuredClone(this.status); }
@@ -67,7 +68,8 @@ export class Updater {
       return this.publish({ phase: this.configured() ? 'idle' : 'unconfigured', error: undefined, version: undefined, notes: undefined, progress: undefined, transfer: undefined, checkedAt: undefined });
     } finally { this.busy = false; }
   }
-  async check(): Promise<UpdateState> {
+  check(): Promise<UpdateState> { return externalOperation(this.network, () => this.checkOnline()); }
+  private async checkOnline(): Promise<UpdateState> {
     if (this.busy) return this.state();
     if (!this.configured()) return this.publish({ phase: 'unconfigured' });
     if (this.downloaded && this.release) return this.publish({ phase: 'ready' });
@@ -80,7 +82,8 @@ export class Updater {
     } catch (error) { return this.publish({ phase: 'error', error: (error as Error).message }); }
     finally { this.busy = false; }
   }
-  async download(): Promise<UpdateState> {
+  download(): Promise<UpdateState> { return externalOperation(this.network, () => this.downloadOnline()); }
+  private async downloadOnline(): Promise<UpdateState> {
     if (this.busy) throw new Error('Обновление уже выполняется.');
     if (!this.release || !this.configured()) throw new Error('Сначала проверьте наличие новой версии.');
     this.busy = true; this.publish({ phase: 'downloading', progress: 0, transfer: undefined, error: undefined });

@@ -109,6 +109,7 @@ export interface DesktopAPI {
   ssh: { fingerprint(host: string, port: number): Promise<string> };
   drivers: import('./drivers').DriversAPI;
   updates: import('./updates').UpdateAPI;
+  network: import('./network').NetworkAPI;
   profiles: {
     list(): Promise<Profile[]>;
     save(profile: ProfileDraft): Promise<Profile>;

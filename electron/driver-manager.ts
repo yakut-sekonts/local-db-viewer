@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { DRIVERS, compareDriverVersions, driverDefinition, type DriverCatalog, type DriverFile, type DriverInstallation, type DriverRelease, type DriversState, type DriverStatus, type DriverUpdateSource } from '../src/drivers';
 import { updateNetworkError, type UpdateFetch } from './update-source';
 import { driverFeedRelease, fetchDriverFeedFile, readDriverFeed, validateDriverFeed, validateDriverSource, validateFeedAdvance, type SavedDriverSource } from './driver-feed';
+import { externalOperation, type NetworkPolicy } from './network-policy';
 
 const CENTRAL = 'https://repo.maven.apache.org/maven2/';
 const SHA = /^[a-f0-9]{64}$/;
@@ -44,7 +45,7 @@ export class DriverManager {
   private verified = new Map<string, string>();
   private queue: Promise<unknown> = Promise.resolve();
   constructor(private directory: string, private bundled: Record<string, DriverInstallation>, initial: unknown,
-    private fetchUpdate: UpdateFetch, private fetchCatalog: () => Promise<unknown>, private probe: (id: string, paths: string[], driverClass?: string) => Promise<void>, private notify: (state: DriversState) => void) {
+    private fetchUpdate: UpdateFetch, private fetchCatalog: () => Promise<unknown>, private probe: (id: string, paths: string[], driverClass?: string) => Promise<void>, private notify: (state: DriversState) => void, private network?: NetworkPolicy) {
     this.catalog = validateDriverCatalog(initial);
   }
   async initialize(): Promise<void> {
@@ -81,8 +82,8 @@ export class DriverManager {
     } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') this.error = 'Не удалось прочитать настройки драйверов. Встроенные драйверы доступны.'; }
     try { this.catalog = validateDriverCatalog(JSON.parse(await readFile(join(this.directory, 'catalog.json'), 'utf8'))); } catch { /* Keep the bundled catalog when offline or cache is invalid. */ }
     this.publish();
-    this.timer = setInterval(() => { if (this.settings.automatic) void this.check(); }, 60 * 60 * 1000); this.timer.unref();
-    if (this.settings.automatic) void this.check();
+    this.timer = setInterval(() => { if (this.network?.allowed() !== false && this.settings.automatic) void this.check().catch(() => {}); }, 60 * 60 * 1000); this.timer.unref();
+    if (this.network?.allowed() !== false && this.settings.automatic) void this.check().catch(() => {});
   }
   isBusy(): boolean { return this.installing || !!this.configuring; }
   dispose(): void { clearInterval(this.timer); }
@@ -111,7 +112,10 @@ export class DriverManager {
     this.queue = task.catch(() => {}); return task;
   }
   automatic(enabled: boolean): Promise<void> { if (typeof enabled !== 'boolean') throw new Error('Некорректная настройка.'); return this.change(settings => { settings.automatic = enabled; }); }
-  async configureSource(id: string, input: DriverUpdateSource | null): Promise<void> {
+  configureSource(id: string, input: DriverUpdateSource | null): Promise<void> {
+    return input === null ? this.saveSource(id, input) : externalOperation(this.network, () => this.saveSource(id, input));
+  }
+  private async saveSource(id: string, input: DriverUpdateSource | null): Promise<void> {
     driverDefinition(id);
     if (this.checking || this.isBusy()) throw new Error('Дождитесь проверки или установки драйверов.');
     this.configuring = id; this.publish();
@@ -127,7 +131,8 @@ export class DriverManager {
       this.sourceErrors.delete(id); this.progress.delete(id);
     } finally { this.configuring = undefined; this.publish(); }
   }
-  async check(): Promise<DriversState> {
+  check(): Promise<DriversState> { return externalOperation(this.network, () => this.checkOnline()); }
+  private async checkOnline(): Promise<DriversState> {
     if (this.checking || this.configuring) return this.state();
     this.checking = true; this.error = undefined; this.publish();
     try {
@@ -208,7 +213,8 @@ export class DriverManager {
       await rename(temporary, path); this.verified.delete(path);
     } finally { await reader.cancel().catch(() => {}); await output?.close().catch(() => {}); await rm(temporary, { force: true }); }
   }
-  async install(id: string): Promise<void> {
+  install(id: string): Promise<void> { return externalOperation(this.network, () => this.installOnline(id)); }
+  private async installOnline(id: string): Promise<void> {
     driverDefinition(id); if (this.isBusy()) throw new Error('Дождитесь установки или настройки другого драйвера.');
     const source = this.settings.sources?.[id];
     const release = source ? (source.manifest ? driverFeedRelease(source.manifest) : undefined) : this.catalog.drivers[id];

@@ -23,6 +23,7 @@ import { MAX_CA_BYTES, validateCertificate, validateSSL } from './tls';
 import { loadSchema, RelationStore, validateRelation } from './schema';
 import { Updater } from './updater';
 import { fetchUpdate } from './update-transport';
+import { NetworkPolicy } from './network-policy';
 import { installUpdate } from './install-update';
 import { confirmUpdateStartup } from './update-install-state';
 import { validateJdbc } from './jdbc-config';
@@ -54,6 +55,7 @@ let relations: RelationStore;
 let updater: Updater;
 let drivers: DriverManager;
 let driversReady: Promise<void>;
+let network: NetworkPolicy;
 let installingUpdate = false;
 let pendingDatabaseOperations = 0;
 const openingSessions = new Set<string>();
@@ -111,7 +113,7 @@ function handle(name: string, fn: (...args: any[]) => unknown): void {
     if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || event.senderFrame.url !== pathToFileURL(entry).href) {
       throw new Error('Недоверенный IPC sender.');
     }
-    const databaseOperation = ['sources:load', 'ddl:preview', 'ddl:write-preview', 'ddl:write-file', 'query:run', 'profiles:test', 'metadata', 'schema:load', 'jdbc:properties', 'jdbc:preview', 'jdbc:browse', 'ssh:fingerprint', 'drivers:install', 'drivers:import', 'drivers:select', 'drivers:configure-source'].includes(name);
+    const databaseOperation = ['sources:load', 'ddl:preview', 'ddl:write-preview', 'ddl:write-file', 'query:run', 'profiles:test', 'metadata', 'schema:load', 'jdbc:properties', 'jdbc:preview', 'jdbc:browse', 'ssh:fingerprint', 'drivers:install', 'drivers:import', 'drivers:select', 'drivers:configure-source', 'network:configure'].includes(name);
     if (!databaseOperation) return fn(...args);
     if (installingUpdate) throw new Error('Приложение обновляется.');
     pendingDatabaseOperations++;
@@ -119,7 +121,7 @@ function handle(name: string, fn: (...args: any[]) => unknown): void {
   });
 }
 
-void app.whenReady().then(() => {
+void app.whenReady().then(async () => {
   app.setName(productName);
   relations = new RelationStore(join(app.getPath('userData'), 'relationships.json'));
   const encryption = {
@@ -143,6 +145,17 @@ void app.whenReady().then(() => {
   window.webContents.once('did-finish-load', () => { void confirmUpdateStartup(join(app.getPath('userData'), 'updates'), app.getVersion()).catch(() => {}); });
   window.webContents.on('will-navigate', event => event.preventDefault());
   window.webContents.on('will-attach-webview', event => event.preventDefault());
+  network = new NetworkPolicy(join(app.getPath('userData'), 'network-settings.json'), value => {
+    if (!window.isDestroyed()) window.webContents.send('network:change', value);
+  });
+  // Load the policy before either manager can issue startup checks.
+  await network.initialize();
+  const externalFetch = network.guard(fetchUpdate);
+  handle('network:state', () => network.state());
+  handle('network:configure', mode => {
+    if (installingUpdate) throw new Error('Приложение обновляется.');
+    return network.configure(mode);
+  });
   updater = new Updater(join(app.getPath('userData'), 'updates'), app.getVersion(), encryption,
     value => { if (!window.isDestroyed()) window.webContents.send('updates:change', value); },
     async (path, version) => {
@@ -153,17 +166,17 @@ void app.whenReady().then(() => {
         for (const id of [...sessions.keys()]) await release(id);
         await window.webContents.session.flushStorageData();
       }); } catch (error) { installingUpdate = false; throw error; }
-    }, fetchUpdate);
+    }, externalFetch, network);
   handle('updates:state', () => updater.state());
   handle('updates:configure', input => updater.configure(input));
   handle('updates:check', () => updater.check());
   handle('updates:download', () => updater.download());
   handle('updates:install', () => updater.install());
-  drivers = new DriverManager(join(app.getPath('userData'), 'drivers'), bundledDrivers(), driverCatalogLock, fetchUpdate,
+  drivers = new DriverManager(join(app.getPath('userData'), 'drivers'), bundledDrivers(), driverCatalogLock, externalFetch,
     () => updater.readDriverCatalog(), async (id, paths, driverClass) => {
       const driver = driverDefinition(id);
       await inspectJdbc({ id: 'driver-probe', name: driver.name, engine: 'jdbc', endpoint: driver.url, user: '', auth: 'none', tls: false, catalog: '', schema: '', jdbc: { driverId: id, driverClass }, driverClasspath: paths }, { kind: 'probe', classOnly: !!driverClass });
-    }, value => { if (!window.isDestroyed()) window.webContents.send('drivers:change', value); });
+    }, value => { if (!window.isDestroyed()) window.webContents.send('drivers:change', value); }, network);
   driversReady = readFile(join(process.resourcesPath, 'update-config.json'), 'utf8').then(value => JSON.parse(value).repository ?? '').catch(() => '')
     .then(repository => updater.initialize(repository)).then(() => drivers.initialize());
   handle('drivers:state', async () => { await driversReady; return drivers.state(); });
@@ -427,6 +440,7 @@ app.on('before-quit', event => {
   exiting = true;
   updater?.dispose();
   drivers?.dispose();
+  network?.dispose();
   event.preventDefault();
   const shutdownTimeout = setTimeout(() => { void sessionPool.abortAll().finally(() => app.exit(0)); }, 20000);
   void (async () => {

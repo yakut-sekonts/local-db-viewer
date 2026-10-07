@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { DesktopAPI, QuerySnapshot } from '../src/shared';
 import type { DriversState } from '../src/drivers';
 import type { UpdateState } from '../src/updates';
+import type { NetworkState } from '../src/network';
 
 async function invoke(channel: string, ...args: unknown[]): Promise<any> {
   try { return await ipcRenderer.invoke(channel, ...args); }
@@ -9,6 +10,13 @@ async function invoke(channel: string, ...args: unknown[]): Promise<any> {
 }
 
 const api: DesktopAPI = {
+  network: {
+    state: () => invoke('network:state'), configure: mode => invoke('network:configure', mode),
+    onChange: listener => {
+      const handler = (_: Electron.IpcRendererEvent, state: NetworkState) => listener(state);
+      ipcRenderer.on('network:change', handler); return () => ipcRenderer.removeListener('network:change', handler);
+    },
+  },
   sources: { load: input => invoke('sources:load', input) },
   ddl: { list: () => invoke('ddl:list'), chooseDirectory: () => invoke('ddl:directory'), save: value => invoke('ddl:save', value), remove: id => invoke('ddl:remove', id), files: id => invoke('ddl:files', id), writeFile: (id, file, sql, hash) => invoke('ddl:write-file', id, file, sql, hash), preview: id => invoke('ddl:preview', id), writePreview: (token, files) => invoke('ddl:write-preview', token, files), index: id => invoke('ddl:index', id) },
   jdbc: { properties: profile => invoke('jdbc:properties', profile), preview: input => invoke('jdbc:preview', input), browse: (profile, input) => invoke('jdbc:browse', profile, input) },

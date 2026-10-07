@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { open, rename, rm } from 'node:fs/promises';
 import { compareReleaseVersions, parseReleaseVersion } from '../src/release-version';
 import type { UpdateChannel } from '../src/updates';
+import { NETWORK_BLOCKED_CODE, NETWORK_BLOCKED_MESSAGE } from '../src/network';
 
 export interface ReleaseAsset { id: number; name: string; size: number; digest: string }
 export interface UpdateRelease { version: string; notes: string; asset: ReleaseAsset; blockmap?: ReleaseAsset }
@@ -79,6 +80,7 @@ export function updateNetworkError(error: unknown, hostname: string): Error {
   const knownCode = /\b(ERR_[A-Z_]+|UND_ERR_CONNECT_TIMEOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|CERT_HAS_EXPIRED|DEPTH_ZERO_SELF_SIGNED_CERT|SELF_SIGNED_CERT_IN_CHAIN|UNABLE_TO_VERIFY_LEAF_SIGNATURE|UNABLE_TO_GET_ISSUER_CERT_LOCALLY)\b/;
   let code = '';
   for (let current: any = error, depth = 0; current && depth < 5; current = current.cause, depth++) {
+    if (current.code === NETWORK_BLOCKED_CODE) return Object.assign(new Error(NETWORK_BLOCKED_MESSAGE), { code: NETWORK_BLOCKED_CODE });
     code = `${current.code ?? ''} ${current.message ?? ''}`.match(knownCode)?.[0] ?? '';
     if (code) break;
     if (current.name === 'TimeoutError' || current.name === 'AbortError') code = 'ETIMEDOUT';

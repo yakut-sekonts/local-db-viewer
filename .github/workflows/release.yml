@@ -94,6 +94,7 @@ jobs:
             export LOCAL_DB_VIEWER_RESOURCES="$GITHUB_WORKSPACE/release/mac-arm64/Local DB Viewer.app/Contents/Resources"
             node scripts/build-licenses.mjs --resources "$LOCAL_DB_VIEWER_RESOURCES"
             node tests/licenses-desktop.mjs
+            node tests/network-policy-desktop.mjs
             node tests/update-channels-desktop.mjs
             node tests/jdbc-runtime.mjs
             node tests/connection-timeout.mjs
@@ -124,6 +125,7 @@ jobs:
             LDV_UPDATE_BETA=1 node tests/update-install-windows.mjs
             node scripts/build-licenses.mjs --resources "$LOCAL_DB_VIEWER_RESOURCES"
             node tests/licenses-desktop.mjs
+            node tests/network-policy-desktop.mjs
             node tests/update-channels-desktop.mjs
             node tests/connection-timeout-desktop.mjs
             node tests/multiple-results-runtime.mjs

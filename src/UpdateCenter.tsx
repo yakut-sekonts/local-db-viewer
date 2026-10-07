@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bell, Download, RefreshCw, X } from 'lucide-react';
 import type { UpdateState, UpdateChannel } from './updates';
+import { useNetwork } from './NetworkCenter';
 
 export function UpdateCenter({ beforeRestart }: { beforeRestart(): void }) {
+  const restricted = useNetwork().mode === 'database-only';
   const [state, setState] = useState<UpdateState>();
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState('');
@@ -29,7 +31,7 @@ export function UpdateCenter({ beforeRestart }: { beforeRestart(): void }) {
   return <>
     <button className={`update-indicator ${available ? 'has-update' : ''}`} aria-label="Обновления Local DB Viewer" onClick={show}><Bell size={15} />{state?.currentVersion ?? '…'}{available && <span className="update-dot" />}</button>
     {installError && !open && <aside className="update-toast" role="alert"><div><strong>Ошибка установки обновления</strong><button className="icon-button" aria-label="Скрыть ошибку обновления" onClick={() => setDismissedError(state!.installationError!)}><X size={14} /></button></div><p>{state?.installationError}</p><button className="button secondary" onClick={show}>Открыть обновления</button></aside>}
-    {available && !installError && state.version !== dismissed && !open && <aside className="update-toast" role="status">
+    {available && !restricted && !installError && state.version !== dismissed && !open && <aside className="update-toast" role="status">
       <div><Download size={18} /><strong>Доступна Local DB Viewer {state.version}</strong><button className="icon-button" aria-label="Скрыть уведомление об обновлении" onClick={() => setDismissed(state.version!)}><X size={14} /></button></div>
       <p>{state.phase === 'downloading' ? `Загрузка ${state.progress ?? 0}%` : 'Установите новую версию с сохранением подключений и SQL-консолей.'}</p>
       <button className="button primary" onClick={show}>Посмотреть обновление</button>
@@ -37,6 +39,7 @@ export function UpdateCenter({ beforeRestart }: { beforeRestart(): void }) {
     {open && <dialog ref={dialog} className="connection-dialog update-dialog" onCancel={event => { if (state?.phase === 'installing') event.preventDefault(); else setOpen(false); }}>
       <div className="dialog-heading"><div><h2>Обновления Local DB Viewer</h2><p>Установлена версия {state?.currentVersion}</p></div><button className="icon-button" aria-label="Закрыть обновления" disabled={state?.phase === 'installing'} onClick={() => setOpen(false)}><X size={18} /></button></div>
       <div className="dialog-body">
+        {restricted && <p role="status">Режим «Только БД»: проверки и загрузки отключены. Настройки можно сохранить; уже загруженное обновление можно установить.</p>}
         {state?.version && <><h3>Версия {state.version}</h3><pre className="release-notes">{state.notes || 'Новая версия Local DB Viewer.'}</pre></>}
         {state?.phase === 'idle' && state.checkedAt && <p>Для выбранного канала нет версии новее установленной.</p>}
         <p>Канал: {state?.settings.channel === 'beta' ? 'Beta — стабильные и тестовые версии' : 'Stable — стабильные версии'}</p>
@@ -57,13 +60,13 @@ export function UpdateCenter({ beforeRestart }: { beforeRestart(): void }) {
           <label>Личный токен GitHub (необязательно)<input type="password" autoComplete="off" placeholder={state?.settings.hasToken ? 'Сохранён · оставьте пустым, чтобы сохранить' : 'Для приватного репозитория'} value={token} disabled={busy} onChange={event => setToken(event.target.value)} /><small>Для публичного репозитория токен не нужен. Сохранённый токен можно удалить кнопкой ниже. Токен хранится зашифрованным только на этом устройстве.</small></label>
           <small>Обновления используют системные настройки proxy и проверку TLS-сертификатов.</small>
           <label className="checkbox-row"><input type="checkbox" checked={automatic} disabled={busy} onChange={event => setAutomatic(event.target.checked)} />Проверять при запуске и каждые 15 минут</label>
-          <button className="button secondary" disabled={busy} onClick={() => void perform(async () => { await window.studio.updates.configure({ repository, automatic, channel, token: token || undefined }); setToken(''); setEditing(false); await window.studio.updates.check(); })}>Сохранить и проверить</button>
+          <button className="button secondary" disabled={busy} onClick={() => void perform(async () => { await window.studio.updates.configure({ repository, automatic, channel, token: token || undefined }); setToken(''); setEditing(false); if (!restricted) await window.studio.updates.check(); })}>{restricted ? 'Сохранить' : 'Сохранить и проверить'}</button>
           {state?.settings.hasToken && <button className="button secondary" disabled={busy} onClick={() => void perform(() => window.studio.updates.configure({ repository, automatic, channel, token: '' }))}>Удалить токен с устройства</button>}
         </div>}
         {state?.installationError && <div className="form-message error" role="alert">{state.installationError}</div>}
         {(error || state?.error) && <div className="form-message error" role="alert">{error || state?.error}</div>}
       </div>
-      <div className="dialog-footer"><button className="button secondary" disabled={busy || !state?.settings.repository} onClick={() => void perform(() => window.studio.updates.check())}><RefreshCw size={14} className={state?.phase === 'checking' ? 'spin' : ''} />Проверить обновления</button><div className="spacer" />{state?.phase === 'available' && <button className="button primary" onClick={() => void perform(update)}><Download size={15} />Обновить и перезапустить</button>}{state?.phase === 'ready' && <button className="button primary" onClick={() => void perform(restart)}>Перезапустить и обновить</button>}</div>
+      <div className="dialog-footer"><button className="button secondary" disabled={restricted || busy || !state?.settings.repository} onClick={() => void perform(() => window.studio.updates.check())}><RefreshCw size={14} className={state?.phase === 'checking' ? 'spin' : ''} />Проверить обновления</button><div className="spacer" />{state?.phase === 'available' && <button className="button primary" disabled={restricted} onClick={() => void perform(update)}><Download size={15} />Обновить и перезапустить</button>}{state?.phase === 'ready' && <button className="button primary" onClick={() => void perform(restart)}>Перезапустить и обновить</button>}</div>
     </dialog>}
   </>;
 }

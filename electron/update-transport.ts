@@ -18,7 +18,9 @@ export const fetchUpdate: UpdateFetch = (url, options) => new Promise((resolve, 
   const request = net.request({ url, method: 'GET', redirect: options.redirect ?? 'error', cache: 'no-store', credentials: options.credentials ?? 'omit', useSessionCookies: false });
   let body: Readable | undefined;
   let settled = false;
+  const cleanup = () => options.signal?.removeEventListener('abort', abort);
   const fail = (error: Error) => {
+    cleanup();
     if (!settled) { settled = true; reject(error); }
     else body?.destroy(error);
   };
@@ -27,17 +29,24 @@ export const fetchUpdate: UpdateFetch = (url, options) => new Promise((resolve, 
     request.abort();
   };
   request.on('error', fail);
-  request.on('close', () => options.signal?.removeEventListener('abort', abort));
+  // ClientRequest's writable side can emit close immediately after end(),
+  // before response headers. Retain cancellation until the response completes.
   request.on('redirect', (status, _method, location, headers) => {
     if (options.redirect !== 'manual') { fail(new Error('ERR_UNSAFE_REDIRECT')); request.abort(); return; }
     const result = responseHeaders(headers); result.set('location', location);
     settled = true;
+    cleanup();
     resolve(new Response(null, { status, headers: result }));
     request.abort();
   });
   request.on('response', response => {
     // Electron IncomingMessage implements Readable; its typings expose only events.
     body = response as unknown as Readable;
+    if (settled) { body.destroy(); cleanup(); return; }
+    body.once('end', cleanup);
+    body.once('error', cleanup);
+    body.once('close', cleanup);
+    body.once('aborted', () => fail(options.signal?.reason ?? new DOMException('Update response aborted', 'AbortError')));
     const stream = Readable.toWeb(body, { strategy: { highWaterMark: 64 * 1024, size: chunk => chunk.byteLength } }) as ReadableStream<Uint8Array>;
     const result = new Response([204, 205, 304].includes(response.statusCode) ? null : stream, {
       status: response.statusCode, headers: responseHeaders(response.headers),
