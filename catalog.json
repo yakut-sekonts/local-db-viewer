@@ -672,9 +672,9 @@
     "postgres": {
       "files": [
         {
-          "path": "org/postgresql/postgresql/42.7.13/postgresql-42.7.13.jar",
-          "sha256": "6e0e4cc2d8cae902084f8a2b18728b073a6fd9d1f87c9d8bff8f298c18185b93",
-          "size": 1220948
+          "path": "org/postgresql/postgresql/42.7.14/postgresql-42.7.14.jar",
+          "sha256": "73914527305a40cce504b0d3d90b23caf565136912d607ae8ae7c5895512332c",
+          "size": 1221004
         },
         {
           "path": "org/checkerframework/checker-qual/3.55.1/checker-qual-3.55.1.jar",
@@ -682,8 +682,8 @@
           "size": 241885
         }
       ],
-      "key": "4e21dd711f46aa5f7f3b71e8d2217020a11e96fc80e6556dcee83c2d4d1af926",
-      "version": "42.7.13"
+      "key": "dfbde93222a5a6ee917e9b729c40a298fbe60b040c18cf7b69a51080edbcba60",
+      "version": "42.7.14"
     },
     "presto": {
       "files": [
