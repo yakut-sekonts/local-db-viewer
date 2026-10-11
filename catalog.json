@@ -167,9 +167,9 @@
     "firebird": {
       "files": [
         {
-          "path": "org/firebirdsql/jdbc/jaybird/6.0.6/jaybird-6.0.6.jar",
-          "sha256": "b051a1609ec64d0e9609c5bc47d82a2857b60dce47bcef22601842d0c24423d1",
-          "size": 1603780
+          "path": "org/firebirdsql/jdbc/jaybird/6.0.7/jaybird-6.0.7.jar",
+          "sha256": "c0186747e4d56c6083095b722a6da2ae513735c9e6f53c17e48a42f4c4a12158",
+          "size": 1603885
         },
         {
           "path": "org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar",
@@ -177,8 +177,8 @@
           "size": 3819
         }
       ],
-      "key": "f283e3b937a92509bb7f250369228050ff2ce8bd03944d6fc450a443f9f4bcbf",
-      "version": "6.0.6"
+      "key": "38263d24e904ff5b1e75db30bc54f06e1ba18fd3a23d585d064db5968e88582d",
+      "version": "6.0.7"
     },
     "h2": {
       "files": [
