@@ -156,13 +156,13 @@
     "exasol": {
       "files": [
         {
-          "path": "com/exasol/exasol-jdbc/26.2.9/exasol-jdbc-26.2.9.jar",
-          "sha256": "952cba60e9b15daca0bf31dcb021718d32f5c3d5705713ae9a659d3e2764364d",
-          "size": 12444352
+          "path": "com/exasol/exasol-jdbc/26.2.10/exasol-jdbc-26.2.10.jar",
+          "sha256": "91b11bd846b0c447a1e9fed86541bc2c1b4c9272f9a2d0f169e9ff0bca222d19",
+          "size": 9525280
         }
       ],
-      "key": "27f2b9c92616754cf33d26b7639fa151ec86ee6ca2c67f1fcebb409466cc96c4",
-      "version": "26.2.9"
+      "key": "4e8412e6f03e500daf6be7cd8afbf63b0c7c94fe0d7964edf4588c69f9ba414e",
+      "version": "26.2.10"
     },
     "firebird": {
       "files": [
