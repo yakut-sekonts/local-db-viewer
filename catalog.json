@@ -699,13 +699,13 @@
     "redshift": {
       "files": [
         {
-          "path": "com/amazon/redshift/redshift-jdbc42/2.2.9/redshift-jdbc42-2.2.9.jar",
-          "sha256": "08773685fa2ac01becd002f621d4180c6a65026f6e80c3659daba82d023b47e3",
-          "size": 1127526
+          "path": "com/amazon/redshift/redshift-jdbc42/2.3.0/redshift-jdbc42-2.3.0.jar",
+          "sha256": "133009e292b583654c45e37bce15947d4e17a60a5804f730cb8abd22320b4295",
+          "size": 1144117
         }
       ],
-      "key": "f0896934174a9d5e4303f2adee509eeb7ede4c2d6db554a3d61d6839d7da8a20",
-      "version": "2.2.9"
+      "key": "133fb2d115a95a19c9f8b645cd89c22ea75ab6b06ae8ad54344a48e55b93d3d3",
+      "version": "2.3.0"
     },
     "snowflake": {
       "files": [
