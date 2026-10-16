@@ -1170,9 +1170,9 @@
     "ucanaccess": {
       "files": [
         {
-          "path": "io/github/spannm/ucanaccess/5.1.8/ucanaccess-5.1.8.jar",
-          "sha256": "c798411dd2010dc34f999f21a826f00a2d7f5534f671051131422c2612f89d17",
-          "size": 447533
+          "path": "io/github/spannm/ucanaccess/5.2.0/ucanaccess-5.2.0.jar",
+          "sha256": "ed8f33f30b9d08c7dc0bead139180ea70061beea915677ce2fe47e4b7aea2490",
+          "size": 462477
         },
         {
           "path": "org/hsqldb/hsqldb/2.7.4/hsqldb-2.7.4.jar",
@@ -1180,13 +1180,13 @@
           "size": 1662185
         },
         {
-          "path": "io/github/spannm/jackcess/5.1.7/jackcess-5.1.7.jar",
-          "sha256": "854bc38ec2bd934b66bdd222c938ccb52aeac7f02684cb0db78bd0089e67f8a1",
-          "size": 1323251
+          "path": "io/github/spannm/jackcess/5.2.0/jackcess-5.2.0.jar",
+          "sha256": "9451d6f336cfaa82f5af178d5f6668b933cda4f27e261f29a1faa83630f95775",
+          "size": 1359716
         }
       ],
-      "key": "a1071b207b75dddae7285842f1b3b2614a036cf6d15b5d02da9c5ddfe65a4dbb",
-      "version": "5.1.8"
+      "key": "131905397ba6f6ed374ba8d02c7cf853750b63e06f0eae17a7552763a4e6e2f2",
+      "version": "5.2.0"
     },
     "vertica": {
       "files": [
