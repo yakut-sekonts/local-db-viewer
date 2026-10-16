@@ -1159,13 +1159,13 @@
     "trino": {
       "files": [
         {
-          "path": "io/trino/trino-jdbc/483/trino-jdbc-483.jar",
-          "sha256": "518062369fdfa937b35f11aa45276daa31cccaaad3c8c05eb51e674e23a419e3",
-          "size": 10436748
+          "path": "io/trino/trino-jdbc/484/trino-jdbc-484.jar",
+          "sha256": "46476af2968e6f3234e8b22d7e29c26e6d7213ce88ab546a29c4c318c921cd34",
+          "size": 10586075
         }
       ],
-      "key": "db1aed7b4bfaa994e26d5afd4f4383bae29281a8ca239492b56e938abd9aec65",
-      "version": "483"
+      "key": "5a0e5965204d45acddaa0f4bc1e1d073b5d9f6fe78365b3d483de5c90b186f3c",
+      "version": "484"
     },
     "ucanaccess": {
       "files": [
