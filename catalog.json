@@ -623,18 +623,18 @@
     "mysql": {
       "files": [
         {
-          "path": "com/mysql/mysql-connector-j/26.7.0/mysql-connector-j-26.7.0.jar",
-          "sha256": "69084713593a4aa8d07c383619b9639276f08bccf8faf1c562178147d389b1e1",
-          "size": 2613206
+          "path": "com/mysql/mysql-connector-j/26.10.0/mysql-connector-j-26.10.0.jar",
+          "sha256": "cef70caf532833c9ab8f41f74773ce22c08bf503fad215c9c2ee1e9db87e759e",
+          "size": 2618793
         },
         {
-          "path": "com/google/protobuf/protobuf-java/4.31.1/protobuf-java-4.31.1.jar",
-          "sha256": "d60dfe7c68a0d38a248cca96924f289dc7e1966a887ee7cae397701af08575ae",
-          "size": 1873183
+          "path": "com/google/protobuf/protobuf-java/4.36.1/protobuf-java-4.36.1.jar",
+          "sha256": "26434a93561a1a44bf7157b2630fa73a5b4d8df20e94df167bc03fcd14abd7e4",
+          "size": 1795060
         }
       ],
-      "key": "c572f0d0e45954bb4b611dc24f06f3a29793c2906fdf4edbe58162abc43eb234",
-      "version": "26.7.0"
+      "key": "dcc3827c2855e8f3fe7cbdaf928ea706ae07e00d5d9a8e9ffea0ac3a4e411a36",
+      "version": "26.10.0"
     },
     "neo4j": {
       "files": [
