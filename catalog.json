@@ -64,9 +64,9 @@
     "clickhouse": {
       "files": [
         {
-          "path": "com/clickhouse/clickhouse-jdbc/0.10.0/clickhouse-jdbc-0.10.0-all.jar",
-          "sha256": "d83736e24306e11929b0cf81b3306ae903c6f51c735c509ad5680c88640d99ce",
-          "size": 12309579
+          "path": "com/clickhouse/clickhouse-jdbc/0.11.0/clickhouse-jdbc-0.11.0-all.jar",
+          "sha256": "b38cfbe4e18ea39f709d8363f8e3ef9a2706cd75708d5bc3d81ef7d55781c137",
+          "size": 13764698
         },
         {
           "path": "org/slf4j/slf4j-api/2.0.19/slf4j-api-2.0.19.jar",
@@ -74,8 +74,8 @@
           "size": 70246
         }
       ],
-      "key": "8c323a65bc148c1b16ac27251ba13204bfc26a3989ab2c3e633cfccb55e9ce49",
-      "version": "0.10.0"
+      "key": "2f26b1e97cb1ab52d291616d8eeceac4d591f89b03b72f880c72865d5fd64611",
+      "version": "0.11.0"
     },
     "databricks": {
       "files": [
