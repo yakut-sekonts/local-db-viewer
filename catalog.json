@@ -435,13 +435,13 @@
     "mariadb": {
       "files": [
         {
-          "path": "org/mariadb/jdbc/mariadb-java-client/3.5.10/mariadb-java-client-3.5.10.jar",
-          "sha256": "919b8c1c771d9ee3465811462f242c9543ab401e140c64988ddbf1d8abcb18b2",
-          "size": 791739
+          "path": "org/mariadb/jdbc/mariadb-java-client/4.0.0/mariadb-java-client-4.0.0.jar",
+          "sha256": "bb1211dac59ef4c54b7a8ad4755a913d36d2e81b34ca1d4cb9ffa9d5633df01f",
+          "size": 817345
         }
       ],
-      "key": "a0f3e9c2bd0f4a28f9a00a494d8e92945941335ba7343415f8f1f33e466b224b",
-      "version": "3.5.10"
+      "key": "8064aa3fb2e502458f610a0d9581a5a29e98044cca724311f4bd1140492657f0",
+      "version": "4.0.0"
     },
     "mongodb": {
       "files": [
