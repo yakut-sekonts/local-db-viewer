@@ -145,13 +145,13 @@
     "duckdb": {
       "files": [
         {
-          "path": "org/duckdb/duckdb_jdbc/1.5.6.0/duckdb_jdbc-1.5.6.0.jar",
-          "sha256": "04ae3375d7c40dc88dc9bf0014b82ba5e66715564584af4e3abea39c7ba144d3",
-          "size": 85178546
+          "path": "org/duckdb/duckdb_jdbc/2.0.0.0/duckdb_jdbc-2.0.0.0.jar",
+          "sha256": "5170daa90a43296705127ef3c80834ba1cd275ec9d765a9f7eee346ab0087186",
+          "size": 79362050
         }
       ],
-      "key": "3a76ddb469b58c570436f9ca0e47fa64105beda71e0d125b5dfd36686b877e0f",
-      "version": "1.5.6.0"
+      "key": "e2df24a5005384b4efeb067a929cff3c19c8170febd654af9cef9546c37c5389",
+      "version": "2.0.0.0"
     },
     "exasol": {
       "files": [
