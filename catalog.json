@@ -721,9 +721,9 @@
     "spanner": {
       "files": [
         {
-          "path": "com/google/cloud/google-cloud-spanner-jdbc/2.46.0/google-cloud-spanner-jdbc-2.46.0.jar",
-          "sha256": "82853b700346ac5298250cd329564c732cd93a66766d8bd84e758df6ae0509d4",
-          "size": 210176
+          "path": "com/google/cloud/google-cloud-spanner-jdbc/2.47.0/google-cloud-spanner-jdbc-2.47.0.jar",
+          "sha256": "205fae7b7f69c9a4f47c192fc1c062ad0580dcdc68ba7268ca1c35bfe8a20889",
+          "size": 210182
         },
         {
           "path": "com/google/http-client/google-http-client/2.2.0/google-http-client-2.2.0.jar",
@@ -776,24 +776,24 @@
           "size": 345005
         },
         {
-          "path": "com/google/cloud/google-cloud-core-grpc/2.77.0/google-cloud-core-grpc-2.77.0.jar",
-          "sha256": "53a0930a1eb4670c9a7cf297c6ca2bbed011f6b04f68822c6dde88ff3fbf3c48",
-          "size": 16947
+          "path": "com/google/cloud/google-cloud-core-grpc/2.78.0/google-cloud-core-grpc-2.78.0.jar",
+          "sha256": "cfdd048bf35cc948362269e69ca82a931d270895c69944c75520e8fdda792a6f",
+          "size": 16946
         },
         {
-          "path": "com/google/api/gax-grpc/2.87.0/gax-grpc-2.87.0.jar",
-          "sha256": "b6314159e4aab7e0ba6d94635418d4b3119eca51428e4aa50c44722bd1452e16",
-          "size": 164349
+          "path": "com/google/api/gax-grpc/2.88.0/gax-grpc-2.88.0.jar",
+          "sha256": "3441a611680422f1c1084d66ad63a82b9f4716452fbd0465626258ae558460df",
+          "size": 168126
         },
         {
-          "path": "com/google/api/grpc/proto-google-common-protos/2.78.0/proto-google-common-protos-2.78.0.jar",
-          "sha256": "31048b6ce4bf3e68776e3e7adb4c7a133964fa170c135fea0a9d4e09ea33b221",
-          "size": 2830165
+          "path": "com/google/api/grpc/proto-google-common-protos/2.79.0/proto-google-common-protos-2.79.0.jar",
+          "sha256": "3eb5dadb9bcdfbeebf76271bcad7e437e3895889a70c1033e6e9ed0b5ffa0d9b",
+          "size": 2830149
         },
         {
-          "path": "com/google/api/gax/2.87.0/gax-2.87.0.jar",
-          "sha256": "10bde9666f7e7b68a12907b1ba9f82b27b0347dc7d9e21d134791e4e6b83755e",
-          "size": 561326
+          "path": "com/google/api/gax/2.88.0/gax-2.88.0.jar",
+          "sha256": "6ec3dae4452a26a49ff607f95a2d199c7d03bef411cc04ee373408786b8c2344",
+          "size": 574062
         },
         {
           "path": "com/google/protobuf/protobuf-java-util/4.33.6/protobuf-java-util-4.33.6.jar",
@@ -821,14 +821,14 @@
           "size": 7491
         },
         {
-          "path": "com/google/cloud/google-cloud-spanner/6.124.0/google-cloud-spanner-6.124.0.jar",
-          "sha256": "87d0b11a428512fcabeac4b2640bc48c4ce9df34217a5a584b9cd8cebd18f928",
-          "size": 1955738
+          "path": "com/google/cloud/google-cloud-spanner/6.125.0/google-cloud-spanner-6.125.0.jar",
+          "sha256": "1553259011ec6165fcd45541897adff58c79261546cf5014a30952ab20308200",
+          "size": 1959145
         },
         {
-          "path": "com/google/cloud/grpc-gcp/1.17.0/grpc-gcp-1.17.0.jar",
-          "sha256": "b1ef18c32e1d7868d08fcd6980610348cf76ce9d3ed7d96b4ce769e18b200142",
-          "size": 201241
+          "path": "com/google/cloud/grpc-gcp/1.18.0/grpc-gcp-1.18.0.jar",
+          "sha256": "55d6d0187fcbe76bcd60b3c16325eac573dbb262876c1d992e9385a7f0a0c17a",
+          "size": 201244
         },
         {
           "path": "javax/annotation/javax.annotation-api/1.3.2/javax.annotation-api-1.3.2.jar",
@@ -876,14 +876,14 @@
           "size": 74948
         },
         {
-          "path": "com/google/api/grpc/grpc-google-common-protos/2.78.0/grpc-google-common-protos-2.78.0.jar",
-          "sha256": "703c9996cab455493e30d02dc7fecf564dee54de569a13453d6fed6e0e986711",
+          "path": "com/google/api/grpc/grpc-google-common-protos/2.79.0/grpc-google-common-protos-2.79.0.jar",
+          "sha256": "bb6147e07a7882bae79537b2cd8e28a4381a8f07e1892778ed54249c7cb21edf",
           "size": 34446
         },
         {
-          "path": "com/google/api/grpc/proto-google-iam-v1/1.73.0/proto-google-iam-v1-1.73.0.jar",
-          "sha256": "be52dd77ab76333d4a6e46bbe7ffdff5d1c8666e8faa2673dc18aace343a27db",
-          "size": 178150
+          "path": "com/google/api/grpc/proto-google-iam-v1/1.74.0/proto-google-iam-v1-1.74.0.jar",
+          "sha256": "ab8e265242d3ddfea16beaefd68345e13b9f03556fc83882744e0d9baf5b47fd",
+          "size": 178152
         },
         {
           "path": "io/opencensus/opencensus-contrib-grpc-util/0.31.1/opencensus-contrib-grpc-util-0.31.1.jar",
@@ -936,9 +936,9 @@
           "size": 18021
         },
         {
-          "path": "com/fasterxml/jackson/core/jackson-core/2.18.3/jackson-core-2.18.3.jar",
-          "sha256": "056bc4d3e5e53ce821450fa97b3f9e0f8dde125cf6da6884353bb1f09582e1d9",
-          "size": 598026
+          "path": "com/fasterxml/jackson/core/jackson-core/2.22.4/jackson-core-2.22.4.jar",
+          "sha256": "2d30c375cddea9657a1e1ef97547a2694b663b355facb4de53a097782b312d1a",
+          "size": 599548
         },
         {
           "path": "io/opentelemetry/opentelemetry-sdk-extension-autoconfigure-spi/1.62.0/opentelemetry-sdk-extension-autoconfigure-spi-1.62.0.jar",
@@ -946,44 +946,44 @@
           "size": 20581
         },
         {
-          "path": "com/google/cloud/google-cloud-monitoring/3.100.0/google-cloud-monitoring-3.100.0.jar",
-          "sha256": "9f93340ca06c3c13adf6c49686d73c4db9c72f352ad53148e9e58d531c2c2492",
-          "size": 269007
+          "path": "com/google/cloud/google-cloud-monitoring/3.101.0/google-cloud-monitoring-3.101.0.jar",
+          "sha256": "6c5deeb10d059d4a5d57b709fce9c25fb14651ff3e05f2056b5fe0e5bbe48554",
+          "size": 269016
         },
         {
-          "path": "com/google/api/grpc/proto-google-cloud-monitoring-v3/3.100.0/proto-google-cloud-monitoring-v3-3.100.0.jar",
-          "sha256": "87612a30db7e00fe4fe72bc00f6fe4258beed4417bb4d4e766842cddf130c4a7",
-          "size": 2036851
+          "path": "com/google/api/grpc/proto-google-cloud-monitoring-v3/3.101.0/proto-google-cloud-monitoring-v3-3.101.0.jar",
+          "sha256": "7c76da96846785066b012b96bd8a5a2f35abcea58a338dfb63f7ee61ca26752c",
+          "size": 2036879
         },
         {
-          "path": "com/google/api/grpc/proto-google-cloud-spanner-admin-instance-v1/6.124.0/proto-google-cloud-spanner-admin-instance-v1-6.124.0.jar",
-          "sha256": "4b3689d61b8757b6ecc6654e7b7af0ae1d0452e8a5ff01757b387341532b3a95",
-          "size": 619115
+          "path": "com/google/api/grpc/proto-google-cloud-spanner-admin-instance-v1/6.125.0/proto-google-cloud-spanner-admin-instance-v1-6.125.0.jar",
+          "sha256": "9cb81c506c9871129d28223e89e66fec0c48e2bb2642002535c4d28b054b1730",
+          "size": 630614
         },
         {
-          "path": "com/google/api/grpc/proto-google-cloud-spanner-admin-database-v1/6.124.0/proto-google-cloud-spanner-admin-database-v1-6.124.0.jar",
-          "sha256": "dbe47900a8805040256d5c9c481bc30d13a38b541d6265af788ddfd5b09a9103",
-          "size": 788033
+          "path": "com/google/api/grpc/proto-google-cloud-spanner-admin-database-v1/6.125.0/proto-google-cloud-spanner-admin-database-v1-6.125.0.jar",
+          "sha256": "d6939bc591d39612e6fbd19a93f55fb74341f0d14ea4ce88aa2028c621780bcb",
+          "size": 788043
         },
         {
-          "path": "com/google/api/grpc/grpc-google-cloud-spanner-admin-instance-v1/6.124.0/grpc-google-cloud-spanner-admin-instance-v1-6.124.0.jar",
-          "sha256": "b4af29b94e3a00dcc3d81482643c37ee4a2cc32b483becc1d2d4b298d9da96d4",
-          "size": 31033
+          "path": "com/google/api/grpc/grpc-google-cloud-spanner-admin-instance-v1/6.125.0/grpc-google-cloud-spanner-admin-instance-v1-6.125.0.jar",
+          "sha256": "255d3f8cd9d92225be51b8fb9ab75fb92681e1a8ec7b1d1a6d72539ce44cdea1",
+          "size": 31030
         },
         {
-          "path": "com/google/api/grpc/grpc-google-cloud-spanner-v1/6.124.0/grpc-google-cloud-spanner-v1-6.124.0.jar",
-          "sha256": "28016bb2bb5578222098818529baf4d1c89c8ed98a5c8f7ecc53cd7c502f5ef8",
-          "size": 27464
+          "path": "com/google/api/grpc/grpc-google-cloud-spanner-v1/6.125.0/grpc-google-cloud-spanner-v1-6.125.0.jar",
+          "sha256": "2a601730a462766fad42bb7d54b1d11f7039b15b9fc87d80c563da9ed6f5bc6e",
+          "size": 27465
         },
         {
-          "path": "com/google/api/grpc/grpc-google-cloud-spanner-admin-database-v1/6.124.0/grpc-google-cloud-spanner-admin-database-v1-6.124.0.jar",
-          "sha256": "31d9bc175edb93578577ca104b7f518ff22fd3032236cd13587993b5d87c1f2c",
-          "size": 34984
+          "path": "com/google/api/grpc/grpc-google-cloud-spanner-admin-database-v1/6.125.0/grpc-google-cloud-spanner-admin-database-v1-6.125.0.jar",
+          "sha256": "768b118b14b2c2849a94d79d28f182a5d6f49e153e75d2c88a1424855c6d8759",
+          "size": 34981
         },
         {
-          "path": "com/google/api/gax-httpjson/2.87.0/gax-httpjson-2.87.0.jar",
-          "sha256": "4ff68de3b2c15844860c8dd82377c83103196d4a4e01949c2beebfbc77730b0e",
-          "size": 201963
+          "path": "com/google/api/gax-httpjson/2.88.0/gax-httpjson-2.88.0.jar",
+          "sha256": "6a9f429e72f2263b1910aa8e77e8f00860a46271011987997846a198d072007b",
+          "size": 207987
         },
         {
           "path": "io/grpc/grpc-googleapis/1.83.0/grpc-googleapis-1.83.0.jar",
@@ -1031,9 +1031,9 @@
           "size": 255742
         },
         {
-          "path": "org/bouncycastle/bcprov-jdk18on/1.80/bcprov-jdk18on-1.80.jar",
-          "sha256": "e8ad209f8c58d291a37ca9750e9e9fac60596956c983e49dd8282381dd8b3249",
-          "size": 8682747
+          "path": "org/bouncycastle/bcprov-jdk18on/1.85/bcprov-jdk18on-1.85.jar",
+          "sha256": "20af26bf6060bb8005cc2389916812c1e0e998dc48d2ced7131b89461b54cff7",
+          "size": 10321819
         },
         {
           "path": "com/google/crypto/tink/tink/1.16.0/tink-1.16.0.jar",
@@ -1091,9 +1091,9 @@
           "size": 3194
         },
         {
-          "path": "com/google/api/api-common/2.70.0/api-common-2.70.0.jar",
-          "sha256": "18477eead80b20e0c3a747f084d8a0b10cd123d6349b7e989ae176c7854efaf5",
-          "size": 51403
+          "path": "com/google/api/api-common/2.71.0/api-common-2.71.0.jar",
+          "sha256": "ceb13741326ac288e9e901dd12f6ca7966ea33f6c3d1aad5a8c329e1768a9794",
+          "size": 51610
         },
         {
           "path": "com/google/code/findbugs/jsr305/3.0.2/jsr305-3.0.2.jar",
@@ -1101,24 +1101,24 @@
           "size": 19936
         },
         {
-          "path": "com/google/auth/google-auth-library-oauth2-http/1.54.0/google-auth-library-oauth2-http-1.54.0.jar",
-          "sha256": "03cb8e07cd40b20307494b640abb08c0a91d455b96681e55bc7cf817634d91d4",
-          "size": 345087
+          "path": "com/google/auth/google-auth-library-oauth2-http/1.55.0/google-auth-library-oauth2-http-1.55.0.jar",
+          "sha256": "706890a5a8f379bfad93dd68e2ef7cfaa9f4bc7adca4ed30dcbfe2c3fbfcf7f8",
+          "size": 377507
         },
         {
-          "path": "com/google/auth/google-auth-library-credentials/1.54.0/google-auth-library-credentials-1.54.0.jar",
-          "sha256": "47c36c6201c4c0336e0275aecfbba155a46d63aa07d416176a790774c9ecdca9",
+          "path": "com/google/auth/google-auth-library-credentials/1.55.0/google-auth-library-credentials-1.55.0.jar",
+          "sha256": "56e0774ba8a8f5da420c5fa14713aa388ba413aad37495d1dbeebdd585eb61e0",
           "size": 8979
         },
         {
-          "path": "com/google/cloud/google-cloud-core/2.77.0/google-cloud-core-2.77.0.jar",
-          "sha256": "4c966d696939f33970ceec79a2cb00a5004c15da97ae0fb0ec469b8bab7d90a4",
-          "size": 141172
+          "path": "com/google/cloud/google-cloud-core/2.78.0/google-cloud-core-2.78.0.jar",
+          "sha256": "915caffbea50e1a5a8c280d1d30d06318828aee191988c0a5e73c1f4028400b5",
+          "size": 141171
         },
         {
-          "path": "com/google/api/grpc/proto-google-cloud-spanner-v1/6.124.0/proto-google-cloud-spanner-v1-6.124.0.jar",
-          "sha256": "8057123b13e2ea1707d4b977b8b13099e957ffa93a1e82b35844642ce7acf7ff",
-          "size": 1166326
+          "path": "com/google/api/grpc/proto-google-cloud-spanner-v1/6.125.0/proto-google-cloud-spanner-v1-6.125.0.jar",
+          "sha256": "e8c14619254d5ecfab7ddc3e99cdbf55853af54262c638a858d6401948de49b6",
+          "size": 1166328
         },
         {
           "path": "io/opentelemetry/opentelemetry-api/1.62.0/opentelemetry-api-1.62.0.jar",
@@ -1131,8 +1131,8 @@
           "size": 3819
         }
       ],
-      "key": "6994ae816fa81585669f728a8434ff4a8a544bb1bf8c700fe17d08cf2e8ac466",
-      "version": "2.46.0"
+      "key": "6e455732c3edf5da73697995215db93e9562a7eb97ce10a28cee56b0f5a73236",
+      "version": "2.47.0"
     },
     "sqlite": {
       "files": [
