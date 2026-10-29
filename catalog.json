@@ -650,13 +650,13 @@
     "oracle": {
       "files": [
         {
-          "path": "com/oracle/database/jdbc/ojdbc11/23.26.3.0.0/ojdbc11-23.26.3.0.0.jar",
-          "sha256": "764cc3f88454d1be117e155d01ed617467b984c9c68f13090dd6083799d2bb8c",
-          "size": 7779716
+          "path": "com/oracle/database/jdbc/ojdbc11/23.26.4.0.0/ojdbc11-23.26.4.0.0.jar",
+          "sha256": "df977e9291499cd4ceee7d577462c285987dd2ad0216637c0865eb98956a9e6e",
+          "size": 8828929
         }
       ],
-      "key": "33d1e07ec1f5f727d37f597734971d9fcfe28996a299ed1f7d362064c9c5f922",
-      "version": "23.26.3.0.0"
+      "key": "d79c6ae01340d1d844677b15e34a650c4c8f53486b0a94ca7747677f979aa0c9",
+      "version": "23.26.4.0.0"
     },
     "phoenix": {
       "files": [
