@@ -612,13 +612,13 @@
     "mssql": {
       "files": [
         {
-          "path": "com/microsoft/sqlserver/mssql-jdbc/13.6.1.jre11/mssql-jdbc-13.6.1.jre11.jar",
-          "sha256": "4f470d23dfdf187ece2d1f9feb33d9dbd2230051b9c9676456727692a1b97d5e",
-          "size": 1576700
+          "path": "com/microsoft/sqlserver/mssql-jdbc/13.6.2.jre11/mssql-jdbc-13.6.2.jre11.jar",
+          "sha256": "5fbc0a70fe4d1d563d431a41b23f493d68807571f0bb49db0bb1737e83e9161f",
+          "size": 1585109
         }
       ],
-      "key": "56d296c12b80def2e58aba1f58692e8ac158c581b4b967dd4b571929ad274a9c",
-      "version": "13.6.1.jre11"
+      "key": "1b871ca8eefaa4ce7a8085c91b61d431d4d4fc41e5c14dc565ea3b8ab145f96b",
+      "version": "13.6.2.jre11"
     },
     "mysql": {
       "files": [
