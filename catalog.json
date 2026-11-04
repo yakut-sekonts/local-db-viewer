@@ -80,13 +80,13 @@
     "databricks": {
       "files": [
         {
-          "path": "com/databricks/databricks-jdbc/3.4.4/databricks-jdbc-3.4.4.jar",
-          "sha256": "1f2e2c5474f2bfbf914f9647319d0d69d8eeb2b1ebb891b05044d79539a359e7",
-          "size": 42987921
+          "path": "com/databricks/databricks-jdbc/3.4.5/databricks-jdbc-3.4.5.jar",
+          "sha256": "e6e346ef307c9c9b5f269419431880d0fd219b0152ec262162c13b1ba69e48e8",
+          "size": 43079880
         }
       ],
-      "key": "2f278776618f163c709b739c30e5bf9ed3f5ffedb1db10d8b54b6c58c36175a5",
-      "version": "3.4.4"
+      "key": "427d66d91ec896632a2fd1911575de2b35c76f292aaf279d6b373f1994787ad9",
+      "version": "3.4.5"
     },
     "db2": {
       "files": [
@@ -658,13 +658,13 @@
     "presto": {
       "files": [
         {
-          "path": "com/facebook/presto/presto-jdbc/0.299/presto-jdbc-0.299.jar",
-          "sha256": "379376e1fc297afeb43fd1a609252918e7b27610d103cd8251182ab06100487c",
-          "size": 15499389
+          "path": "com/facebook/presto/presto-jdbc/0.300/presto-jdbc-0.300.jar",
+          "sha256": "f1341eef07b50a8933c8ba72232bf08ec237a8b47086ca2bce698eea3247ae14",
+          "size": 15546860
         }
       ],
-      "key": "16ab1c38aaa1fe027cb7a323fd5fe30fdecc3347760e5fb72b513aa89c24a7b0",
-      "version": "0.299"
+      "key": "08ff84adb4de7a5c8b736fe089be16e103e19d44b20f41cb5a5581422d00b24d",
+      "version": "0.300"
     },
     "redshift": {
       "files": [
