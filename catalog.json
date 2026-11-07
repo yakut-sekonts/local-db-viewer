@@ -1118,13 +1118,13 @@
     "teradata": {
       "files": [
         {
-          "path": "com/teradata/jdbc/terajdbc/20.00.00.62/terajdbc-20.00.00.62.jar",
-          "sha256": "e3264b00355f8e4030f21459e9ef635582b2dd91ddf62e0c5cb0f7fbe6873544",
-          "size": 1305372
+          "path": "com/teradata/jdbc/terajdbc/20.00.00.63/terajdbc-20.00.00.63.jar",
+          "sha256": "156f0634c0cbf4020a346ccdbd8cd54891a86e3a766282dfc840b4a55ab70bde",
+          "size": 1309410
         }
       ],
-      "key": "121a6f9722db783731668c0a0c74d19d2ae5af543ff4b2ff2d5062688478d359",
-      "version": "20.00.00.62"
+      "key": "9c5d014dce2a78b588f8d42db968da2c03117f89afa43b206c0d7664c505c1e0",
+      "version": "20.00.00.63"
     },
     "trino": {
       "files": [
