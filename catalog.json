@@ -194,13 +194,13 @@
     "hana": {
       "files": [
         {
-          "path": "com/sap/cloud/db/jdbc/ngdbc/2.30.11/ngdbc-2.30.11.jar",
-          "sha256": "38654a00df1ea9616f9f4cea745f1f8a5a923a1c98acbd10ce4962ba4a2c1fb8",
-          "size": 1588075
+          "path": "com/sap/cloud/db/jdbc/ngdbc/2.30.12/ngdbc-2.30.12.jar",
+          "sha256": "9367dbb9be1a9aeeb019ed5c0205f300a3430a9cade10877f5f79d15cfe63532",
+          "size": 1588079
         }
       ],
-      "key": "0c37cde36c57c881274a3cd936bf02caad09b48eeffc5f547b921ad5c4620287",
-      "version": "2.30.11"
+      "key": "74799e250807a22dc81bbd5088fe2592563ac3147ffb600b1d90841b186624a9",
+      "version": "2.30.12"
     },
     "hive": {
       "files": [
@@ -446,9 +446,9 @@
     "mongodb": {
       "files": [
         {
-          "path": "org/mongodb/mongodb-jdbc/4.0.1/mongodb-jdbc-4.0.1.jar",
-          "sha256": "0faa63b2c7db830d2df4432b71f2f3b1ac6bcc663c332ac6c4baa44126798a7e",
-          "size": 42072250
+          "path": "org/mongodb/mongodb-jdbc/4.0.2/mongodb-jdbc-4.0.2.jar",
+          "sha256": "795469cb8037dbedf69043fde193cb4ff9f1d0e278229fec2bef017884b687ac",
+          "size": 42071789
         },
         {
           "path": "org/mongodb/mongodb-driver-sync/5.14.0/mongodb-driver-sync-5.14.0.jar",
@@ -506,9 +506,9 @@
           "size": 16762
         },
         {
-          "path": "org/apache/commons/commons-lang3/3.21.0/commons-lang3-3.21.0.jar",
-          "sha256": "a2af247ec4db6eb8947e18e23e0433e4871a7c5d0a40e1f92e46ede54ae1defe",
-          "size": 749083
+          "path": "org/apache/commons/commons-lang3/3.22.0/commons-lang3-3.22.0.jar",
+          "sha256": "2ea88052c8662bf51874f4159467ba24b040b22dfd54d2596e11936896c76192",
+          "size": 764703
         },
         {
           "path": "org/apache/commons/commons-text/1.15.0/commons-text-1.15.0.jar",
@@ -516,19 +516,19 @@
           "size": 264873
         },
         {
-          "path": "org/bouncycastle/bcprov-jdk18on/1.86/bcprov-jdk18on-1.86.jar",
-          "sha256": "2af190b300cbb0b35e248ccf5f4a06b6072030aeb3da7a98ec73abe5b4cb371f",
-          "size": 7224011
+          "path": "org/bouncycastle/bcprov-jdk18on/1.87/bcprov-jdk18on-1.87.jar",
+          "sha256": "12d2d3dd82a9ec15e92ec7c7943ee64f6097c6dc12c07e984f1693b77565b9aa",
+          "size": 7337657
         },
         {
-          "path": "org/bouncycastle/bcpkix-jdk18on/1.86/bcpkix-jdk18on-1.86.jar",
-          "sha256": "8d8b41a4b149bdae8d331f059a578870954d1e3ff29f8269a9eb3ee19a7e4ef7",
-          "size": 1341621
+          "path": "org/bouncycastle/bcpkix-jdk18on/1.87/bcpkix-jdk18on-1.87.jar",
+          "sha256": "a44be2660d72ed88673372b8cc2d53a25a5aaf27122fb803ed93f07147536aa1",
+          "size": 1381169
         },
         {
-          "path": "org/bouncycastle/bcutil-jdk18on/1.86/bcutil-jdk18on-1.86.jar",
-          "sha256": "1c268e15f785aafb1e4670d8d6e5f856f69475e96c162dadcd1ff9b350e9139f",
-          "size": 789287
+          "path": "org/bouncycastle/bcutil-jdk18on/1.87/bcutil-jdk18on-1.87.jar",
+          "sha256": "af46dd381553fdc466cd0c18f8bf2144c7dbcb7337eee3e16cab15e96613ddf0",
+          "size": 804361
         },
         {
           "path": "com/samskivert/jmustache/1.15/jmustache-1.15.jar",
@@ -536,9 +536,9 @@
           "size": 85888
         },
         {
-          "path": "com/nimbusds/oauth2-oidc-sdk/11.38.2/oauth2-oidc-sdk-11.38.2.jar",
-          "sha256": "30e63220c15bd93006c557bd0d614bb57a5f00232188693577c222383ea4bbe7",
-          "size": 921011
+          "path": "com/nimbusds/oauth2-oidc-sdk/11.39/oauth2-oidc-sdk-11.39.jar",
+          "sha256": "1bb8f0ae909685b5555b3aa8e239694325df41bc957956575c39bc260b4d286a",
+          "size": 922551
         },
         {
           "path": "com/github/stephenc/jcip/jcip-annotations/1.0-1/jcip-annotations-1.0-1.jar",
@@ -576,8 +576,8 @@
           "size": 813607
         }
       ],
-      "key": "64a99551fc3188c952bcca682f407d287586d4fe45a6886d245583b41255c7dd",
-      "version": "4.0.1"
+      "key": "e0dc0cf63fd2cbc67bc66b32e5aa4bd475d3dfcc7f2eb3bd0a33176db6b9fdcd",
+      "version": "4.0.2"
     },
     "mssql": {
       "files": [
