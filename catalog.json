@@ -446,9 +446,9 @@
     "mongodb": {
       "files": [
         {
-          "path": "org/mongodb/mongodb-jdbc/4.0.2/mongodb-jdbc-4.0.2.jar",
-          "sha256": "795469cb8037dbedf69043fde193cb4ff9f1d0e278229fec2bef017884b687ac",
-          "size": 42071789
+          "path": "org/mongodb/mongodb-jdbc/4.0.3/mongodb-jdbc-4.0.3.jar",
+          "sha256": "ddd85f5dc52a7d24eb98d30bb6593d96534cbcbbbaa833784a51d40bc8403e33",
+          "size": 42079947
         },
         {
           "path": "org/mongodb/mongodb-driver-sync/5.14.0/mongodb-driver-sync-5.14.0.jar",
@@ -576,8 +576,8 @@
           "size": 813607
         }
       ],
-      "key": "e0dc0cf63fd2cbc67bc66b32e5aa4bd475d3dfcc7f2eb3bd0a33176db6b9fdcd",
-      "version": "4.0.2"
+      "key": "d08f18b9e9aa6adf4c55df047fb62cd59946fc82db63a7956088a81b77042dd9",
+      "version": "4.0.3"
     },
     "mssql": {
       "files": [
