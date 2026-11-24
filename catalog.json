@@ -1172,24 +1172,24 @@
     "ydb": {
       "files": [
         {
-          "path": "tech/ydb/jdbc/ydb-jdbc-driver/2.4.1/ydb-jdbc-driver-2.4.1.jar",
-          "sha256": "2d9a5752cc6ca9af419e788a4732ea0cfea176c12e785d3fcef6a499a4053559",
-          "size": 352156
+          "path": "tech/ydb/jdbc/ydb-jdbc-driver/2.4.2/ydb-jdbc-driver-2.4.2.jar",
+          "sha256": "93d1d232642c66b706ceaa3248adabc5ea300e73db6d2a9f8c8643573dc7e82b",
+          "size": 351242
         },
         {
-          "path": "tech/ydb/ydb-sdk-query/2.4.10/ydb-sdk-query-2.4.10.jar",
-          "sha256": "8de3481054ece1f33d949895e09e748997930803ea5fed6206c39ee620a69313",
-          "size": 161275
+          "path": "tech/ydb/ydb-sdk-query/2.4.12/ydb-sdk-query-2.4.12.jar",
+          "sha256": "5acaa131360727e31646413aabc60bfbe9e10335227c9ac84171094649d51cf4",
+          "size": 161277
         },
         {
-          "path": "tech/ydb/ydb-sdk-core/2.4.10/ydb-sdk-core-2.4.10.jar",
-          "sha256": "0f5024124819fe19c49ffed7026154ecc80aef17ec0b3fc72072ed53ba05a5db",
-          "size": 206322
+          "path": "tech/ydb/ydb-sdk-core/2.4.12/ydb-sdk-core-2.4.12.jar",
+          "sha256": "b378efcb13f0cfa692676c7ec6b39eb58056c43ed788ed48ccd83b3dcbe5f1cc",
+          "size": 206325
         },
         {
-          "path": "tech/ydb/ydb-proto-api/1.9.6/ydb-proto-api-1.9.6.jar",
-          "sha256": "b349532412618f98d6a5c719e6fb451379da8f22586d013f24d51b847a0bef0e",
-          "size": 10067559
+          "path": "tech/ydb/ydb-proto-api/1.9.7/ydb-proto-api-1.9.7.jar",
+          "sha256": "f9f7453244e560082d0bdec2772292883af73edb208fdb00afd7b5c79419cfb8",
+          "size": 10076902
         },
         {
           "path": "io/grpc/grpc-stub/1.68.3/grpc-stub-1.68.3.jar",
@@ -1302,19 +1302,19 @@
           "size": 20389
         },
         {
-          "path": "tech/ydb/ydb-sdk-table/2.4.10/ydb-sdk-table-2.4.10.jar",
-          "sha256": "0351da8a4ba28317d88637780fc30a8034ce5fa9256da3411bdf7d6e499b16f7",
-          "size": 393684
+          "path": "tech/ydb/ydb-sdk-table/2.4.12/ydb-sdk-table-2.4.12.jar",
+          "sha256": "b2cc2ab4701c2ef30120088908c713ea20622fa600f84370ba5468e5f7e765a7",
+          "size": 395482
         },
         {
-          "path": "tech/ydb/ydb-sdk-common/2.4.10/ydb-sdk-common-2.4.10.jar",
-          "sha256": "4ea1d656915137691652f277e06fdee9399435c46c4da90e1aae2146874fe4ca",
-          "size": 15780
+          "path": "tech/ydb/ydb-sdk-common/2.4.12/ydb-sdk-common-2.4.12.jar",
+          "sha256": "11a33857378cd58abebfa48a6c17a5f1cf49f2c6997f83a32edf45ebc28438f8",
+          "size": 15782
         },
         {
-          "path": "tech/ydb/ydb-sdk-scheme/2.4.10/ydb-sdk-scheme-2.4.10.jar",
-          "sha256": "7065657792002211e9f2a4acf76e4bf650f9f1a71656b929a3ca625fd426d44e",
-          "size": 14229
+          "path": "tech/ydb/ydb-sdk-scheme/2.4.12/ydb-sdk-scheme-2.4.12.jar",
+          "sha256": "f43b318f6d86104f9e2b47dd12e71b20164cad5364c6c2284a552be1f7c2ad0b",
+          "size": 14231
         },
         {
           "path": "tech/ydb/auth/yc-auth-provider/2.3.2/yc-auth-provider-2.3.2.jar",
@@ -1377,8 +1377,8 @@
           "size": 707499
         }
       ],
-      "key": "ece6af4c150fd217089d5a04eadaf6b2e3f0508c697c8dc0862ae2646ac6e9fe",
-      "version": "2.4.1"
+      "key": "e22e08104564c5e58778917cce44afa581d0cf2a0b681dbad1b8daae38294b6b",
+      "version": "2.4.2"
     }
   },
   "format": 1
